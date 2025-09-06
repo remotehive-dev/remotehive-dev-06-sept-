@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: remotehive-monitoring
+  labels:
+    name: remotehive-monitoring
+    app.kubernetes.io/name: remotehive-monitoring
+    app.kubernetes.io/part-of: remotehive
+    app.kubernetes.io/managed-by: kubectl
+  annotations:
+    description: "RemoteHive monitoring and observability namespace"
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: monitoring-resource-quota
+  namespace: remotehive-monitoring
+spec:
+  hard:
+    requests.cpu: "4"
+    requests.memory: 8Gi
+    limits.cpu: "8"
+    limits.memory: 16Gi
+    persistentvolumeclaims: "10"
+    services: "20"
+    secrets: "10"
+    configmaps: "20"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: monitoring-limit-range
+  namespace: remotehive-monitoring
+spec:
+  limits:
+  - default:
+      cpu: 500m
+      memory: 512Mi
+    defaultRequest:
+      cpu: 100m
+      memory: 128Mi
+    type: Container
+  - default:
+      storage: 10Gi
+    type: PersistentVolumeClaim

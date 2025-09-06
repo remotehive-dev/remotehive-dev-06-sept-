@@ -1,0 +1,512 @@
+# Docker Compose configuration for RemoteHive Production/Staging
+# This file is optimized for production deployments with security, performance, and monitoring
+# Usage: docker-compose -f docker-compose.prod.yml up -d
+
+version: '3.8'
+
+services:
+  # Production Backend API
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+      target: production
+      args:
+        BUILD_DATE: ${BUILD_DATE:-$(date -u +'%Y-%m-%dT%H:%M:%SZ')}
+        VERSION: ${VERSION:-latest}
+        VCS_REF: ${VCS_REF:-$(git rev-parse --short HEAD)}
+    image: ${REGISTRY:-remotehive}/backend:${TAG:-latest}
+    container_name: remotehive-backend-prod
+    restart: unless-stopped
+    environment:
+      # Application settings
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - LOG_LEVEL=info
+      - PYTHONPATH=/app
+      
+      # Database connections
+      - MONGODB_URL=${MONGODB_URL:-mongodb://mongodb:27017/remotehive}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      
+      # Security
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
+      - JWT_ACCESS_TOKEN_EXPIRE_MINUTES=${JWT_ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      - CORS_ORIGINS=${CORS_ORIGINS:-https://remotehive.com,https://admin.remotehive.com}
+      
+      # External services
+      - SMTP_SERVER=${SMTP_SERVER}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USERNAME=${SMTP_USERNAME}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SMTP_USE_TLS=${SMTP_USE_TLS:-true}
+      
+      # Monitoring
+      - SENTRY_DSN=${SENTRY_DSN}
+      - PROMETHEUS_ENABLED=${PROMETHEUS_ENABLED:-true}
+      
+      # File storage
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_S3_BUCKET=${AWS_S3_BUCKET}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+    volumes:
+      - backend_logs:/app/logs
+      - backend_uploads:/app/uploads
+    ports:
+      - "8000:8000"
+    networks:
+      - remotehive-prod
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+
+  # Production Autoscraper Service
+  autoscraper:
+    build:
+      context: ./autoscraper-service
+      dockerfile: Dockerfile
+      target: production
+    image: ${REGISTRY:-remotehive}/autoscraper:${TAG:-latest}
+    container_name: remotehive-autoscraper-prod
+    restart: unless-stopped
+    environment:
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - LOG_LEVEL=info
+      - DATABASE_URL=sqlite:///data/autoscraper.db
+      - BACKEND_API_URL=http://backend:8000
+      - SCRAPING_INTERVAL=${SCRAPING_INTERVAL:-3600}
+    volumes:
+      - autoscraper_data:/app/data
+      - autoscraper_logs:/app/logs
+    ports:
+      - "8001:8001"
+    networks:
+      - remotehive-prod
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # Production Admin Panel
+  admin:
+    build:
+      context: ./remotehive-admin
+      dockerfile: Dockerfile
+      target: production
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.remotehive.com}
+        NEXT_PUBLIC_ENVIRONMENT: production
+    image: ${REGISTRY:-remotehive}/admin:${TAG:-latest}
+    container_name: remotehive-admin-prod
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-https://api.remotehive.com}
+      - NEXT_PUBLIC_ENVIRONMENT=production
+    ports:
+      - "3000:3000"
+    networks:
+      - remotehive-prod
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  # Production Public Website
+  public:
+    build:
+      context: ./remotehive-public
+      dockerfile: Dockerfile
+      target: production
+      args:
+        VITE_API_URL: ${VITE_API_URL:-https://api.remotehive.com}
+        VITE_ENVIRONMENT: production
+    image: ${REGISTRY:-remotehive}/public:${TAG:-latest}
+    container_name: remotehive-public-prod
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - VITE_API_URL=${VITE_API_URL:-https://api.remotehive.com}
+      - VITE_ENVIRONMENT=production
+    ports:
+      - "5173:5173"
+    networks:
+      - remotehive-prod
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5173/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  # Production Celery Workers
+  celery-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+      target: production
+    image: ${REGISTRY:-remotehive}/backend:${TAG:-latest}
+    container_name: remotehive-celery-worker-prod
+    restart: unless-stopped
+    environment:
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - LOG_LEVEL=info
+      - MONGODB_URL=${MONGODB_URL:-mongodb://mongodb:27017/remotehive}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - CELERY_BROKER_URL=${REDIS_URL:-redis://redis:6379/0}
+      - CELERY_RESULT_BACKEND=${REDIS_URL:-redis://redis:6379/0}
+      - SENTRY_DSN=${SENTRY_DSN}
+    volumes:
+      - celery_logs:/app/logs
+    networks:
+      - remotehive-prod
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      celery -A app.tasks.celery_app worker 
+      --loglevel=info 
+      --concurrency=4 
+      --max-tasks-per-child=1000 
+      --time-limit=300 
+      --soft-time-limit=240
+    healthcheck:
+      test: ["CMD", "celery", "-A", "app.tasks.celery_app", "inspect", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+      replicas: 2
+
+  # Production Celery Beat Scheduler
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+      target: production
+    image: ${REGISTRY:-remotehive}/backend:${TAG:-latest}
+    container_name: remotehive-celery-beat-prod
+    restart: unless-stopped
+    environment:
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - LOG_LEVEL=info
+      - MONGODB_URL=${MONGODB_URL:-mongodb://mongodb:27017/remotehive}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - CELERY_BROKER_URL=${REDIS_URL:-redis://redis:6379/0}
+      - CELERY_RESULT_BACKEND=${REDIS_URL:-redis://redis:6379/0}
+    volumes:
+      - celery_beat_data:/app/celerybeat-schedule
+      - celery_logs:/app/logs
+    networks:
+      - remotehive-prod
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A app.tasks.celery_app beat --loglevel=info --pidfile=/tmp/celerybeat.pid
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/celerybeat.pid"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+
+  # Production MongoDB
+  mongodb:
+    image: mongo:7.0
+    container_name: remotehive-mongodb-prod
+    restart: unless-stopped
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USERNAME:-admin}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD}
+      - MONGO_INITDB_DATABASE=${MONGO_DATABASE:-remotehive}
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+      - ./scripts/mongo-init-prod.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+      - ./config/mongod.conf:/etc/mongod.conf:ro
+    ports:
+      - "27017:27017"
+    networks:
+      - remotehive-prod
+    command: mongod --config /etc/mongod.conf
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+
+  # Production Redis
+  redis:
+    image: redis:7-alpine
+    container_name: remotehive-redis-prod
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+      - ./config/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    ports:
+      - "6379:6379"
+    networks:
+      - remotehive-prod
+    command: redis-server /usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # NGINX Load Balancer and Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: remotehive-nginx-prod
+    restart: unless-stopped
+    volumes:
+      - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - nginx_logs:/var/log/nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - remotehive-prod
+    depends_on:
+      - backend
+      - admin
+      - public
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  # Prometheus Monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: remotehive-prometheus-prod
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/prometheus.prod.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/rules:/etc/prometheus/rules:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - remotehive-prod
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.25'
+          memory: 512M
+    profiles:
+      - monitoring
+
+  # Grafana Dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: remotehive-grafana-prod
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel,grafana-worldmap-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3001:3000"
+    networks:
+      - remotehive-prod
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    profiles:
+      - monitoring
+
+# Production volumes with backup labels
+volumes:
+  mongodb_data:
+    driver: local
+    labels:
+      backup: "true"
+      service: "mongodb"
+  mongodb_config:
+    driver: local
+  redis_data:
+    driver: local
+    labels:
+      backup: "true"
+      service: "redis"
+  autoscraper_data:
+    driver: local
+    labels:
+      backup: "true"
+      service: "autoscraper"
+  celery_beat_data:
+    driver: local
+  backend_logs:
+    driver: local
+  autoscraper_logs:
+    driver: local
+  celery_logs:
+    driver: local
+  nginx_logs:
+    driver: local
+  backend_uploads:
+    driver: local
+    labels:
+      backup: "true"
+      service: "backend"
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+# Production network with custom subnet
+networks:
+  remotehive-prod:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/16
+    labels:
+      environment: "production"
+      project: "remotehive"

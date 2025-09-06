@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: remotehive
+  labels:
+    name: remotehive
+    environment: production
+    app: remotehive-platform
+  annotations:
+    description: "RemoteHive job board platform namespace"
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: remotehive-quota
+  namespace: remotehive
+spec:
+  hard:
+    requests.cpu: "8"
+    requests.memory: 16Gi
+    limits.cpu: "16"
+    limits.memory: 32Gi
+    persistentvolumeclaims: "10"
+    services: "20"
+    secrets: "20"
+    configmaps: "20"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: remotehive-limits
+  namespace: remotehive
+spec:
+  limits:
+  - default:
+      cpu: "1"
+      memory: "1Gi"
+    defaultRequest:
+      cpu: "100m"
+      memory: "128Mi"
+    type: Container
+  - default:
+      storage: "10Gi"
+    type: PersistentVolumeClaim

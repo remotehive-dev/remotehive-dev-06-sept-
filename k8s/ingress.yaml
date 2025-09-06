@@ -1,0 +1,239 @@
+# Nginx Ingress Controller Configuration
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: remotehive-ingress
+  namespace: remotehive
+  labels:
+    app: remotehive
+    tier: ingress
+  annotations:
+    # Nginx Ingress Controller
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    
+    # SSL/TLS Configuration
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    
+    # Security Headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      add_header X-Frame-Options "SAMEORIGIN" always;
+      add_header X-Content-Type-Options "nosniff" always;
+      add_header X-XSS-Protection "1; mode=block" always;
+      add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+      add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; media-src 'self'; object-src 'none'; child-src 'self'; frame-ancestors 'self'; form-action 'self'; base-uri 'self';" always;
+    
+    # Rate Limiting
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    
+    # CORS Configuration
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://remotehive.in, https://admin.remotehive.in, https://api.remotehive.in"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
+    
+    # Client Body Size
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    
+    # Timeouts
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+spec:
+  tls:
+  - hosts:
+    - remotehive.in
+    - www.remotehive.in
+    - admin.remotehive.in
+    - api.remotehive.in
+    - autoscraper.remotehive.in
+    secretName: remotehive-tls
+  rules:
+  # Public Website
+  - host: remotehive.in
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: public-website
+            port:
+              number: 80
+  - host: www.remotehive.in
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: public-website
+            port:
+              number: 80
+  
+  # Admin Panel
+  - host: admin.remotehive.in
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: admin-panel
+            port:
+              number: 3000
+  
+  # Backend API
+  - host: api.remotehive.in
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: backend-api
+            port:
+              number: 8000
+  
+  # Autoscraper Service
+  - host: autoscraper.remotehive.in
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: autoscraper-service
+            port:
+              number: 8001
+---
+# Internal Services Ingress (for internal communication)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: remotehive-internal-ingress
+  namespace: remotehive
+  labels:
+    app: remotehive
+    tier: internal-ingress
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+    nginx.ingress.kubernetes.io/rate-limit: "200"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+spec:
+  rules:
+  # Internal API Access
+  - host: internal-api.remotehive.local
+    http:
+      paths:
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: backend-api
+            port:
+              number: 8000
+      - path: /autoscraper
+        pathType: Prefix
+        backend:
+          service:
+            name: autoscraper-service
+            port:
+              number: 8001
+---
+# Certificate Issuer for Let's Encrypt
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+  namespace: remotehive
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: admin@remotehive.in
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+---
+# Certificate Issuer for Let's Encrypt Staging (for testing)
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+  namespace: remotehive
+spec:
+  acme:
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: admin@remotehive.in
+    privateKeySecretRef:
+      name: letsencrypt-staging
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+---
+# Network Policy for Ingress Traffic
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ingress-network-policy
+  namespace: remotehive
+  labels:
+    app: remotehive
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow ingress from nginx-ingress namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 3000
+    - protocol: TCP
+      port: 8000
+    - protocol: TCP
+      port: 8001
+  # Allow internal communication within namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: remotehive
+  egress:
+  # Allow all egress traffic
+  - {}
+---
+# Service Monitor for Prometheus (if using Prometheus for monitoring)
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: remotehive-ingress-monitor
+  namespace: remotehive
+  labels:
+    app: remotehive
+    tier: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: nginx-ingress
+  endpoints:
+  - port: prometheus
+    interval: 30s
+    path: /metrics
+  namespaceSelector:
+    matchNames:
+    - ingress-nginx

@@ -1,0 +1,4 @@
+[2025-08-12 01:07:24] INFO: Starting RemoteHive data migration to Supabase
+[2025-08-12 01:07:24] INFO: ============================================================
+[2025-08-12 01:07:24] INFO: Connected to SQLite database: remotehive.db
+[2025-08-12 01:07:24] ERROR: Failed to connect to Supabase: could not translate host name "db.nwltjjqhdpezreaikxfj.supabase.co" to address: Name or service not known

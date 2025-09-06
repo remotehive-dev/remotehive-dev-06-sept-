@@ -1,0 +1,277 @@
+# Docker Compose configuration for CI/CD testing
+version: '3.8'
+
+services:
+  # Test-specific MongoDB configuration
+  mongodb:
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=password123
+      - MONGO_INITDB_DATABASE=remotehive_test
+    volumes:
+      - mongodb_test_data:/data/db
+      - ./scripts/mongo-init-test.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    command: ["mongod", "--auth", "--bind_ip_all"]
+
+  # Test-specific Redis configuration
+  redis:
+    environment:
+      - REDIS_PASSWORD=redis_password
+    volumes:
+      - redis_test_data:/data
+    command: redis-server --requirepass redis_password --appendonly yes --appendfsync everysec
+
+  # Backend API test configuration
+  backend:
+    image: ${BACKEND_IMAGE:-remotehive-backend:latest}
+    environment:
+      - ENVIRONMENT=test
+      - DEBUG=false
+      - MONGODB_URL=mongodb://admin:password123@mongodb:27017/remotehive_test?authSource=admin
+      - REDIS_URL=redis://:redis_password@redis:6379/1
+      - CELERY_BROKER_URL=redis://:redis_password@redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://:redis_password@redis:6379/1
+      - JWT_SECRET_KEY=test-secret-key-for-ci-cd
+      - JWT_ALGORITHM=HS256
+      - JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
+      - CORS_ORIGINS=["http://localhost:3000","http://localhost:5173"]
+      - ADMIN_EMAIL=admin@remotehive.in
+      - ADMIN_PASSWORD=Ranjeet11$
+      - SMTP_SERVER=mailhog
+      - SMTP_PORT=1025
+      - SMTP_USERNAME=""
+      - SMTP_PASSWORD=""
+      - SMTP_USE_TLS=false
+    depends_on:
+      - mongodb
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Autoscraper service test configuration
+  autoscraper:
+    image: ${AUTOSCRAPER_IMAGE:-remotehive-autoscraper:latest}
+    environment:
+      - ENVIRONMENT=test
+      - DEBUG=false
+      - DATABASE_URL=sqlite:///./test_autoscraper.db
+      - BACKEND_API_URL=http://backend:8000
+      - REDIS_URL=redis://:redis_password@redis:6379/2
+      - MAX_CONCURRENT_JOBS=2
+      - JOB_TIMEOUT=300
+      - RATE_LIMIT_REQUESTS=10
+      - RATE_LIMIT_PERIOD=60
+    volumes:
+      - autoscraper_test_data:/app/data
+    depends_on:
+      - backend
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Admin panel test configuration
+  admin:
+    image: ${ADMIN_IMAGE:-remotehive-admin:latest}
+    environment:
+      - NODE_ENV=test
+      - NEXT_PUBLIC_API_URL=http://backend:8000
+      - NEXT_PUBLIC_AUTOSCRAPER_URL=http://autoscraper:8001
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=test-nextauth-secret
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+
+  # Public website test configuration
+  public:
+    image: ${PUBLIC_IMAGE:-remotehive-public:latest}
+    environment:
+      - NODE_ENV=test
+      - VITE_API_URL=http://backend:8000
+      - VITE_AUTOSCRAPER_URL=http://autoscraper:8001
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5173/"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+
+  # Celery worker test configuration
+  celery-worker:
+    image: ${BACKEND_IMAGE:-remotehive-backend:latest}
+    command: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=2
+    environment:
+      - ENVIRONMENT=test
+      - DEBUG=false
+      - MONGODB_URL=mongodb://admin:password123@mongodb:27017/remotehive_test?authSource=admin
+      - REDIS_URL=redis://:redis_password@redis:6379/1
+      - CELERY_BROKER_URL=redis://:redis_password@redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://:redis_password@redis:6379/1
+      - JWT_SECRET_KEY=test-secret-key-for-ci-cd
+    depends_on:
+      - mongodb
+      - redis
+      - backend
+    healthcheck:
+      test: ["CMD", "celery", "-A", "app.tasks.celery_app", "inspect", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Celery beat test configuration
+  celery-beat:
+    image: ${BACKEND_IMAGE:-remotehive-backend:latest}
+    command: celery -A app.tasks.celery_app beat --loglevel=info
+    environment:
+      - ENVIRONMENT=test
+      - DEBUG=false
+      - MONGODB_URL=mongodb://admin:password123@mongodb:27017/remotehive_test?authSource=admin
+      - REDIS_URL=redis://:redis_password@redis:6379/1
+      - CELERY_BROKER_URL=redis://:redis_password@redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://:redis_password@redis:6379/1
+      - JWT_SECRET_KEY=test-secret-key-for-ci-cd
+    volumes:
+      - celery_beat_test_data:/app/celerybeat-schedule
+    depends_on:
+      - mongodb
+      - redis
+      - backend
+    healthcheck:
+      test: ["CMD", "test", "-f", "/app/celerybeat-schedule"]
+      interval: 60s
+      timeout: 5s
+      retries: 2
+      start_period: 120s
+
+  # Nginx test configuration
+  nginx:
+    image: ${NGINX_IMAGE:-remotehive-nginx:latest}
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+      - autoscraper
+      - admin
+      - public
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # MailHog for email testing
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: remotehive-mailhog-test
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8025"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Test runner service
+  test-runner:
+    image: ${BACKEND_IMAGE:-remotehive-backend:latest}
+    command: |
+      sh -c '
+        echo "Waiting for services to be ready..."
+        sleep 30
+        
+        echo "Running backend integration tests..."
+        pytest tests/integration/ -v --tb=short
+        
+        echo "Running API tests..."
+        pytest tests/api/ -v --tb=short
+        
+        echo "Running end-to-end tests..."
+        pytest tests/e2e/ -v --tb=short
+        
+        echo "All tests completed!"
+      '
+    environment:
+      - ENVIRONMENT=test
+      - DEBUG=false
+      - MONGODB_URL=mongodb://admin:password123@mongodb:27017/remotehive_test?authSource=admin
+      - REDIS_URL=redis://:redis_password@redis:6379/1
+      - CELERY_BROKER_URL=redis://:redis_password@redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://:redis_password@redis:6379/1
+      - JWT_SECRET_KEY=test-secret-key-for-ci-cd
+      - BACKEND_URL=http://backend:8000
+      - AUTOSCRAPER_URL=http://autoscraper:8001
+      - ADMIN_URL=http://admin:3000
+      - PUBLIC_URL=http://public:5173
+    depends_on:
+      - backend
+      - autoscraper
+      - admin
+      - public
+      - celery-worker
+      - celery-beat
+      - nginx
+      - mailhog
+    profiles:
+      - test
+
+  # Database migration service for tests
+  db-migrate:
+    image: ${BACKEND_IMAGE:-remotehive-backend:latest}
+    command: |
+      sh -c '
+        echo "Waiting for MongoDB to be ready..."
+        sleep 10
+        
+        echo "Running database migrations..."
+        python -m app.database.init_db
+        
+        echo "Creating test data..."
+        python -m app.database.seed_test_data
+        
+        echo "Database setup completed!"
+      '
+    environment:
+      - ENVIRONMENT=test
+      - MONGODB_URL=mongodb://admin:password123@mongodb:27017/remotehive_test?authSource=admin
+      - ADMIN_EMAIL=admin@remotehive.in
+      - ADMIN_PASSWORD=Ranjeet11$
+    depends_on:
+      - mongodb
+    profiles:
+      - migration
+
+volumes:
+  mongodb_test_data:
+    driver: local
+  redis_test_data:
+    driver: local
+  autoscraper_test_data:
+    driver: local
+  celery_beat_test_data:
+    driver: local
+
+networks:
+  default:
+    name: remotehive-test-network
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

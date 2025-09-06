@@ -1,0 +1,330 @@
+# Docker Compose override for development environment
+# This file extends docker-compose.yml with development-specific configurations
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+version: '3.8'
+
+services:
+  # Backend API with hot-reload and debugging
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development  # Use development stage if available
+    environment:
+      - DEBUG=true
+      - LOG_LEVEL=debug
+      - RELOAD=true
+      - PYTHONPATH=/app
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Mount source code for hot-reload
+      - ./app:/app/app:ro
+      - ./tests:/app/tests:ro
+      - ./requirements.txt:/app/requirements.txt:ro
+      # Mount logs directory
+      - ./logs:/app/logs
+    ports:
+      - "8000:8000"
+      - "5678:5678"  # Debug port for Python debugger
+    command: >
+      sh -c "pip install debugpy &&
+             python -m debugpy --listen 0.0.0.0:5678 --wait-for-client -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Autoscraper service with hot-reload
+  autoscraper:
+    build:
+      context: ./autoscraper-service
+      dockerfile: Dockerfile
+    environment:
+      - DEBUG=true
+      - LOG_LEVEL=debug
+      - RELOAD=true
+    volumes:
+      # Mount source code for hot-reload
+      - ./autoscraper-service/app:/app/app:ro
+      - ./autoscraper-service/data:/app/data
+      - ./logs:/app/logs
+    ports:
+      - "8001:8001"
+      - "5679:5679"  # Debug port
+    command: >
+      sh -c "pip install debugpy &&
+             python -m debugpy --listen 0.0.0.0:5679 -m uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload"
+
+  # Admin panel with hot-reload
+  admin:
+    build:
+      context: ./remotehive-admin
+      dockerfile: Dockerfile
+      target: development
+    environment:
+      - NODE_ENV=development
+      - NEXT_TELEMETRY_DISABLED=1
+      - WATCHPACK_POLLING=true
+    volumes:
+      # Mount source code for hot-reload
+      - ./remotehive-admin/src:/app/src:ro
+      - ./remotehive-admin/public:/app/public:ro
+      - ./remotehive-admin/package.json:/app/package.json:ro
+      - ./remotehive-admin/package-lock.json:/app/package-lock.json:ro
+      - ./remotehive-admin/next.config.js:/app/next.config.js:ro
+      - ./remotehive-admin/tailwind.config.js:/app/tailwind.config.js:ro
+      - ./remotehive-admin/tsconfig.json:/app/tsconfig.json:ro
+      # Node modules volume for better performance
+      - admin_node_modules:/app/node_modules
+    ports:
+      - "3000:3000"
+    command: npm run dev
+    depends_on:
+      - backend
+
+  # Public website with hot-reload
+  public:
+    build:
+      context: ./remotehive-public
+      dockerfile: Dockerfile
+      target: development
+    environment:
+      - NODE_ENV=development
+      - VITE_HMR_PORT=5173
+      - CHOKIDAR_USEPOLLING=true
+    volumes:
+      # Mount source code for hot-reload
+      - ./remotehive-public/src:/app/src:ro
+      - ./remotehive-public/public:/app/public:ro
+      - ./remotehive-public/package.json:/app/package.json:ro
+      - ./remotehive-public/package-lock.json:/app/package-lock.json:ro
+      - ./remotehive-public/vite.config.ts:/app/vite.config.ts:ro
+      - ./remotehive-public/tailwind.config.js:/app/tailwind.config.js:ro
+      - ./remotehive-public/tsconfig.json:/app/tsconfig.json:ro
+      - ./remotehive-public/index.html:/app/index.html:ro
+      # Node modules volume for better performance
+      - public_node_modules:/app/node_modules
+    ports:
+      - "5173:5173"
+    command: npm run dev -- --host 0.0.0.0
+    depends_on:
+      - backend
+
+  # Celery worker with auto-reload
+  celery-worker:
+    environment:
+      - DEBUG=true
+      - LOG_LEVEL=debug
+      - PYTHONPATH=/app
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Mount source code for hot-reload
+      - ./app:/app/app:ro
+      - ./logs:/app/logs
+    command: >
+      sh -c "pip install watchdog &&
+             watchmedo auto-restart --directory=/app/app --pattern=*.py --recursive -- 
+             celery -A app.tasks.celery_app worker --loglevel=debug --concurrency=2"
+
+  # Celery beat with auto-reload
+  celery-beat:
+    environment:
+      - DEBUG=true
+      - LOG_LEVEL=debug
+      - PYTHONPATH=/app
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Mount source code for hot-reload
+      - ./app:/app/app:ro
+      - ./logs:/app/logs
+      - celery_beat_data:/app/celerybeat-schedule
+    command: >
+      sh -c "pip install watchdog &&
+             watchmedo auto-restart --directory=/app/app --pattern=*.py --recursive -- 
+             celery -A app.tasks.celery_app beat --loglevel=debug"
+
+  # MongoDB with development configuration
+  mongodb:
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=password123
+      - MONGO_INITDB_DATABASE=remotehive_dev
+    volumes:
+      - mongodb_dev_data:/data/db
+      - ./scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    ports:
+      - "27017:27017"
+    command: mongod --auth --bind_ip_all --logpath /var/log/mongodb/mongod.log --logappend
+
+  # Redis with development configuration
+  redis:
+    volumes:
+      - redis_dev_data:/data
+      - ./logs:/var/log/redis
+    ports:
+      - "6379:6379"
+    command: >
+      sh -c "redis-server --appendonly yes --appendfsync everysec --save 60 1000 --loglevel debug"
+
+  # Development tools and utilities
+  
+  # MongoDB Express for database management
+  mongo-express:
+    image: mongo-express:1.0.0-alpha
+    container_name: remotehive-mongo-express
+    restart: unless-stopped
+    environment:
+      - ME_CONFIG_MONGODB_ADMINUSERNAME=admin
+      - ME_CONFIG_MONGODB_ADMINPASSWORD=password123
+      - ME_CONFIG_MONGODB_SERVER=mongodb
+      - ME_CONFIG_MONGODB_PORT=27017
+      - ME_CONFIG_BASICAUTH_USERNAME=admin
+      - ME_CONFIG_BASICAUTH_PASSWORD=admin123
+    ports:
+      - "8081:8081"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - remotehive-network
+
+  # Redis Commander for Redis management
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: remotehive-redis-commander
+    restart: unless-stopped
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+      - HTTP_USER=admin
+      - HTTP_PASSWORD=admin123
+    ports:
+      - "8082:8081"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - remotehive-network
+
+  # Mailhog for email testing
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: remotehive-mailhog
+    restart: unless-stopped
+    ports:
+      - "1025:1025"  # SMTP port
+      - "8025:8025"  # Web UI port
+    networks:
+      - remotehive-network
+
+  # File watcher for automatic testing
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: remotehive-test-runner
+    environment:
+      - PYTHONPATH=/app
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./app:/app/app:ro
+      - ./tests:/app/tests:ro
+      - ./pytest.ini:/app/pytest.ini:ro
+      - ./logs:/app/logs
+    command: >
+      sh -c "pip install pytest-watch &&
+             ptw tests/ --runner 'python -m pytest --tb=short -v'"
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - remotehive-network
+    profiles:
+      - testing
+
+  # Documentation server
+  docs:
+    image: nginx:alpine
+    container_name: remotehive-docs
+    volumes:
+      - ./docs:/usr/share/nginx/html:ro
+      - ./nginx/docs.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "8080:80"
+    networks:
+      - remotehive-network
+    profiles:
+      - docs
+
+  # Prometheus for monitoring (development)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: remotehive-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/prometheus.dev.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - remotehive-network
+    profiles:
+      - monitoring
+
+  # Grafana for monitoring dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: remotehive-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - remotehive-network
+    profiles:
+      - monitoring
+
+# Development-specific volumes
+volumes:
+  mongodb_dev_data:
+    driver: local
+  redis_dev_data:
+    driver: local
+  admin_node_modules:
+    driver: local
+  public_node_modules:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+# Networks
+networks:
+  remotehive-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

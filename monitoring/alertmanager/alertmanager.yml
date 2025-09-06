@@ -1,0 +1,314 @@
+# AlertManager Configuration for RemoteHive
+# Handles alert routing, grouping, and notifications
+
+global:
+  # SMTP configuration for email notifications
+  smtp_smarthost: '${SMTP_HOST:localhost:587}'
+  smtp_from: '${SMTP_FROM:alerts@remotehive.com}'
+  smtp_auth_username: '${SMTP_USERNAME}'
+  smtp_auth_password: '${SMTP_PASSWORD}'
+  smtp_require_tls: true
+  
+  # Slack configuration
+  slack_api_url: '${SLACK_API_URL}'
+  
+  # PagerDuty configuration
+  pagerduty_url: 'https://events.pagerduty.com/v2/enqueue'
+  
+  # Resolve timeout
+  resolve_timeout: 5m
+
+# Templates for custom notification formats
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Route configuration
+route:
+  # Default grouping
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 1h
+  receiver: 'default-receiver'
+  
+  # Routing rules
+  routes:
+    # Critical alerts - immediate notification
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 0s
+      group_interval: 5m
+      repeat_interval: 15m
+      routes:
+        # Database critical alerts
+        - match:
+            service: mongodb
+          receiver: 'database-critical'
+        - match:
+            service: redis
+          receiver: 'database-critical'
+        
+        # Service critical alerts
+        - match:
+            service: backend
+          receiver: 'backend-critical'
+    
+    # Warning alerts - standard notification
+    - match:
+        severity: warning
+      receiver: 'warning-alerts'
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 2h
+      routes:
+        # Performance warnings
+        - match_re:
+            alertname: '.*High.*'
+          receiver: 'performance-alerts'
+        
+        # Security warnings
+        - match_re:
+            alertname: '.*Security.*|.*Failed.*Login.*'
+          receiver: 'security-alerts'
+    
+    # Info alerts - low priority
+    - match:
+        severity: info
+      receiver: 'info-alerts'
+      group_wait: 5m
+      group_interval: 10m
+      repeat_interval: 24h
+    
+    # Business alerts
+    - match:
+        category: business
+      receiver: 'business-alerts'
+      group_wait: 1m
+      group_interval: 10m
+      repeat_interval: 4h
+    
+    # Development environment alerts (lower priority)
+    - match:
+        environment: development
+      receiver: 'dev-alerts'
+      group_wait: 2m
+      group_interval: 15m
+      repeat_interval: 6h
+    
+    # Staging environment alerts
+    - match:
+        environment: staging
+      receiver: 'staging-alerts'
+      group_wait: 1m
+      group_interval: 10m
+      repeat_interval: 2h
+
+# Inhibition rules - suppress certain alerts when others are firing
+inhibit_rules:
+  # Suppress warning alerts when critical alerts are firing for the same service
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'service', 'instance']
+  
+  # Suppress individual service alerts when the entire cluster is down
+  - source_match:
+      alertname: 'RemoteHiveClusterDown'
+    target_match_re:
+      alertname: 'RemoteHive.*Down'
+    equal: ['cluster']
+  
+  # Suppress high memory alerts when node is down
+  - source_match:
+      alertname: 'NodeDown'
+    target_match:
+      alertname: 'RemoteHiveHighMemoryUsage'
+    equal: ['instance']
+
+# Receivers configuration
+receivers:
+  # Default receiver
+  - name: 'default-receiver'
+    email_configs:
+      - to: '${DEFAULT_EMAIL:admin@remotehive.com}'
+        subject: '[RemoteHive] {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Labels: {{ range .Labels.SortedPairs }}{{ .Name }}={{ .Value }} {{ end }}
+          {{ end }}
+  
+  # Critical alerts receiver
+  - name: 'critical-alerts'
+    email_configs:
+      - to: '${CRITICAL_EMAIL:oncall@remotehive.com}'
+        subject: '[CRITICAL] RemoteHive Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          🚨 CRITICAL ALERT 🚨
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Severity: {{ .Labels.severity }}
+          Service: {{ .Labels.service }}
+          Instance: {{ .Labels.instance }}
+          Started: {{ .StartsAt }}
+          {{ if .Annotations.runbook_url }}
+          Runbook: {{ .Annotations.runbook_url }}
+          {{ end }}
+          {{ end }}
+    slack_configs:
+      - api_url: '${SLACK_CRITICAL_WEBHOOK}'
+        channel: '#alerts-critical'
+        title: '🚨 Critical Alert: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Service:* {{ .Labels.service }}
+          *Severity:* {{ .Labels.severity }}
+          {{ end }}
+        send_resolved: true
+    pagerduty_configs:
+      - routing_key: '${PAGERDUTY_INTEGRATION_KEY}'
+        description: '{{ .GroupLabels.alertname }}: {{ .GroupLabels.service }}'
+        severity: 'critical'
+        details:
+          summary: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+          source: 'RemoteHive Monitoring'
+          component: '{{ .GroupLabels.service }}'
+  
+  # Database critical alerts
+  - name: 'database-critical'
+    email_configs:
+      - to: '${DBA_EMAIL:dba@remotehive.com}'
+        subject: '[DB CRITICAL] {{ .GroupLabels.alertname }}'
+        body: |
+          🔥 DATABASE CRITICAL ALERT 🔥
+          
+          {{ range .Alerts }}
+          Database: {{ .Labels.service }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Instance: {{ .Labels.instance }}
+          {{ end }}
+    slack_configs:
+      - api_url: '${SLACK_DB_WEBHOOK}'
+        channel: '#database-alerts'
+        title: '🔥 Database Critical: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Database:* {{ .Labels.service }}
+          *Alert:* {{ .Annotations.summary }}
+          *Instance:* {{ .Labels.instance }}
+          {{ end }}
+  
+  # Backend critical alerts
+  - name: 'backend-critical'
+    email_configs:
+      - to: '${BACKEND_EMAIL:backend-team@remotehive.com}'
+        subject: '[BACKEND CRITICAL] {{ .GroupLabels.alertname }}'
+    slack_configs:
+      - api_url: '${SLACK_BACKEND_WEBHOOK}'
+        channel: '#backend-alerts'
+        title: '⚠️ Backend Critical: {{ .GroupLabels.alertname }}'
+  
+  # Warning alerts receiver
+  - name: 'warning-alerts'
+    email_configs:
+      - to: '${WARNING_EMAIL:warnings@remotehive.com}'
+        subject: '[WARNING] RemoteHive: {{ .GroupLabels.alertname }}'
+        body: |
+          ⚠️ WARNING ALERT ⚠️
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Service: {{ .Labels.service }}
+          Severity: {{ .Labels.severity }}
+          {{ end }}
+    slack_configs:
+      - api_url: '${SLACK_WARNING_WEBHOOK}'
+        channel: '#alerts-warning'
+        title: '⚠️ Warning: {{ .GroupLabels.alertname }}'
+        send_resolved: true
+  
+  # Performance alerts
+  - name: 'performance-alerts'
+    email_configs:
+      - to: '${PERFORMANCE_EMAIL:performance@remotehive.com}'
+        subject: '[PERFORMANCE] {{ .GroupLabels.alertname }}'
+    slack_configs:
+      - api_url: '${SLACK_PERFORMANCE_WEBHOOK}'
+        channel: '#performance-alerts'
+        title: '📊 Performance Alert: {{ .GroupLabels.alertname }}'
+  
+  # Security alerts
+  - name: 'security-alerts'
+    email_configs:
+      - to: '${SECURITY_EMAIL:security@remotehive.com}'
+        subject: '[SECURITY] {{ .GroupLabels.alertname }}'
+        body: |
+          🔒 SECURITY ALERT 🔒
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Instance: {{ .Labels.instance }}
+          Time: {{ .StartsAt }}
+          {{ end }}
+    slack_configs:
+      - api_url: '${SLACK_SECURITY_WEBHOOK}'
+        channel: '#security-alerts'
+        title: '🔒 Security Alert: {{ .GroupLabels.alertname }}'
+        color: 'danger'
+  
+  # Info alerts receiver
+  - name: 'info-alerts'
+    email_configs:
+      - to: '${INFO_EMAIL:info@remotehive.com}'
+        subject: '[INFO] RemoteHive: {{ .GroupLabels.alertname }}'
+    slack_configs:
+      - api_url: '${SLACK_INFO_WEBHOOK}'
+        channel: '#alerts-info'
+        title: 'ℹ️ Info: {{ .GroupLabels.alertname }}'
+  
+  # Business alerts
+  - name: 'business-alerts'
+    email_configs:
+      - to: '${BUSINESS_EMAIL:business@remotehive.com}'
+        subject: '[BUSINESS] {{ .GroupLabels.alertname }}'
+    slack_configs:
+      - api_url: '${SLACK_BUSINESS_WEBHOOK}'
+        channel: '#business-metrics'
+        title: '📈 Business Alert: {{ .GroupLabels.alertname }}'
+  
+  # Development environment alerts
+  - name: 'dev-alerts'
+    slack_configs:
+      - api_url: '${SLACK_DEV_WEBHOOK}'
+        channel: '#dev-alerts'
+        title: '🔧 Dev Alert: {{ .GroupLabels.alertname }}'
+  
+  # Staging environment alerts
+  - name: 'staging-alerts'
+    email_configs:
+      - to: '${STAGING_EMAIL:staging@remotehive.com}'
+        subject: '[STAGING] {{ .GroupLabels.alertname }}'
+    slack_configs:
+      - api_url: '${SLACK_STAGING_WEBHOOK}'
+        channel: '#staging-alerts'
+        title: '🎭 Staging Alert: {{ .GroupLabels.alertname }}'
+
+# Webhook configurations for custom integrations
+webhook_configs:
+  - url: '${WEBHOOK_URL}'
+    send_resolved: true
+    http_config:
+      basic_auth:
+        username: '${WEBHOOK_USERNAME}'
+        password: '${WEBHOOK_PASSWORD}'
+    max_alerts: 10

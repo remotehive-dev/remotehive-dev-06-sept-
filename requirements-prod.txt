@@ -1,0 +1,90 @@
+# Production-specific requirements for RemoteHive Backend
+# These are additional packages needed only in production
+
+# Production WSGI server
+gunicorn==21.2.0
+
+# Production monitoring and logging
+prometheus-client==0.19.0
+structlog==23.2.0
+sentry-sdk[fastapi]==1.40.6
+
+# Performance optimization
+uvloop==0.19.0  # Faster event loop for asyncio
+httptools==0.6.1  # Faster HTTP parsing
+
+# Security enhancements
+cryptography==41.0.8
+argon2-cffi==23.1.0  # Secure password hashing
+
+# Production database optimizations
+motor[srv]==3.3.2  # Async MongoDB driver with SRV support
+pymongo[srv,tls]==4.6.1  # MongoDB driver with TLS support
+
+# Caching and session management
+redis[hiredis]==5.0.1  # Redis with faster hiredis parser
+
+# Email services for production
+email-validator==2.1.0.post1
+
+# File handling and storage
+boto3==1.34.34  # AWS S3 integration
+Pillow==10.2.0  # Image processing
+
+# API documentation and validation
+orjson==3.9.10  # Faster JSON serialization
+
+# Background task processing
+celery[redis]==5.3.4
+kombu==5.3.4
+
+# Health checks and monitoring
+psutil==5.9.6  # System monitoring
+
+# Production utilities
+python-multipart==0.0.6  # File upload support
+python-jose[cryptography]==3.3.0  # JWT handling
+passlib[bcrypt]==1.7.4  # Password hashing
+
+# Timezone handling
+pytz==2023.3.post1
+
+# HTTP client for external APIs
+httpx[http2]==0.26.0
+
+# Configuration management
+python-dotenv==1.0.0
+
+# Data validation and serialization
+pydantic[email]==2.5.3
+
+# CORS handling
+fastapi-cors==0.0.6
+
+# Rate limiting
+slowapi==0.1.9
+
+# Database migrations
+alembic==1.13.1
+
+# Async database toolkit
+databases[postgresql,mysql]==0.8.0
+
+# Production logging
+loguru==0.7.2
+
+# Memory profiling (optional, for debugging)
+# memory-profiler==0.61.0
+
+# APM and tracing (optional)
+# elastic-apm==6.20.0
+# opentelemetry-api==1.21.0
+# opentelemetry-sdk==1.21.0
+# opentelemetry-instrumentation-fastapi==0.42b0
+
+# Backup and data export
+# mongodump-python==0.1.0  # Custom package if needed
+
+# Security scanning (development/CI only)
+# bandit==1.7.5
+# safety==2.3.5

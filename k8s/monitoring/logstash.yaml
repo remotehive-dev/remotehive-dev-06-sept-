@@ -1,0 +1,623 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: logstash-config
+  namespace: remotehive-monitoring
+  labels:
+    app: logstash
+data:
+  logstash.yml: |
+    http.host: "0.0.0.0"
+    path.config: /usr/share/logstash/pipeline
+    path.data: /usr/share/logstash/data
+    path.logs: /usr/share/logstash/logs
+    
+    # Pipeline settings
+    pipeline.workers: 2
+    pipeline.batch.size: 125
+    pipeline.batch.delay: 50
+    
+    # Queue settings
+    queue.type: memory
+    queue.max_events: 0
+    queue.max_bytes: 1gb
+    
+    # Dead letter queue
+    dead_letter_queue.enable: true
+    dead_letter_queue.max_bytes: 1gb
+    
+    # Monitoring
+    xpack.monitoring.enabled: false
+    
+    # Logging
+    log.level: info
+    
+  pipelines.yml: |
+    - pipeline.id: main
+      path.config: "/usr/share/logstash/pipeline/logstash.conf"
+      pipeline.workers: 2
+      pipeline.batch.size: 125
+      pipeline.batch.delay: 50
+    
+    - pipeline.id: beats
+      path.config: "/usr/share/logstash/pipeline/beats.conf"
+      pipeline.workers: 1
+      pipeline.batch.size: 50
+      pipeline.batch.delay: 50
+    
+    - pipeline.id: security
+      path.config: "/usr/share/logstash/pipeline/security.conf"
+      pipeline.workers: 1
+      pipeline.batch.size: 25
+      pipeline.batch.delay: 100
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: logstash-pipeline
+  namespace: remotehive-monitoring
+  labels:
+    app: logstash
+data:
+  logstash.conf: |
+    input {
+      # Beats input (Filebeat, Metricbeat, etc.)
+      beats {
+        port => 5044
+        host => "0.0.0.0"
+      }
+      
+      # HTTP input for direct log submission
+      http {
+        port => 8080
+        host => "0.0.0.0"
+        codec => json
+        additional_codecs => {
+          "application/json" => "json"
+          "text/plain" => "plain"
+        }
+      }
+      
+      # TCP input for syslog
+      tcp {
+        port => 5000
+        host => "0.0.0.0"
+        codec => json_lines
+      }
+      
+      # UDP input for syslog
+      udp {
+        port => 5001
+        host => "0.0.0.0"
+        codec => json
+      }
+      
+      # Redis input for queued logs
+      redis {
+        host => "redis"
+        port => 6379
+        key => "logstash"
+        data_type => "list"
+        codec => json
+      }
+    }
+    
+    filter {
+      # Add common fields
+      mutate {
+        add_field => {
+          "[@metadata][pipeline]" => "main"
+          "environment" => "${ENVIRONMENT:development}"
+          "cluster" => "remotehive"
+        }
+      }
+      
+      # Parse timestamp
+      if [timestamp] {
+        date {
+          match => [ "timestamp", "ISO8601", "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd'T'HH:mm:ss.SSSZ" ]
+          target => "@timestamp"
+        }
+      }
+      
+      # Process container logs
+      if [container] {
+        if [container][name] {
+          mutate {
+            add_field => { "service" => "%{[container][name]}" }
+          }
+        }
+      }
+      
+      # Process Kubernetes metadata
+      if [kubernetes] {
+        if [kubernetes][container][name] {
+          mutate {
+            add_field => { "service" => "%{[kubernetes][container][name]}" }
+          }
+        }
+        
+        if [kubernetes][pod][name] {
+          mutate {
+            add_field => { "pod_name" => "%{[kubernetes][pod][name]}" }
+          }
+        }
+        
+        if [kubernetes][namespace] {
+          mutate {
+            add_field => { "namespace" => "%{[kubernetes][namespace]}" }
+          }
+        }
+      }
+      
+      # Parse RemoteHive Backend API logs
+      if [service] =~ /remotehive-backend/ or [container][name] =~ /backend/ {
+        mutate {
+          add_field => { "service_type" => "backend-api" }
+        }
+        
+        # Parse FastAPI logs
+        grok {
+          match => { "message" => "%{TIMESTAMP_ISO8601:log_timestamp} - %{WORD:log_level} - %{GREEDYDATA:log_message}" }
+        }
+        
+        # Parse HTTP access logs
+        grok {
+          match => { "message" => "%{IPORHOST:client_ip} - - \[%{HTTPDATE:access_time}\] \"%{WORD:http_method} %{URIPATH:http_path}(?:%{URIPARAM:http_params})? HTTP/%{NUMBER:http_version}\" %{NUMBER:http_status} %{NUMBER:response_size} \"%{DATA:referrer}\" \"%{DATA:user_agent}\" %{NUMBER:response_time}" }
+        }
+        
+        # Parse JSON logs
+        if [message] =~ /^\{.*\}$/ {
+          json {
+            source => "message"
+          }
+        }
+        
+        # Convert response time to float
+        if [response_time] {
+          mutate {
+            convert => { "response_time" => "float" }
+          }
+        }
+        
+        # Convert HTTP status to integer
+        if [http_status] {
+          mutate {
+            convert => { "http_status" => "integer" }
+          }
+        }
+      }
+      
+      # Parse RemoteHive Autoscraper logs
+      if [service] =~ /autoscraper/ or [container][name] =~ /autoscraper/ {
+        mutate {
+          add_field => { "service_type" => "autoscraper" }
+        }
+        
+        # Parse scraper logs
+        grok {
+          match => { "message" => "%{TIMESTAMP_ISO8601:log_timestamp} - %{WORD:log_level} - %{DATA:scraper_name} - %{GREEDYDATA:log_message}" }
+        }
+        
+        # Parse job scraping logs
+        grok {
+          match => { "message" => "Scraped %{NUMBER:jobs_scraped} jobs from %{DATA:job_source}" }
+        }
+        
+        if [jobs_scraped] {
+          mutate {
+            convert => { "jobs_scraped" => "integer" }
+          }
+        }
+      }
+      
+      # Parse RemoteHive Admin Panel logs
+      if [service] =~ /admin/ or [container][name] =~ /admin/ {
+        mutate {
+          add_field => { "service_type" => "admin-panel" }
+        }
+        
+        # Parse Next.js logs
+        grok {
+          match => { "message" => "%{TIMESTAMP_ISO8601:log_timestamp} %{WORD:log_level} %{GREEDYDATA:log_message}" }
+        }
+      }
+      
+      # Parse RemoteHive Public Website logs
+      if [service] =~ /public/ or [container][name] =~ /public/ {
+        mutate {
+          add_field => { "service_type" => "public-website" }
+        }
+        
+        # Parse React/Vite logs
+        grok {
+          match => { "message" => "%{TIMESTAMP_ISO8601:log_timestamp} \[%{WORD:log_level}\] %{GREEDYDATA:log_message}" }
+        }
+      }
+      
+      # Parse Celery worker logs
+      if [service] =~ /celery/ or [container][name] =~ /celery/ {
+        mutate {
+          add_field => { "service_type" => "celery-worker" }
+        }
+        
+        # Parse Celery task logs
+        grok {
+          match => { "message" => "\[%{TIMESTAMP_ISO8601:log_timestamp}: %{WORD:log_level}/%{DATA:worker_name}\] %{DATA:task_name}\[%{DATA:task_id}\]: %{GREEDYDATA:log_message}" }
+        }
+      }
+      
+      # Parse MongoDB logs
+      if [service] =~ /mongo/ or [container][name] =~ /mongo/ {
+        mutate {
+          add_field => { "service_type" => "mongodb" }
+        }
+        
+        # Parse MongoDB logs
+        grok {
+          match => { "message" => "%{TIMESTAMP_ISO8601:log_timestamp} %{WORD:log_level}  %{WORD:component} \[%{DATA:context}\] %{GREEDYDATA:log_message}" }
+        }
+      }
+      
+      # Parse Redis logs
+      if [service] =~ /redis/ or [container][name] =~ /redis/ {
+        mutate {
+          add_field => { "service_type" => "redis" }
+        }
+        
+        # Parse Redis logs
+        grok {
+          match => { "message" => "%{NUMBER:redis_pid}:%{WORD:redis_role} %{TIMESTAMP_ISO8601:log_timestamp} %{WORD:log_level} %{GREEDYDATA:log_message}" }
+        }
+      }
+      
+      # Parse Nginx logs
+      if [service] =~ /nginx/ or [container][name] =~ /nginx/ {
+        mutate {
+          add_field => { "service_type" => "nginx" }
+        }
+        
+        # Parse Nginx access logs
+        grok {
+          match => { "message" => "%{IPORHOST:client_ip} - %{DATA:remote_user} \[%{HTTPDATE:access_time}\] \"%{WORD:http_method} %{DATA:http_path} HTTP/%{NUMBER:http_version}\" %{NUMBER:http_status} %{NUMBER:response_size} \"%{DATA:referrer}\" \"%{DATA:user_agent}\" %{NUMBER:response_time}" }
+        }
+        
+        # Parse Nginx error logs
+        grok {
+          match => { "message" => "%{TIMESTAMP_ISO8601:log_timestamp} \[%{WORD:log_level}\] %{NUMBER:nginx_pid}#%{NUMBER:nginx_tid}: \*%{NUMBER:connection_id} %{GREEDYDATA:log_message}" }
+        }
+      }
+      
+      # GeoIP enrichment for client IPs
+      if [client_ip] and [client_ip] !~ /^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.)/ {
+        geoip {
+          source => "client_ip"
+          target => "geoip"
+        }
+      }
+      
+      # User agent parsing
+      if [user_agent] {
+        useragent {
+          source => "user_agent"
+          target => "ua"
+        }
+      }
+      
+      # Security event detection
+      if [http_status] == 401 or [http_status] == 403 or [log_message] =~ /(?i)(failed|error|unauthorized|forbidden)/ {
+        mutate {
+          add_field => { "security_event" => "true" }
+        }
+      }
+      
+      # Performance metrics
+      if [response_time] {
+        if [response_time] > 5000 {
+          mutate {
+            add_field => { "performance_issue" => "slow_response" }
+          }
+        }
+      }
+      
+      # Clean up fields
+      mutate {
+        remove_field => [ "host", "agent", "ecs", "input", "log" ]
+      }
+    }
+    
+    output {
+      # Main Elasticsearch output
+      elasticsearch {
+        hosts => ["elasticsearch:9200"]
+        index => "remotehive-logs-%{+YYYY.MM.dd}"
+        template_name => "remotehive-logs"
+        template_pattern => "remotehive-logs-*"
+        manage_template => false
+      }
+      
+      # Security events to separate index
+      if [security_event] == "true" {
+        elasticsearch {
+          hosts => ["elasticsearch:9200"]
+          index => "remotehive-security-%{+YYYY.MM.dd}"
+        }
+      }
+      
+      # Debug output for development
+      if "${ENVIRONMENT}" == "development" {
+        file {
+          path => "/usr/share/logstash/logs/debug.log"
+          codec => json_lines
+        }
+      }
+      
+      # Stdout for debugging
+      if "${LOG_DEBUG}" == "true" {
+        stdout {
+          codec => rubydebug
+        }
+      }
+    }
+  
+  beats.conf: |
+    input {
+      beats {
+        port => 5044
+        host => "0.0.0.0"
+      }
+    }
+    
+    filter {
+      # Process Filebeat logs
+      if [agent][type] == "filebeat" {
+        mutate {
+          add_field => { "[@metadata][pipeline]" => "beats" }
+        }
+        
+        # Extract service name from container name or log path
+        if [container][name] {
+          mutate {
+            add_field => { "service" => "%{[container][name]}" }
+          }
+        } else if [log][file][path] {
+          grok {
+            match => { "[log][file][path]" => "/var/log/%{DATA:service}/" }
+          }
+        }
+      }
+      
+      # Process Metricbeat logs
+      if [agent][type] == "metricbeat" {
+        mutate {
+          add_field => { "[@metadata][pipeline]" => "beats" }
+        }
+      }
+    }
+    
+    output {
+      elasticsearch {
+        hosts => ["elasticsearch:9200"]
+        index => "%{[@metadata][beat]}-%{[@metadata][version]}-%{+YYYY.MM.dd}"
+      }
+    }
+  
+  security.conf: |
+    input {
+      beats {
+        port => 5045
+        host => "0.0.0.0"
+      }
+    }
+    
+    filter {
+      # Security-specific processing
+      mutate {
+        add_field => { "[@metadata][pipeline]" => "security" }
+      }
+      
+      # Detect security events
+      if [message] =~ /(?i)(attack|intrusion|malware|virus|hack|breach|exploit)/ {
+        mutate {
+          add_field => { "threat_level" => "high" }
+        }
+      }
+      
+      # Failed login attempts
+      if [message] =~ /(?i)(failed login|authentication failed|invalid credentials)/ {
+        mutate {
+          add_field => { "event_type" => "failed_login" }
+        }
+      }
+      
+      # Suspicious IP patterns
+      if [client_ip] {
+        # Check against known bad IP ranges or patterns
+        if [client_ip] =~ /^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.)/ {
+          mutate {
+            add_field => { "ip_type" => "internal" }
+          }
+        } else {
+          mutate {
+            add_field => { "ip_type" => "external" }
+          }
+        }
+      }
+    }
+    
+    output {
+      elasticsearch {
+        hosts => ["elasticsearch:9200"]
+        index => "remotehive-security-%{+YYYY.MM.dd}"
+      }
+      
+      # Alert on high-threat events
+      if [threat_level] == "high" {
+        http {
+          url => "http://alertmanager:9093/api/v1/alerts"
+          http_method => "post"
+          format => "json"
+          mapping => {
+            "alerts" => [{
+              "labels" => {
+                "alertname" => "SecurityThreat"
+                "severity" => "critical"
+                "service" => "%{service}"
+                "instance" => "%{host}"
+              }
+              "annotations" => {
+                "summary" => "High-level security threat detected"
+                "description" => "%{message}"
+              }
+            }]
+          }
+        }
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: logstash
+  namespace: remotehive-monitoring
+  labels:
+    app: logstash
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: logstash
+  template:
+    metadata:
+      labels:
+        app: logstash
+    spec:
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 1000
+        runAsGroup: 1000
+      containers:
+      - name: logstash
+        image: docker.elastic.co/logstash/logstash:8.11.0
+        env:
+        - name: LS_JAVA_OPTS
+          value: "-Xmx1g -Xms1g"
+        - name: ENVIRONMENT
+          value: "production"
+        - name: LOG_DEBUG
+          value: "false"
+        - name: XPACK_MONITORING_ENABLED
+          value: "false"
+        ports:
+        - containerPort: 5044
+          name: beats
+        - containerPort: 5045
+          name: beats-security
+        - containerPort: 8080
+          name: http
+        - containerPort: 5000
+          name: tcp-syslog
+        - containerPort: 5001
+          name: udp-syslog
+          protocol: UDP
+        - containerPort: 9600
+          name: monitoring
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2
+            memory: 2Gi
+        volumeMounts:
+        - name: config
+          mountPath: /usr/share/logstash/config/logstash.yml
+          subPath: logstash.yml
+        - name: config
+          mountPath: /usr/share/logstash/config/pipelines.yml
+          subPath: pipelines.yml
+        - name: pipeline
+          mountPath: /usr/share/logstash/pipeline
+        - name: data
+          mountPath: /usr/share/logstash/data
+        - name: logs
+          mountPath: /usr/share/logstash/logs
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 9600
+          initialDelaySeconds: 60
+          timeoutSeconds: 30
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 9600
+          initialDelaySeconds: 30
+          timeoutSeconds: 30
+          periodSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /
+            port: 9600
+          initialDelaySeconds: 30
+          timeoutSeconds: 30
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 30
+      volumes:
+      - name: config
+        configMap:
+          name: logstash-config
+      - name: pipeline
+        configMap:
+          name: logstash-pipeline
+      - name: data
+        emptyDir: {}
+      - name: logs
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: logstash
+  namespace: remotehive-monitoring
+  labels:
+    app: logstash
+  annotations:
+    prometheus.io/scrape: 'true'
+    prometheus.io/port: '9600'
+    prometheus.io/path: '/_node/stats'
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5044
+    targetPort: 5044
+    protocol: TCP
+    name: beats
+  - port: 5045
+    targetPort: 5045
+    protocol: TCP
+    name: beats-security
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  - port: 5000
+    targetPort: 5000
+    protocol: TCP
+    name: tcp-syslog
+  - port: 5001
+    targetPort: 5001
+    protocol: UDP
+    name: udp-syslog
+  - port: 9600
+    targetPort: 9600
+    protocol: TCP
+    name: monitoring
+  selector:
+    app: logstash

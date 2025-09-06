@@ -1,0 +1,370 @@
+# Celery Worker Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: celery-worker
+  namespace: remotehive
+  labels:
+    app: celery-worker
+    tier: worker
+    version: "1.0"
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: celery-worker
+      tier: worker
+  template:
+    metadata:
+      labels:
+        app: celery-worker
+        tier: worker
+        version: "1.0"
+    spec:
+      initContainers:
+      - name: wait-for-redis
+        image: busybox:1.35
+        command: ['sh', '-c']
+        args:
+        - |
+          until nc -z redis 6379; do
+            echo "Waiting for Redis..."
+            sleep 2
+          done
+          echo "Redis is ready!"
+      - name: wait-for-mongodb
+        image: busybox:1.35
+        command: ['sh', '-c']
+        args:
+        - |
+          until nc -z mongodb 27017; do
+            echo "Waiting for MongoDB..."
+            sleep 2
+          done
+          echo "MongoDB is ready!"
+      containers:
+      - name: celery-worker
+        image: remotehive/backend-api:latest
+        imagePullPolicy: Always
+        command:
+        - celery
+        - -A
+        - app.tasks.celery_app
+        - worker
+        - --loglevel=info
+        - --concurrency=4
+        - --max-tasks-per-child=1000
+        env:
+        - name: ENVIRONMENT
+          valueFrom:
+            configMapKeyRef:
+              name: remotehive-config
+              key: ENVIRONMENT
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: remotehive-config
+              key: LOG_LEVEL
+        - name: MONGODB_URL
+          valueFrom:
+            secretKeyRef:
+              name: mongodb-secret
+              key: MONGODB_URL
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: redis-secret
+              key: REDIS_URL
+        - name: CELERY_BROKER_URL
+          valueFrom:
+            secretKeyRef:
+              name: redis-secret
+              key: REDIS_URL
+        - name: CELERY_RESULT_BACKEND
+          valueFrom:
+            secretKeyRef:
+              name: redis-secret
+              key: REDIS_URL
+        - name: CELERY_TASK_SERIALIZER
+          valueFrom:
+            configMapKeyRef:
+              name: remotehive-config
+              key: CELERY_TASK_SERIALIZER
+        - name: CELERY_RESULT_SERIALIZER
+          valueFrom:
+            configMapKeyRef:
+              name: remotehive-config
+              key: CELERY_RESULT_SERIALIZER
+        - name: CELERY_ACCEPT_CONTENT
+          valueFrom:
+            configMapKeyRef:
+              name: remotehive-config
+              key: CELERY_ACCEPT_CONTENT
+        - name: CELERY_TIMEZONE
+          valueFrom:
+            configMapKeyRef:
+              name: remotehive-config
+              key: CELERY_TIMEZONE
+        - name: SMTP_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: remotehive-secrets
+              key: SMTP_USERNAME
+        - name: SMTP_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: remotehive-secrets
+              key: SMTP_PASSWORD
+        - name: SMTP_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: remotehive-config
+              key: SMTP_PORT
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+        - name: uploads
+          mountPath: /app/uploads
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          exec:
+            command:
+            - celery
+            - -A
+            - app.tasks.celery_app
+            - inspect
+            - ping
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - celery
+            - -A
+            - app.tasks.celery_app
+            - inspect
+            - ping
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      volumes:
+      - name: logs
+        persistentVolumeClaim:
+          claimName: logs-pvc
+      - name: uploads
+        persistentVolumeClaim:
+          claimName: uploads-pvc
+      restartPolicy: Always
+---
+# Celery Beat Scheduler Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: celery-beat
+  namespace: remotehive
+  labels:
+    app: celery-beat
+    tier: scheduler
+    version: "1.0"
+spec:
+  replicas: 1  # Only one beat scheduler should run
+  strategy:
+    type: Recreate  # Ensure only one instance runs at a time
+  selector:
+    matchLabels:
+      app: celery-beat
+      tier: scheduler
+  template:
+    metadata:
+      labels:
+        app: celery-beat
+        tier: scheduler
+        version: "1.0"
+    spec:
+      initContainers:
+      - name: wait-for-redis
+        image: busybox:1.35
+        command: ['sh', '-c']
+        args:
+        - |
+          until nc -z redis 6379; do
+            echo "Waiting for Redis..."
+            sleep 2
+          done
+          echo "Redis is ready!"
+      - name: wait-for-mongodb
+        image: busybox:1.35
+        command: ['sh', '-c']
+        args:
+        - |
+          until nc -z mongodb 27017; do
+            echo "Waiting for MongoDB..."
+            sleep 2
+          done
+          echo "MongoDB is ready!"
+      containers:
+      - name: celery-beat
+        image: remotehive/backend-api:latest
+        imagePullPolicy: Always
+        command:
+        - celery
+        - -A
+        - app.tasks.celery_app
+        - beat
+        - --loglevel=info
+        - --schedule=/app/celerybeat-schedule
+        env:
+        - name: ENVIRONMENT
+          valueFrom:
+            configMapKeyRef:
+              name: remotehive-config
+              key: ENVIRONMENT
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: remotehive-config
+              key: LOG_LEVEL
+        - name: MONGODB_URL
+          valueFrom:
+            secretKeyRef:
+              name: mongodb-secret
+              key: MONGODB_URL
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: redis-secret
+              key: REDIS_URL
+        - name: CELERY_BROKER_URL
+          valueFrom:
+            secretKeyRef:
+              name: redis-secret
+              key: REDIS_URL
+        - name: CELERY_RESULT_BACKEND
+          valueFrom:
+            secretKeyRef:
+              name: redis-secret
+              key: REDIS_URL
+        - name: CELERY_TASK_SERIALIZER
+          valueFrom:
+            configMapKeyRef:
+              name: remotehive-config
+              key: CELERY_TASK_SERIALIZER
+        - name: CELERY_RESULT_SERIALIZER
+          valueFrom:
+            configMapKeyRef:
+              name: remotehive-config
+              key: CELERY_RESULT_SERIALIZER
+        - name: CELERY_ACCEPT_CONTENT
+          valueFrom:
+            configMapKeyRef:
+              name: remotehive-config
+              key: CELERY_ACCEPT_CONTENT
+        - name: CELERY_TIMEZONE
+          valueFrom:
+            configMapKeyRef:
+              name: remotehive-config
+              key: CELERY_TIMEZONE
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+        - name: celery-schedule
+          mountPath: /app/celerybeat-schedule
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "250m"
+        livenessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - "ps aux | grep 'celery.*beat' | grep -v grep"
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+      volumes:
+      - name: logs
+        persistentVolumeClaim:
+          claimName: logs-pvc
+      - name: celery-schedule
+        emptyDir: {}
+      restartPolicy: Always
+---
+# Celery Worker Horizontal Pod Autoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: celery-worker-hpa
+  namespace: remotehive
+  labels:
+    app: celery-worker
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: celery-worker
+  minReplicas: 3
+  maxReplicas: 8
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 75
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 85
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 25
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+      selectPolicy: Max
+---
+# Celery Worker Pod Disruption Budget
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: celery-worker-pdb
+  namespace: remotehive
+  labels:
+    app: celery-worker
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: celery-worker
+      tier: worker

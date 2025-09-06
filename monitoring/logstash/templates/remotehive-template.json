@@ -1,0 +1,426 @@
+{
+  "index_patterns": ["remotehive-*"],
+  "version": 1,
+  "settings": {
+    "index": {
+      "number_of_shards": 1,
+      "number_of_replicas": 1,
+      "refresh_interval": "5s",
+      "max_result_window": 50000,
+      "lifecycle": {
+        "name": "remotehive-logs-policy",
+        "rollover_alias": "remotehive-logs"
+      },
+      "codec": "best_compression",
+      "mapping": {
+        "total_fields": {
+          "limit": 2000
+        }
+      }
+    },
+    "analysis": {
+      "analyzer": {
+        "log_analyzer": {
+          "type": "custom",
+          "tokenizer": "standard",
+          "filter": [
+            "lowercase",
+            "stop",
+            "snowball"
+          ]
+        },
+        "path_analyzer": {
+          "type": "custom",
+          "tokenizer": "path_hierarchy",
+          "filter": [
+            "lowercase"
+          ]
+        }
+      },
+      "tokenizer": {
+        "path_hierarchy": {
+          "type": "path_hierarchy",
+          "delimiter": "/"
+        }
+      }
+    }
+  },
+  "mappings": {
+    "dynamic_templates": [
+      {
+        "message_field": {
+          "path_match": "message",
+          "match_mapping_type": "string",
+          "mapping": {
+            "type": "text",
+            "analyzer": "log_analyzer",
+            "norms": false
+          }
+        }
+      },
+      {
+        "log_message_field": {
+          "path_match": "log_message",
+          "match_mapping_type": "string",
+          "mapping": {
+            "type": "text",
+            "analyzer": "log_analyzer",
+            "norms": false
+          }
+        }
+      },
+      {
+        "string_fields": {
+          "match": "*",
+          "match_mapping_type": "string",
+          "mapping": {
+            "type": "text",
+            "norms": false,
+            "fields": {
+              "keyword": {
+                "type": "keyword",
+                "ignore_above": 256
+              }
+            }
+          }
+        }
+      }
+    ],
+    "properties": {
+      "@timestamp": {
+        "type": "date",
+        "format": "strict_date_optional_time||epoch_millis"
+      },
+      "@version": {
+        "type": "keyword"
+      },
+      "timestamp": {
+        "type": "date",
+        "format": "strict_date_optional_time||epoch_millis"
+      },
+      "access_time": {
+        "type": "date",
+        "format": "dd/MMM/yyyy:HH:mm:ss Z"
+      },
+      "service": {
+        "type": "keyword"
+      },
+      "service_type": {
+        "type": "keyword"
+      },
+      "environment": {
+        "type": "keyword"
+      },
+      "cluster": {
+        "type": "keyword"
+      },
+      "log_level": {
+        "type": "keyword"
+      },
+      "severity": {
+        "type": "keyword"
+      },
+      "logger": {
+        "type": "keyword"
+      },
+      "component": {
+        "type": "keyword"
+      },
+      "context": {
+        "type": "keyword"
+      },
+      "process_id": {
+        "type": "integer"
+      },
+      "thread_id": {
+        "type": "integer"
+      },
+      "process_type": {
+        "type": "keyword"
+      },
+      "role": {
+        "type": "keyword"
+      },
+      "container_name": {
+        "type": "keyword"
+      },
+      "container_id": {
+        "type": "keyword"
+      },
+      "client_ip": {
+        "type": "ip"
+      },
+      "client_port": {
+        "type": "integer"
+      },
+      "remote_user": {
+        "type": "keyword"
+      },
+      "http_method": {
+        "type": "keyword"
+      },
+      "uri_path": {
+        "type": "text",
+        "analyzer": "path_analyzer",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 256
+          }
+        }
+      },
+      "uri_params": {
+        "type": "text",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 512
+          }
+        }
+      },
+      "api_path": {
+        "type": "text",
+        "analyzer": "path_analyzer",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 256
+          }
+        }
+      },
+      "api_method": {
+        "type": "keyword"
+      },
+      "http_version": {
+        "type": "keyword"
+      },
+      "status_code": {
+        "type": "integer"
+      },
+      "response_size": {
+        "type": "long"
+      },
+      "response_time": {
+        "type": "float"
+      },
+      "referrer": {
+        "type": "text",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 512
+          }
+        }
+      },
+      "user_agent": {
+        "type": "text",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 512
+          }
+        }
+      },
+      "task_name": {
+        "type": "keyword"
+      },
+      "task_id": {
+        "type": "keyword"
+      },
+      "task_status": {
+        "type": "keyword"
+      },
+      "jobs_scraped": {
+        "type": "integer"
+      },
+      "companies_scraped": {
+        "type": "integer"
+      },
+      "scrape_duration": {
+        "type": "float"
+      },
+      "metric_type": {
+        "type": "keyword"
+      },
+      "log_type": {
+        "type": "keyword"
+      },
+      "security_event": {
+        "type": "boolean"
+      },
+      "geoip": {
+        "properties": {
+          "location": {
+            "type": "geo_point"
+          },
+          "country_name": {
+            "type": "keyword"
+          },
+          "country_code2": {
+            "type": "keyword"
+          },
+          "country_code3": {
+            "type": "keyword"
+          },
+          "region_name": {
+            "type": "keyword"
+          },
+          "region_code": {
+            "type": "keyword"
+          },
+          "city_name": {
+            "type": "keyword"
+          },
+          "postal_code": {
+            "type": "keyword"
+          },
+          "timezone": {
+            "type": "keyword"
+          },
+          "continent_code": {
+            "type": "keyword"
+          },
+          "latitude": {
+            "type": "float"
+          },
+          "longitude": {
+            "type": "float"
+          }
+        }
+      },
+      "json_data": {
+        "type": "object",
+        "dynamic": true
+      },
+      "tags": {
+        "type": "keyword"
+      },
+      "type": {
+        "type": "keyword"
+      },
+      "host": {
+        "properties": {
+          "name": {
+            "type": "keyword"
+          },
+          "hostname": {
+            "type": "keyword"
+          },
+          "ip": {
+            "type": "ip"
+          },
+          "mac": {
+            "type": "keyword"
+          }
+        }
+      },
+      "agent": {
+        "properties": {
+          "name": {
+            "type": "keyword"
+          },
+          "type": {
+            "type": "keyword"
+          },
+          "version": {
+            "type": "keyword"
+          },
+          "hostname": {
+            "type": "keyword"
+          }
+        }
+      },
+      "input": {
+        "properties": {
+          "type": {
+            "type": "keyword"
+          }
+        }
+      },
+      "fields": {
+        "type": "object",
+        "dynamic": true
+      },
+      "ecs": {
+        "properties": {
+          "version": {
+            "type": "keyword"
+          }
+        }
+      },
+      "container": {
+        "properties": {
+          "id": {
+            "type": "keyword"
+          },
+          "name": {
+            "type": "keyword"
+          },
+          "image": {
+            "properties": {
+              "name": {
+                "type": "keyword"
+              },
+              "tag": {
+                "type": "keyword"
+              }
+            }
+          },
+          "labels": {
+            "type": "object",
+            "dynamic": true
+          }
+        }
+      },
+      "kubernetes": {
+        "properties": {
+          "pod": {
+            "properties": {
+              "name": {
+                "type": "keyword"
+              },
+              "uid": {
+                "type": "keyword"
+              }
+            }
+          },
+          "namespace": {
+            "type": "keyword"
+          },
+          "node": {
+            "properties": {
+              "name": {
+                "type": "keyword"
+              }
+            }
+          },
+          "deployment": {
+            "properties": {
+              "name": {
+                "type": "keyword"
+              }
+            }
+          },
+          "replicaset": {
+            "properties": {
+              "name": {
+                "type": "keyword"
+              }
+            }
+          },
+          "labels": {
+            "type": "object",
+            "dynamic": true
+          },
+          "annotations": {
+            "type": "object",
+            "dynamic": true
+          }
+        }
+      }
+    }
+  },
+  "aliases": {
+    "remotehive-logs": {}
+  }
+}

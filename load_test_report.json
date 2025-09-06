@@ -1,0 +1,85 @@
+{
+  "test_summary": {
+    "total_duration": 62.628621339797974,
+    "total_tests": 4,
+    "timestamp": "2025-08-12T13:44:43.798779"
+  },
+  "system_metrics": {
+    "initial": {
+      "cpu_percent": 25.8,
+      "memory_percent": 82.5,
+      "disk_usage_percent": 5.9,
+      "network_connections": 263,
+      "process_count": 361
+    },
+    "final": {
+      "cpu_percent": 31.3,
+      "memory_percent": 86.3,
+      "disk_usage_percent": 5.9,
+      "network_connections": 337,
+      "process_count": 366
+    },
+    "cpu_change": 5.5,
+    "memory_change": 3.799999999999997
+  },
+  "test_results": [
+    {
+      "test_name": "Health Endpoints Load Test",
+      "duration": 30.319750785827637,
+      "success_rate": 99.98825463941743,
+      "total_requests": 8514,
+      "successful_requests": 8513,
+      "failed_requests": 1,
+      "avg_response_time_ms": 74.63505082156195,
+      "min_response_time_ms": 2.025604248046875,
+      "max_response_time_ms": 2456.7224979400635,
+      "p95_response_time_ms": 261.440634727478,
+      "throughput_rps": 280.69012881830037,
+      "errors": [
+        "/api/v1/health/database: [WinError 64] The specified network name is no longer available"
+      ]
+    },
+    {
+      "test_name": "Connection Pool Test",
+      "duration": 5.489974498748779,
+      "success_rate": 100.0,
+      "total_requests": 1000,
+      "successful_requests": 1000,
+      "failed_requests": 0,
+      "avg_response_time_ms": 445.56644678115845,
+      "min_response_time_ms": 48.380136489868164,
+      "max_response_time_ms": 2462.185859680176,
+      "p95_response_time_ms": 1367.4304127693176,
+      "throughput_rps": 182.07725628333716,
+      "errors": []
+    },
+    {
+      "test_name": "Pagination Performance Test",
+      "duration": 8.055325508117676,
+      "success_rate": 100.0,
+      "total_requests": 45,
+      "successful_requests": 45,
+      "failed_requests": 0,
+      "avg_response_time_ms": 178.6528057522244,
+      "min_response_time_ms": 7.631540298461914,
+      "max_response_time_ms": 3005.2618980407715,
+      "p95_response_time_ms": 727.4975538253784,
+      "throughput_rps": 5.586207043515095,
+      "errors": []
+    },
+    {
+      "test_name": "Realistic User Scenarios",
+      "duration": 61.594233751297,
+      "success_rate": 100.0,
+      "total_requests": 1122,
+      "successful_requests": 1122,
+      "failed_requests": 0,
+      "avg_response_time_ms": 99.89776267087396,
+      "min_response_time_ms": 1.3897418975830078,
+      "max_response_time_ms": 2165.581703186035,
+      "p95_response_time_ms": 487.3073101043701,
+      "throughput_rps": 18.215197809718426,
+      "errors": []
+    }
+  ]
+}

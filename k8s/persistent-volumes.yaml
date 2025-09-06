@@ -1,0 +1,169 @@
+# MongoDB Persistent Volume
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mongodb-pv
+  labels:
+    app: mongodb
+    tier: database
+spec:
+  capacity:
+    storage: 50Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: fast-ssd
+  hostPath:
+    path: /data/mongodb
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongodb-pvc
+  namespace: remotehive
+  labels:
+    app: mongodb
+    tier: database
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: fast-ssd
+---
+# Redis Persistent Volume
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: redis-pv
+  labels:
+    app: redis
+    tier: cache
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: fast-ssd
+  hostPath:
+    path: /data/redis
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-pvc
+  namespace: remotehive
+  labels:
+    app: redis
+    tier: cache
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: fast-ssd
+---
+# Autoscraper SQLite Persistent Volume
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: autoscraper-pv
+  labels:
+    app: autoscraper
+    tier: service
+spec:
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: standard
+  hostPath:
+    path: /data/autoscraper
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: autoscraper-pvc
+  namespace: remotehive
+  labels:
+    app: autoscraper
+    tier: service
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: standard
+---
+# Shared Logs Persistent Volume
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: logs-pv
+  labels:
+    app: remotehive
+    tier: logging
+spec:
+  capacity:
+    storage: 30Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: standard
+  hostPath:
+    path: /data/logs
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: logs-pvc
+  namespace: remotehive
+  labels:
+    app: remotehive
+    tier: logging
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 30Gi
+  storageClassName: standard
+---
+# File Uploads Persistent Volume
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: uploads-pv
+  labels:
+    app: remotehive
+    tier: storage
+spec:
+  capacity:
+    storage: 100Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: standard
+  hostPath:
+    path: /data/uploads
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: uploads-pvc
+  namespace: remotehive
+  labels:
+    app: remotehive
+    tier: storage
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: standard

@@ -1,0 +1,394 @@
+# ServiceMonitor for Prometheus monitoring
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: remotehive-services-monitor
+  namespace: remotehive
+  labels:
+    app: remotehive
+    tier: monitoring
+spec:
+  selector:
+    matchLabels:
+      monitoring: "enabled"
+  endpoints:
+  - port: http
+    interval: 30s
+    path: /metrics
+    honorLabels: true
+  - port: http
+    interval: 30s
+    path: /health
+    honorLabels: true
+  namespaceSelector:
+    matchNames:
+    - remotehive
+---
+# Grafana Dashboard ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: remotehive-dashboard
+  namespace: remotehive
+  labels:
+    app: remotehive
+    tier: monitoring
+    grafana_dashboard: "1"
+data:
+  remotehive-dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "RemoteHive Services Dashboard",
+        "tags": ["remotehive", "microservices"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Service Health Status",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "up{job=\"remotehive-services\"}",
+                "legendFormat": "{{instance}}"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "thresholds": {
+                  "steps": [
+                    {"color": "red", "value": 0},
+                    {"color": "green", "value": 1}
+                  ]
+                }
+              }
+            },
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+          },
+          {
+            "id": 2,
+            "title": "Request Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(http_requests_total[5m])",
+                "legendFormat": "{{service}} - {{method}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+          },
+          {
+            "id": 3,
+            "title": "Response Time",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))",
+                "legendFormat": "95th percentile"
+              },
+              {
+                "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket[5m]))",
+                "legendFormat": "50th percentile"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+          },
+          {
+            "id": 4,
+            "title": "Error Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(http_requests_total{status=~\"5..\"}[5m])",
+                "legendFormat": "5xx errors"
+              },
+              {
+                "expr": "rate(http_requests_total{status=~\"4..\"}[5m])",
+                "legendFormat": "4xx errors"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+          }
+        ],
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "refresh": "30s"
+      }
+    }
+---
+# Prometheus Rules for Alerting
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: remotehive-alerts
+  namespace: remotehive
+  labels:
+    app: remotehive
+    tier: monitoring
+spec:
+  groups:
+  - name: remotehive.rules
+    rules:
+    # Service Down Alert
+    - alert: ServiceDown
+      expr: up{job="remotehive-services"} == 0
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "RemoteHive service {{ $labels.instance }} is down"
+        description: "Service {{ $labels.instance }} has been down for more than 1 minute."
+    
+    # High Error Rate Alert
+    - alert: HighErrorRate
+      expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.1
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High error rate on {{ $labels.service }}"
+        description: "Error rate is {{ $value }} errors per second on {{ $labels.service }}."
+    
+    # High Response Time Alert
+    - alert: HighResponseTime
+      expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High response time on {{ $labels.service }}"
+        description: "95th percentile response time is {{ $value }}s on {{ $labels.service }}."
+    
+    # Database Connection Alert
+    - alert: DatabaseConnectionFailed
+      expr: mongodb_up == 0 or redis_up == 0
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Database connection failed"
+        description: "Database connection has been failing for more than 1 minute."
+    
+    # High Memory Usage Alert
+    - alert: HighMemoryUsage
+      expr: (container_memory_usage_bytes / container_spec_memory_limit_bytes) > 0.9
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High memory usage on {{ $labels.pod }}"
+        description: "Memory usage is {{ $value | humanizePercentage }} on {{ $labels.pod }}."
+    
+    # High CPU Usage Alert
+    - alert: HighCPUUsage
+      expr: rate(container_cpu_usage_seconds_total[5m]) > 0.8
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High CPU usage on {{ $labels.pod }}"
+        description: "CPU usage is {{ $value | humanizePercentage }} on {{ $labels.pod }}."
+    
+    # Pod Restart Alert
+    - alert: PodRestartingTooOften
+      expr: increase(kube_pod_container_status_restarts_total[1h]) > 3
+      for: 0m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Pod {{ $labels.pod }} is restarting too often"
+        description: "Pod {{ $labels.pod }} has restarted {{ $value }} times in the last hour."
+    
+    # Celery Queue Length Alert
+    - alert: CeleryQueueTooLong
+      expr: celery_queue_length > 100
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Celery queue is too long"
+        description: "Celery queue length is {{ $value }} tasks."
+---
+# Health Check Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: health-check-service
+  namespace: remotehive
+  labels:
+    app: health-check
+    tier: monitoring
+spec:
+  selector:
+    app: health-check
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  type: ClusterIP
+---
+# Health Check Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: health-check
+  namespace: remotehive
+  labels:
+    app: health-check
+    tier: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: health-check
+  template:
+    metadata:
+      labels:
+        app: health-check
+        tier: monitoring
+    spec:
+      containers:
+      - name: health-check
+        image: nginx:1.21-alpine
+        ports:
+        - containerPort: 8080
+        volumeMounts:
+        - name: health-check-config
+          mountPath: /etc/nginx/conf.d
+        - name: health-check-html
+          mountPath: /usr/share/nginx/html
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+      volumes:
+      - name: health-check-config
+        configMap:
+          name: health-check-nginx-config
+      - name: health-check-html
+        configMap:
+          name: health-check-html
+---
+# Health Check Nginx Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: health-check-nginx-config
+  namespace: remotehive
+  labels:
+    app: health-check
+data:
+  default.conf: |
+    server {
+        listen 8080;
+        server_name localhost;
+        
+        location /health {
+            access_log off;
+            return 200 "healthy\n";
+            add_header Content-Type text/plain;
+        }
+        
+        location /status {
+            access_log off;
+            return 200 '{"status":"ok","timestamp":"'$(date -Iseconds)'","services":{"backend-api":"checking","autoscraper":"checking","admin-panel":"checking","public-website":"checking"}}';
+            add_header Content-Type application/json;
+        }
+        
+        location / {
+            root /usr/share/nginx/html;
+            index index.html;
+        }
+    }
+---
+# Health Check HTML Page
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: health-check-html
+  namespace: remotehive
+  labels:
+    app: health-check
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>RemoteHive Health Check</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+            body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
+            .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+            .status { padding: 10px; margin: 10px 0; border-radius: 4px; }
+            .healthy { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+            .unhealthy { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+            .checking { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+            h1 { color: #333; }
+            .timestamp { color: #666; font-size: 0.9em; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>RemoteHive System Health</h1>
+            <div id="status-container">
+                <div class="status checking">
+                    <strong>System Status:</strong> Checking services...
+                </div>
+            </div>
+            <div class="timestamp" id="timestamp"></div>
+        </div>
+        
+        <script>
+            function updateStatus() {
+                fetch('/status')
+                    .then(response => response.json())
+                    .then(data => {
+                        const container = document.getElementById('status-container');
+                        const timestamp = document.getElementById('timestamp');
+                        
+                        let html = '<div class="status healthy"><strong>System Status:</strong> All services operational</div>';
+                        
+                        for (const [service, status] of Object.entries(data.services)) {
+                            const statusClass = status === 'healthy' ? 'healthy' : status === 'unhealthy' ? 'unhealthy' : 'checking';
+                            html += `<div class="status ${statusClass}"><strong>${service}:</strong> ${status}</div>`;
+                        }
+                        
+                        container.innerHTML = html;
+                        timestamp.textContent = `Last updated: ${new Date(data.timestamp).toLocaleString()}`;
+                    })
+                    .catch(error => {
+                        console.error('Error fetching status:', error);
+                        document.getElementById('status-container').innerHTML = 
+                            '<div class="status unhealthy"><strong>Error:</strong> Unable to fetch system status</div>';
+                    });
+            }
+            
+            // Update status every 30 seconds
+            updateStatus();
+            setInterval(updateStatus, 30000);
+        </script>
+    </body>
+    </html>

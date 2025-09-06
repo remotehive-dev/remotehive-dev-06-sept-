@@ -1,0 +1,314 @@
+# RemoteHive Alerting Rules
+# Comprehensive monitoring and alerting for all services
+
+groups:
+  # Service Health Alerts
+  - name: remotehive.service.health
+    rules:
+      # Backend API Health
+      - alert: RemoteHiveBackendDown
+        expr: up{job="remotehive-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: backend
+        annotations:
+          summary: "RemoteHive Backend API is down"
+          description: "The RemoteHive Backend API has been down for more than 1 minute."
+          runbook_url: "https://docs.remotehive.com/runbooks/backend-down"
+
+      # Autoscraper Service Health
+      - alert: RemoteHiveAutoscraperDown
+        expr: up{job="remotehive-autoscraper"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: autoscraper
+        annotations:
+          summary: "RemoteHive Autoscraper service is down"
+          description: "The RemoteHive Autoscraper service has been down for more than 2 minutes."
+
+      # Admin Panel Health
+      - alert: RemoteHiveAdminDown
+        expr: up{job="remotehive-admin"} == 0
+        for: 3m
+        labels:
+          severity: warning
+          service: admin
+        annotations:
+          summary: "RemoteHive Admin Panel is down"
+          description: "The RemoteHive Admin Panel has been down for more than 3 minutes."
+
+      # Public Website Health
+      - alert: RemoteHivePublicDown
+        expr: up{job="remotehive-public"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: public
+        annotations:
+          summary: "RemoteHive Public Website is down"
+          description: "The RemoteHive Public Website has been down for more than 2 minutes."
+
+  # Database Alerts
+  - name: remotehive.database
+    rules:
+      # MongoDB Health
+      - alert: MongoDBDown
+        expr: up{job="mongodb-exporter"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: mongodb
+        annotations:
+          summary: "MongoDB is down"
+          description: "MongoDB has been down for more than 1 minute."
+
+      # MongoDB Connection Issues
+      - alert: MongoDBHighConnections
+        expr: mongodb_connections{state="current"} > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: mongodb
+        annotations:
+          summary: "MongoDB high connection count"
+          description: "MongoDB has {{ $value }} active connections, which is above the threshold."
+
+      # Redis Health
+      - alert: RedisDown
+        expr: up{job="redis-exporter"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: redis
+        annotations:
+          summary: "Redis is down"
+          description: "Redis has been down for more than 1 minute."
+
+      # Redis Memory Usage
+      - alert: RedisHighMemoryUsage
+        expr: (redis_memory_used_bytes / redis_memory_max_bytes) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+          service: redis
+        annotations:
+          summary: "Redis high memory usage"
+          description: "Redis memory usage is {{ $value }}%, which is above 90%."
+
+  # Performance Alerts
+  - name: remotehive.performance
+    rules:
+      # High Response Time
+      - alert: RemoteHiveHighResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="remotehive-backend"}[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+          service: backend
+        annotations:
+          summary: "RemoteHive Backend high response time"
+          description: "95th percentile response time is {{ $value }}s, which is above 2s."
+
+      # High Error Rate
+      - alert: RemoteHiveHighErrorRate
+        expr: rate(http_requests_total{job="remotehive-backend",status=~"5.."}[5m]) / rate(http_requests_total{job="remotehive-backend"}[5m]) > 0.05
+        for: 3m
+        labels:
+          severity: warning
+          service: backend
+        annotations:
+          summary: "RemoteHive Backend high error rate"
+          description: "Error rate is {{ $value | humanizePercentage }}, which is above 5%."
+
+      # Low Request Rate (possible issue)
+      - alert: RemoteHiveLowRequestRate
+        expr: rate(http_requests_total{job="remotehive-backend"}[5m]) < 0.1
+        for: 10m
+        labels:
+          severity: info
+          service: backend
+        annotations:
+          summary: "RemoteHive Backend low request rate"
+          description: "Request rate is {{ $value }} requests/second, which is unusually low."
+
+  # Resource Usage Alerts
+  - name: remotehive.resources
+    rules:
+      # High CPU Usage
+      - alert: RemoteHiveHighCPUUsage
+        expr: rate(container_cpu_usage_seconds_total{name=~"remotehive-.*"}[5m]) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "RemoteHive container high CPU usage"
+          description: "Container {{ $labels.name }} CPU usage is {{ $value }}%, which is above 80%."
+
+      # High Memory Usage
+      - alert: RemoteHiveHighMemoryUsage
+        expr: (container_memory_usage_bytes{name=~"remotehive-.*"} / container_spec_memory_limit_bytes{name=~"remotehive-.*"}) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "RemoteHive container high memory usage"
+          description: "Container {{ $labels.name }} memory usage is {{ $value }}%, which is above 85%."
+
+      # Disk Space Usage
+      - alert: RemoteHiveHighDiskUsage
+        expr: (node_filesystem_size_bytes{fstype!="tmpfs"} - node_filesystem_avail_bytes{fstype!="tmpfs"}) / node_filesystem_size_bytes{fstype!="tmpfs"} * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High disk usage"
+          description: "Disk usage on {{ $labels.device }} is {{ $value }}%, which is above 85%."
+
+  # Celery Worker Alerts
+  - name: remotehive.celery
+    rules:
+      # Celery Queue Length
+      - alert: RemoteHiveCeleryQueueHigh
+        expr: celery_queue_length > 100
+        for: 5m
+        labels:
+          severity: warning
+          service: celery
+        annotations:
+          summary: "RemoteHive Celery queue length high"
+          description: "Celery queue {{ $labels.queue }} has {{ $value }} tasks, which is above 100."
+
+      # Celery Worker Down
+      - alert: RemoteHiveCeleryWorkerDown
+        expr: celery_workers_active == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: celery
+        annotations:
+          summary: "RemoteHive Celery workers are down"
+          description: "No active Celery workers detected for more than 2 minutes."
+
+      # Celery Task Failure Rate
+      - alert: RemoteHiveCeleryHighFailureRate
+        expr: rate(celery_task_failed_total[5m]) / rate(celery_task_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: celery
+        annotations:
+          summary: "RemoteHive Celery high task failure rate"
+          description: "Celery task failure rate is {{ $value | humanizePercentage }}, which is above 10%."
+
+  # Security Alerts
+  - name: remotehive.security
+    rules:
+      # Too Many Failed Login Attempts
+      - alert: RemoteHiveHighFailedLogins
+        expr: increase(http_requests_total{job="remotehive-backend",endpoint="/auth/login",status="401"}[5m]) > 10
+        for: 1m
+        labels:
+          severity: warning
+          service: backend
+        annotations:
+          summary: "RemoteHive high failed login attempts"
+          description: "{{ $value }} failed login attempts in the last 5 minutes."
+
+      # Unusual Traffic Pattern
+      - alert: RemoteHiveUnusualTraffic
+        expr: rate(http_requests_total{job="remotehive-backend"}[5m]) > (avg_over_time(rate(http_requests_total{job="remotehive-backend"}[5m])[1h:5m]) * 3)
+        for: 5m
+        labels:
+          severity: info
+          service: backend
+        annotations:
+          summary: "RemoteHive unusual traffic pattern"
+          description: "Current request rate is {{ $value }} requests/second, which is 3x higher than the hourly average."
+
+  # Business Logic Alerts
+  - name: remotehive.business
+    rules:
+      # Job Scraping Issues
+      - alert: RemoteHiveJobScrapingDown
+        expr: increase(autoscraper_jobs_scraped_total[1h]) == 0
+        for: 2h
+        labels:
+          severity: warning
+          service: autoscraper
+        annotations:
+          summary: "RemoteHive job scraping stopped"
+          description: "No jobs have been scraped in the last 2 hours."
+
+      # Low Job Application Rate
+      - alert: RemoteHiveLowJobApplications
+        expr: increase(remotehive_job_applications_total[1h]) < 5
+        for: 2h
+        labels:
+          severity: info
+          service: backend
+        annotations:
+          summary: "RemoteHive low job application rate"
+          description: "Only {{ $value }} job applications in the last hour, which is unusually low."
+
+      # Email Service Issues
+      - alert: RemoteHiveEmailServiceDown
+        expr: increase(remotehive_emails_failed_total[5m]) > 5
+        for: 5m
+        labels:
+          severity: warning
+          service: backend
+        annotations:
+          summary: "RemoteHive email service issues"
+          description: "{{ $value }} email failures in the last 5 minutes."
+
+  # External Dependencies
+  - name: remotehive.external
+    rules:
+      # External API Failures
+      - alert: RemoteHiveExternalAPIFailures
+        expr: increase(remotehive_external_api_failures_total[5m]) > 3
+        for: 5m
+        labels:
+          severity: warning
+          service: backend
+        annotations:
+          summary: "RemoteHive external API failures"
+          description: "{{ $value }} external API failures in the last 5 minutes for {{ $labels.api }}."
+
+      # SSL Certificate Expiry
+      - alert: RemoteHiveSSLCertificateExpiry
+        expr: probe_ssl_earliest_cert_expiry - time() < 86400 * 7
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "RemoteHive SSL certificate expiring soon"
+          description: "SSL certificate for {{ $labels.instance }} expires in {{ $value | humanizeDuration }}."
+
+  # Infrastructure Alerts
+  - name: remotehive.infrastructure
+    rules:
+      # Container Restart Rate
+      - alert: RemoteHiveContainerRestarts
+        expr: increase(kube_pod_container_status_restarts_total{pod=~"remotehive-.*"}[1h]) > 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "RemoteHive container restarting frequently"
+          description: "Container {{ $labels.container }} in pod {{ $labels.pod }} has restarted {{ $value }} times in the last hour."
+
+      # Node Resource Exhaustion
+      - alert: RemoteHiveNodeResourceExhaustion
+        expr: |
+          (
+            (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes
+          ) * 100 > 90
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Node memory usage critical"
+          description: "Node {{ $labels.instance }} memory usage is {{ $value }}%, which is above 90%."

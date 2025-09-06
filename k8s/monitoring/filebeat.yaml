@@ -1,0 +1,435 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: filebeat-config
+  namespace: remotehive-monitoring
+  labels:
+    app: filebeat
+data:
+  filebeat.yml: |
+    filebeat.inputs:
+    # Container logs from Kubernetes
+    - type: container
+      paths:
+        - /var/log/containers/*remotehive*.log
+        - /var/log/containers/*backend*.log
+        - /var/log/containers/*autoscraper*.log
+        - /var/log/containers/*admin*.log
+        - /var/log/containers/*public*.log
+        - /var/log/containers/*celery*.log
+        - /var/log/containers/*mongo*.log
+        - /var/log/containers/*redis*.log
+        - /var/log/containers/*nginx*.log
+      processors:
+      - add_kubernetes_metadata:
+          host: ${NODE_NAME}
+          matchers:
+          - logs_path:
+              logs_path: "/var/log/containers/"
+      - decode_json_fields:
+          fields: ["message"]
+          target: ""
+          overwrite_keys: true
+      - timestamp:
+          field: time
+          layouts:
+            - '2006-01-02T15:04:05.000Z'
+            - '2006-01-02T15:04:05Z'
+          test:
+            - '2023-01-02T15:04:05.000Z'
+      fields:
+        logtype: container
+        environment: ${ENVIRONMENT:production}
+      fields_under_root: true
+    
+    # System logs
+    - type: log
+      paths:
+        - /var/log/syslog
+        - /var/log/messages
+        - /var/log/kern.log
+        - /var/log/auth.log
+      fields:
+        logtype: system
+        environment: ${ENVIRONMENT:production}
+      fields_under_root: true
+      multiline.pattern: '^[A-Za-z]{3}\s+[0-9]{1,2}\s+[0-9]{2}:[0-9]{2}:[0-9]{2}'
+      multiline.negate: true
+      multiline.match: after
+    
+    # Kubernetes audit logs
+    - type: log
+      paths:
+        - /var/log/audit.log
+      fields:
+        logtype: audit
+        environment: ${ENVIRONMENT:production}
+      fields_under_root: true
+      json.keys_under_root: true
+      json.add_error_key: true
+    
+    # Docker daemon logs
+    - type: log
+      paths:
+        - /var/log/docker.log
+      fields:
+        logtype: docker
+        environment: ${ENVIRONMENT:production}
+      fields_under_root: true
+      multiline.pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}'
+      multiline.negate: true
+      multiline.match: after
+    
+    # Kubernetes component logs
+    - type: log
+      paths:
+        - /var/log/kube-apiserver.log
+        - /var/log/kube-controller-manager.log
+        - /var/log/kube-scheduler.log
+        - /var/log/kubelet.log
+        - /var/log/kube-proxy.log
+      fields:
+        logtype: kubernetes
+        environment: ${ENVIRONMENT:production}
+      fields_under_root: true
+      multiline.pattern: '^[A-Z][0-9]{4}\s+[0-9]{2}:[0-9]{2}:[0-9]{2}'
+      multiline.negate: true
+      multiline.match: after
+    
+    # Processors
+    processors:
+    - add_host_metadata:
+        when.not.contains.tags: forwarded
+    - add_docker_metadata: ~
+    - add_kubernetes_metadata:
+        host: ${NODE_NAME}
+        matchers:
+        - logs_path:
+            logs_path: "/var/log/containers/"
+    - drop_event:
+        when:
+          or:
+            - contains:
+                message: "healthcheck"
+            - contains:
+                message: "ping"
+            - contains:
+                message: "GET /health"
+            - contains:
+                kubernetes.container.name: "pause"
+    - rename:
+        fields:
+          - from: "kubernetes.container.name"
+            to: "service"
+        ignore_missing: true
+    - script:
+        lang: javascript
+        source: >
+          function process(event) {
+            var service = event.Get("service");
+            var namespace = event.Get("kubernetes.namespace");
+            var podName = event.Get("kubernetes.pod.name");
+            
+            // Set service type based on container name
+            if (service) {
+              if (service.includes("backend") || service.includes("api")) {
+                event.Put("service_type", "backend-api");
+              } else if (service.includes("autoscraper")) {
+                event.Put("service_type", "autoscraper");
+              } else if (service.includes("admin")) {
+                event.Put("service_type", "admin-panel");
+              } else if (service.includes("public")) {
+                event.Put("service_type", "public-website");
+              } else if (service.includes("celery")) {
+                event.Put("service_type", "celery-worker");
+              } else if (service.includes("mongo")) {
+                event.Put("service_type", "mongodb");
+              } else if (service.includes("redis")) {
+                event.Put("service_type", "redis");
+              } else if (service.includes("nginx")) {
+                event.Put("service_type", "nginx");
+              }
+            }
+            
+            // Set environment based on namespace
+            if (namespace) {
+              if (namespace.includes("prod")) {
+                event.Put("environment", "production");
+              } else if (namespace.includes("staging")) {
+                event.Put("environment", "staging");
+              } else if (namespace.includes("dev")) {
+                event.Put("environment", "development");
+              }
+            }
+            
+            // Extract job information from autoscraper logs
+            var message = event.Get("message");
+            if (message && service && service.includes("autoscraper")) {
+              var jobMatch = message.match(/Scraped (\d+) jobs from (.+)/);
+              if (jobMatch) {
+                event.Put("jobs_scraped", parseInt(jobMatch[1]));
+                event.Put("job_source", jobMatch[2]);
+              }
+            }
+            
+            // Extract HTTP status codes
+            if (message) {
+              var statusMatch = message.match(/\b(\d{3})\b/);
+              if (statusMatch) {
+                var status = parseInt(statusMatch[1]);
+                if (status >= 200 && status < 600) {
+                  event.Put("http_status", status);
+                  
+                  // Categorize status codes
+                  if (status >= 200 && status < 300) {
+                    event.Put("status_category", "success");
+                  } else if (status >= 300 && status < 400) {
+                    event.Put("status_category", "redirect");
+                  } else if (status >= 400 && status < 500) {
+                    event.Put("status_category", "client_error");
+                  } else if (status >= 500) {
+                    event.Put("status_category", "server_error");
+                  }
+                }
+              }
+            }
+            
+            return event;
+          }
+    
+    # Output configuration
+    output.logstash:
+      hosts: ["logstash:5044"]
+      compression_level: 3
+      bulk_max_size: 2048
+      worker: 2
+      template.enabled: false
+      loadbalance: true
+    
+    # Logging configuration
+    logging.level: info
+    logging.to_files: true
+    logging.files:
+      path: /var/log/filebeat
+      name: filebeat
+      keepfiles: 7
+      permissions: 0644
+    
+    # Monitoring
+    monitoring.enabled: true
+    http.enabled: true
+    http.host: 0.0.0.0
+    http.port: 5066
+    
+    # Setup
+    setup.template.enabled: false
+    setup.ilm.enabled: false
+    
+    # Autodiscovery
+    filebeat.autodiscover:
+      providers:
+        - type: kubernetes
+          node: ${NODE_NAME}
+          hints.enabled: true
+          hints.default_config:
+            type: container
+            paths:
+              - /var/log/containers/*${data.kubernetes.container.id}.log
+          templates:
+            - condition:
+                contains:
+                  kubernetes.labels.app: "remotehive-backend"
+              config:
+                type: container
+                paths:
+                  - /var/log/containers/*${data.kubernetes.container.id}.log
+                processors:
+                  - decode_json_fields:
+                      fields: ["message"]
+                      target: ""
+                      overwrite_keys: true
+            - condition:
+                contains:
+                  kubernetes.labels.app: "remotehive-autoscraper"
+              config:
+                type: container
+                paths:
+                  - /var/log/containers/*${data.kubernetes.container.id}.log
+                processors:
+                  - decode_json_fields:
+                      fields: ["message"]
+                      target: ""
+                      overwrite_keys: true
+            - condition:
+                contains:
+                  kubernetes.labels.app: "remotehive-admin"
+              config:
+                type: container
+                paths:
+                  - /var/log/containers/*${data.kubernetes.container.id}.log
+            - condition:
+                contains:
+                  kubernetes.labels.app: "remotehive-public"
+              config:
+                type: container
+                paths:
+                  - /var/log/containers/*${data.kubernetes.container.id}.log
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: filebeat
+  namespace: remotehive-monitoring
+  labels:
+    app: filebeat
+spec:
+  selector:
+    matchLabels:
+      app: filebeat
+  template:
+    metadata:
+      labels:
+        app: filebeat
+    spec:
+      serviceAccountName: filebeat
+      terminationGracePeriodSeconds: 30
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+      - name: filebeat
+        image: docker.elastic.co/beats/filebeat:8.11.0
+        args: [
+          "-c", "/etc/filebeat.yml",
+          "-e",
+        ]
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: ENVIRONMENT
+          value: "production"
+        securityContext:
+          runAsUser: 0
+          # If using Red Hat OpenShift uncomment this:
+          #privileged: true
+        resources:
+          limits:
+            memory: 200Mi
+            cpu: 100m
+          requests:
+            cpu: 100m
+            memory: 100Mi
+        volumeMounts:
+        - name: config
+          mountPath: /etc/filebeat.yml
+          readOnly: true
+          subPath: filebeat.yml
+        - name: data
+          mountPath: /usr/share/filebeat/data
+        - name: varlibdockercontainers
+          mountPath: /var/lib/docker/containers
+          readOnly: true
+        - name: varlog
+          mountPath: /var/log
+          readOnly: true
+        - name: dockersock
+          mountPath: /var/run/docker.sock
+          readOnly: true
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 5066
+          initialDelaySeconds: 30
+          timeoutSeconds: 15
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 5066
+          initialDelaySeconds: 10
+          timeoutSeconds: 15
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+      volumes:
+      - name: config
+        configMap:
+          defaultMode: 0640
+          name: filebeat-config
+      - name: varlibdockercontainers
+        hostPath:
+          path: /var/lib/docker/containers
+      - name: varlog
+        hostPath:
+          path: /var/log
+      - name: dockersock
+        hostPath:
+          path: /var/run/docker.sock
+      - name: data
+        hostPath:
+          path: /var/lib/filebeat-data
+          type: DirectoryOrCreate
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: filebeat
+rules:
+- apiGroups: [""]
+  resources:
+  - nodes
+  - namespaces
+  - events
+  - pods
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources:
+  - replicasets
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["batch"]
+  resources:
+  - jobs
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: filebeat
+  namespace: remotehive-monitoring
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: filebeat
+roleRef:
+  kind: ClusterRole
+  name: filebeat
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: ServiceAccount
+  name: filebeat
+  namespace: remotehive-monitoring
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: filebeat
+  namespace: remotehive-monitoring
+  labels:
+    app: filebeat
+  annotations:
+    prometheus.io/scrape: 'true'
+    prometheus.io/port: '5066'
+    prometheus.io/path: '/stats'
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5066
+    targetPort: 5066
+    protocol: TCP
+    name: monitoring
+  selector:
+    app: filebeat

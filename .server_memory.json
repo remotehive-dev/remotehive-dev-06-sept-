@@ -1,0 +1,32 @@
+{
+  "servers": {
+    "redis": {
+      "pid": 22361,
+      "port": 6379,
+      "name": "Redis Server",
+      "started_at": "2025-08-26T15:58:08.349029",
+      "command": "redis-server --port 6379",
+      "cwd": "/Users/ranjeettiwary/Downloads/developer/RemoteHive_Migration_Package"
+    },
+    "celery_worker": {
+      "pid": 22379,
+      "port": null,
+      "name": "Celery Worker (Email Server)",
+      "started_at": "2025-08-26T15:58:10.366364",
+      "command": "python -m celery -A app.core.celery worker --loglevel=info --pool=solo",
+      "cwd": "/Users/ranjeettiwary/Downloads/developer/RemoteHive_Migration_Package"
+    },
+    "celery_beat": {
+      "pid": 22407,
+      "port": null,
+      "name": "Celery Beat (Task Scheduler)",
+      "started_at": "2025-08-26T15:58:13.376678",
+      "command": "python -m celery -A app.core.celery beat --loglevel=info",
+      "cwd": "/Users/ranjeettiwary/Downloads/developer/RemoteHive_Migration_Package"
+    }
+  },
+  "last_startup": null,
+  "last_shutdown": "2025-08-26T15:58:08.314665",
+  "startup_count": 0,
+  "last_update": "2025-08-26T15:58:24.452015"
+}

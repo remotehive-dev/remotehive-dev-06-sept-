@@ -1,0 +1,382 @@
+name: RemoteHive Docker CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  release:
+    types: [ published ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
+
+jobs:
+  # Test Job - Run tests in Docker containers
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [backend, autoscraper]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build test image for ${{ matrix.service }}
+      run: |
+        if [ "${{ matrix.service }}" = "backend" ]; then
+          docker build -t remotehive-backend-test -f Dockerfile --target test .
+        else
+          docker build -t remotehive-autoscraper-test -f autoscraper-service/Dockerfile --target test ./autoscraper-service
+        fi
+
+    - name: Run tests for ${{ matrix.service }}
+      run: |
+        if [ "${{ matrix.service }}" = "backend" ]; then
+          docker run --rm remotehive-backend-test pytest tests/ -v --cov=app --cov-report=xml
+        else
+          docker run --rm remotehive-autoscraper-test pytest tests/ -v --cov=app --cov-report=xml
+        fi
+
+  # Frontend Test Job
+  frontend-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [admin, public]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: |
+          remotehive-admin/package-lock.json
+          remotehive-public/package-lock.json
+
+    - name: Install dependencies for ${{ matrix.service }}
+      run: |
+        if [ "${{ matrix.service }}" = "admin" ]; then
+          cd remotehive-admin && npm ci
+        else
+          cd remotehive-public && npm ci
+        fi
+
+    - name: Run tests for ${{ matrix.service }}
+      run: |
+        if [ "${{ matrix.service }}" = "admin" ]; then
+          cd remotehive-admin && npm test
+        else
+          cd remotehive-public && npm test
+        fi
+
+    - name: Build ${{ matrix.service }}
+      run: |
+        if [ "${{ matrix.service }}" = "admin" ]; then
+          cd remotehive-admin && npm run build
+        else
+          cd remotehive-public && npm run build
+        fi
+
+  # Security Scan Job
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: [test, frontend-test]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  # Build and Push Images Job
+  build-and-push:
+    runs-on: ubuntu-latest
+    needs: [test, frontend-test, security-scan]
+    if: github.event_name != 'pull_request'
+    
+    strategy:
+      matrix:
+        service: [backend, autoscraper, admin, public, nginx]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.service }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Build and push ${{ matrix.service }} image
+      uses: docker/build-push-action@v5
+      with:
+        context: ${{ matrix.service == 'backend' && '.' || matrix.service == 'nginx' && './nginx' || format('./{0}-service', matrix.service == 'autoscraper' && 'autoscraper' || format('remotehive-{0}', matrix.service)) }}
+        file: ${{ matrix.service == 'backend' && './Dockerfile' || matrix.service == 'nginx' && './nginx/Dockerfile' || format('./{0}/Dockerfile', matrix.service == 'autoscraper' && 'autoscraper-service' || format('remotehive-{0}', matrix.service)) }}
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        platforms: linux/amd64,linux/arm64
+
+  # Integration Test Job
+  integration-test:
+    runs-on: ubuntu-latest
+    needs: [build-and-push]
+    if: github.event_name != 'pull_request'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Create test environment file
+      run: |
+        cat > .env.test << EOF
+        COMPOSE_PROJECT_NAME=remotehive-test
+        MONGODB_URL=mongodb://admin:password123@mongodb:27017/remotehive_test?authSource=admin
+        REDIS_URL=redis://:redis_password@redis:6379/1
+        JWT_SECRET_KEY=test-secret-key-for-ci-cd
+        ENVIRONMENT=test
+        DEBUG=false
+        EOF
+
+    - name: Run integration tests
+      run: |
+        # Use built images for integration testing
+        export BACKEND_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:${{ github.sha }}
+        export AUTOSCRAPER_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-autoscraper:${{ github.sha }}
+        export ADMIN_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-admin:${{ github.sha }}
+        export PUBLIC_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-public:${{ github.sha }}
+        export NGINX_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-nginx:${{ github.sha }}
+        
+        # Start services
+        docker-compose -f docker-compose.yml -f docker-compose.test.yml up -d
+        
+        # Wait for services to be ready
+        sleep 30
+        
+        # Run integration tests
+        docker-compose exec -T backend pytest tests/integration/ -v
+        
+        # Cleanup
+        docker-compose down -v
+
+  # Deploy to Staging
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: [integration-test]
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'v1.28.0'
+
+    - name: Configure kubectl for staging
+      run: |
+        echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > kubeconfig
+        export KUBECONFIG=kubeconfig
+
+    - name: Deploy to staging
+      run: |
+        export KUBECONFIG=kubeconfig
+        
+        # Update image tags in Kubernetes manifests
+        sed -i "s|image: .*backend.*|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:${{ github.sha }}|g" k8s/backend-api.yaml
+        sed -i "s|image: .*autoscraper.*|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-autoscraper:${{ github.sha }}|g" k8s/autoscraper-service.yaml
+        sed -i "s|image: .*admin.*|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-admin:${{ github.sha }}|g" k8s/admin-panel.yaml
+        sed -i "s|image: .*public.*|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-public:${{ github.sha }}|g" k8s/public-website.yaml
+        sed -i "s|image: .*nginx.*|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-nginx:${{ github.sha }}|g" k8s/ingress.yaml
+        
+        # Apply Kubernetes manifests
+        kubectl apply -f k8s/ -n remotehive-staging
+        
+        # Wait for rollout to complete
+        kubectl rollout status deployment/backend-api -n remotehive-staging --timeout=300s
+        kubectl rollout status deployment/autoscraper-service -n remotehive-staging --timeout=300s
+        kubectl rollout status deployment/admin-panel -n remotehive-staging --timeout=300s
+        kubectl rollout status deployment/public-website -n remotehive-staging --timeout=300s
+
+    - name: Run staging smoke tests
+      run: |
+        export KUBECONFIG=kubeconfig
+        
+        # Get staging URLs
+        BACKEND_URL=$(kubectl get ingress remotehive-ingress -n remotehive-staging -o jsonpath='{.spec.rules[0].host}')
+        
+        # Basic health checks
+        curl -f http://$BACKEND_URL/health || exit 1
+        curl -f http://$BACKEND_URL/api/v1/health || exit 1
+
+  # Deploy to Production
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: [integration-test]
+    if: github.event_name == 'release'
+    environment: production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'v1.28.0'
+
+    - name: Configure kubectl for production
+      run: |
+        echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" | base64 -d > kubeconfig
+        export KUBECONFIG=kubeconfig
+
+    - name: Deploy to production
+      run: |
+        export KUBECONFIG=kubeconfig
+        
+        # Update image tags in Kubernetes manifests
+        sed -i "s|image: .*backend.*|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:${{ github.sha }}|g" k8s/backend-api.yaml
+        sed -i "s|image: .*autoscraper.*|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-autoscraper:${{ github.sha }}|g" k8s/autoscraper-service.yaml
+        sed -i "s|image: .*admin.*|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-admin:${{ github.sha }}|g" k8s/admin-panel.yaml
+        sed -i "s|image: .*public.*|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-public:${{ github.sha }}|g" k8s/public-website.yaml
+        sed -i "s|image: .*nginx.*|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-nginx:${{ github.sha }}|g" k8s/ingress.yaml
+        
+        # Apply Kubernetes manifests with rolling update
+        kubectl apply -f k8s/ -n remotehive-production
+        
+        # Wait for rollout to complete
+        kubectl rollout status deployment/backend-api -n remotehive-production --timeout=600s
+        kubectl rollout status deployment/autoscraper-service -n remotehive-production --timeout=600s
+        kubectl rollout status deployment/admin-panel -n remotehive-production --timeout=600s
+        kubectl rollout status deployment/public-website -n remotehive-production --timeout=600s
+
+    - name: Run production smoke tests
+      run: |
+        export KUBECONFIG=kubeconfig
+        
+        # Get production URLs
+        BACKEND_URL=$(kubectl get ingress remotehive-ingress -n remotehive-production -o jsonpath='{.spec.rules[0].host}')
+        
+        # Basic health checks
+        curl -f https://$BACKEND_URL/health || exit 1
+        curl -f https://$BACKEND_URL/api/v1/health || exit 1
+
+    - name: Notify deployment success
+      if: success()
+      run: |
+        echo "🚀 RemoteHive successfully deployed to production!"
+        echo "Version: ${{ github.event.release.tag_name }}"
+        echo "Commit: ${{ github.sha }}"
+
+  # Cleanup Job
+  cleanup:
+    runs-on: ubuntu-latest
+    needs: [deploy-staging, deploy-production]
+    if: always()
+    
+    steps:
+    - name: Clean up old images
+      run: |
+        # This would typically clean up old container images
+        # Implementation depends on your registry and retention policy
+        echo "Cleanup job completed"
+
+  # Rollback Job (Manual trigger)
+  rollback:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    environment: production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'v1.28.0'
+
+    - name: Configure kubectl
+      run: |
+        echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" | base64 -d > kubeconfig
+        export KUBECONFIG=kubeconfig
+
+    - name: Rollback deployment
+      run: |
+        export KUBECONFIG=kubeconfig
+        
+        # Rollback to previous version
+        kubectl rollout undo deployment/backend-api -n remotehive-production
+        kubectl rollout undo deployment/autoscraper-service -n remotehive-production
+        kubectl rollout undo deployment/admin-panel -n remotehive-production
+        kubectl rollout undo deployment/public-website -n remotehive-production
+        
+        # Wait for rollback to complete
+        kubectl rollout status deployment/backend-api -n remotehive-production
+        kubectl rollout status deployment/autoscraper-service -n remotehive-production
+        kubectl rollout status deployment/admin-panel -n remotehive-production
+        kubectl rollout status deployment/public-website -n remotehive-production
+
+    - name: Verify rollback
+      run: |
+        export KUBECONFIG=kubeconfig
+        
+        # Get production URLs and test
+        BACKEND_URL=$(kubectl get ingress remotehive-ingress -n remotehive-production -o jsonpath='{.spec.rules[0].host}')
+        curl -f https://$BACKEND_URL/health || exit 1
+        
+        echo "✅ Rollback completed successfully"

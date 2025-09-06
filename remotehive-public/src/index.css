@@ -1,0 +1,177 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222.2 84% 4.9%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222.2 84% 4.9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 84% 4.9%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 94.1%;
+  }
+
+  * {
+    border-color: hsl(var(--border));
+  }
+  body {
+    font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+    font-weight: 400;
+    color-scheme: light dark;
+    color: hsl(var(--foreground));
+    background-color: hsl(var(--background));
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-text-size-adjust: 100%;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 disabled:opacity-50 disabled:pointer-events-none;
+    --tw-ring-color: hsl(var(--ring));
+    --tw-ring-offset-color: hsl(var(--background));
+  }
+  
+  .btn-primary {
+    background-color: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+  }
+  
+  .btn-primary:hover {
+    background-color: hsl(var(--primary) / 0.9);
+  }
+  
+  .btn-secondary {
+    background-color: hsl(var(--secondary));
+    color: hsl(var(--secondary-foreground));
+  }
+  
+  .btn-secondary:hover {
+    background-color: hsl(var(--secondary) / 0.8);
+  }
+  
+  .btn-outline {
+    border: 1px solid hsl(var(--input));
+  }
+  
+  .btn-outline:hover {
+    background-color: hsl(var(--accent));
+    color: hsl(var(--accent-foreground));
+  }
+  
+  .card {
+    @apply rounded-lg shadow-sm;
+    border: 1px solid hsl(var(--border));
+    background-color: hsl(var(--card));
+    color: hsl(var(--card-foreground));
+  }
+  
+  .job-card {
+    @apply bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 border border-gray-100;
+  }
+  
+  .gradient-bg {
+    @apply bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50;
+  }
+  
+  .text-gradient {
+    @apply bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Loading animation */
+.loading-spinner {
+  @apply animate-spin rounded-full h-8 w-8 border-b-2;
+  border-color: hsl(var(--primary));
+}
+
+/* 3D effect for job cards */
+.job-card-3d {
+  transform-style: preserve-3d;
+  transition: transform 0.3s ease;
+}
+
+.job-card-3d:hover {
+  transform: rotateY(5deg) rotateX(5deg);
+}
+
+/* Company logos scrolling animation */
+@keyframes scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-scroll {
+  animation: scroll 30s linear infinite;
+}
+
+.animate-scroll:hover {
+  animation-play-state: paused;
+}

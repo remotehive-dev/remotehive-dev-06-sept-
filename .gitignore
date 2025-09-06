@@ -1,0 +1,134 @@
+
+# IDE and tool-specific rules
+.clinerules/byterover-rules.md
+.kilocode/rules/byterover-rules.md
+.roo/rules/byterover-rules.md
+.windsurf/rules/byterover-rules.md
+.cursor/rules/byterover-rules.mdc
+.kiro/steering/byterover-rules.md
+.qoder/rules/byterover-rules.md
+.augment/rules/byterover-rules.md
+
+# Dependencies
+node_modules/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+postgresql.dmg
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+
+# nyc test coverage
+.nyc_output
+
+# Dependency directories
+jspm_packages/
+
+# Optional npm cache directory
+.npm
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# dotenv environment variables file
+.env
+
+# next.js build output
+.next
+
+# nuxt.js build output
+.nuxt
+
+# vuepress build output
+.vuepress/dist
+
+# Serverless directories
+.serverless
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Redis dump
+dump.rdb
+
+# Uploads
+uploads/
+
+# Test files
+test.db
+app.db
+remotehive.db
+
+# Temporary files
+temp_docs.html
+openapi_temp.json
+headers.txt
+token.txt
+
+# Cache
+.pytest_cache/
+.trae/
+redis-stable/

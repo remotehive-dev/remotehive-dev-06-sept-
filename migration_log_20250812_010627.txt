@@ -1,0 +1,5 @@
+[2025-08-12 01:06:26] INFO: Starting RemoteHive data migration to Supabase
+[2025-08-12 01:06:26] INFO: ============================================================
+[2025-08-12 01:06:26] INFO: Connected to SQLite database: remotehive.db
+[2025-08-12 01:06:27] ERROR: Failed to connect to Supabase: connection to server at "aws-0-us-east-1.pooler.supabase.com" (52.45.94.125), port 6543 failed: FATAL:  Tenant or user not found
+connection to server at "aws-0-us-east-1.pooler.supabase.com" (52.45.94.125), port 6543 failed: FATAL:  Tenant or user not found

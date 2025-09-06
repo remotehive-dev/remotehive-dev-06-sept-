@@ -1,0 +1,405 @@
+[2025-08-12 01:54:55] INFO: Starting RemoteHive data migration to Supabase
+[2025-08-12 01:54:55] INFO: ============================================================
+[2025-08-12 01:54:55] INFO: Connected to SQLite database: remotehive.db
+[2025-08-12 01:54:55] INFO: Connected to Supabase successfully
+[2025-08-12 01:54:55] INFO: Found 32 tables to migrate
+[2025-08-12 01:54:55] INFO: 
+Processing table: users
+[2025-08-12 01:54:55] INFO: Migrating 44 rows from users...
+[2025-08-12 01:54:55] WARNING: Error migrating final batch to users: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:56] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:56] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:56] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:56] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:56] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:56] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:56] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:56] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:56] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:56] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:56] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:56] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:56] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:56] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:56] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:56] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:56] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:57] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:57] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:57] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:57] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:57] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:57] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:57] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:57] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:57] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:57] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:57] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:57] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:57] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:57] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:57] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:57] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:57] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:57] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:58] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:58] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:58] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:58] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:58] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:58] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:58] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:58] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:58] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'clerk_user_id' column of 'users' in the schema cache"}
+[2025-08-12 01:54:58] INFO: Successfully migrated 0/44 rows to users
+[2025-08-12 01:54:58] INFO: 
+Processing table: job_categories
+[2025-08-12 01:54:58] INFO: Migrating 12 rows from job_categories...
+[2025-08-12 01:54:58] WARNING: Error migrating final batch to job_categories: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'sort_order' column of 'job_categories' in the schema cache"}
+[2025-08-12 01:54:58] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'sort_order' column of 'job_categories' in the schema cache"}
+[2025-08-12 01:54:58] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'sort_order' column of 'job_categories' in the schema cache"}
+[2025-08-12 01:54:58] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'sort_order' column of 'job_categories' in the schema cache"}
+[2025-08-12 01:54:58] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'sort_order' column of 'job_categories' in the schema cache"}
+[2025-08-12 01:54:58] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'sort_order' column of 'job_categories' in the schema cache"}
+[2025-08-12 01:54:58] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'sort_order' column of 'job_categories' in the schema cache"}
+[2025-08-12 01:54:58] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'sort_order' column of 'job_categories' in the schema cache"}
+[2025-08-12 01:54:59] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'sort_order' column of 'job_categories' in the schema cache"}
+[2025-08-12 01:54:59] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'sort_order' column of 'job_categories' in the schema cache"}
+[2025-08-12 01:54:59] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'sort_order' column of 'job_categories' in the schema cache"}
+[2025-08-12 01:54:59] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'sort_order' column of 'job_categories' in the schema cache"}
+[2025-08-12 01:54:59] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'sort_order' column of 'job_categories' in the schema cache"}
+[2025-08-12 01:54:59] INFO: Successfully migrated 0/12 rows to job_categories
+[2025-08-12 01:54:59] INFO: 
+Processing table: system_settings
+[2025-08-12 01:54:59] INFO: Migrating 22 rows from system_settings...
+[2025-08-12 01:54:59] WARNING: Error migrating final batch to system_settings: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'updated_by' column of 'system_settings' in the schema cache"}
+[2025-08-12 01:54:59] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'updated_by' column of 'system_settings' in the schema cache"}
+[2025-08-12 01:54:59] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'updated_by' column of 'system_settings' in the schema cache"}
+[2025-08-12 01:54:59] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'updated_by' column of 'system_settings' in the schema cache"}
+[2025-08-12 01:54:59] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'updated_by' column of 'system_settings' in the schema cache"}
+[2025-08-12 01:54:59] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'updated_by' column of 'system_settings' in the schema cache"}
+[2025-08-12 01:54:59] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'updated_by' column of 'system_settings' in the schema cache"}
+[2025-08-12 01:54:59] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'updated_by' column of 'system_settings' in the schema cache"}
+[2025-08-12 01:54:59] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'updated_by' column of 'system_settings' in the schema cache"}
+[2025-08-12 01:54:59] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'updated_by' column of 'system_settings' in the schema cache"}
+[2025-08-12 01:54:59] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'updated_by' column of 'system_settings' in the schema cache"}
+[2025-08-12 01:54:59] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'updated_by' column of 'system_settings' in the schema cache"}
+[2025-08-12 01:54:59] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'updated_by' column of 'system_settings' in the schema cache"}
+[2025-08-12 01:55:00] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'updated_by' column of 'system_settings' in the schema cache"}
+[2025-08-12 01:55:00] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'updated_by' column of 'system_settings' in the schema cache"}
+[2025-08-12 01:55:00] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'updated_by' column of 'system_settings' in the schema cache"}
+[2025-08-12 01:55:00] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'updated_by' column of 'system_settings' in the schema cache"}
+[2025-08-12 01:55:00] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'updated_by' column of 'system_settings' in the schema cache"}
+[2025-08-12 01:55:00] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'updated_by' column of 'system_settings' in the schema cache"}
+[2025-08-12 01:55:00] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'updated_by' column of 'system_settings' in the schema cache"}
+[2025-08-12 01:55:00] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'updated_by' column of 'system_settings' in the schema cache"}
+[2025-08-12 01:55:00] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'updated_by' column of 'system_settings' in the schema cache"}
+[2025-08-12 01:55:00] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'updated_by' column of 'system_settings' in the schema cache"}
+[2025-08-12 01:55:00] INFO: Successfully migrated 0/22 rows to system_settings
+[2025-08-12 01:55:00] INFO: 
+Processing table: email_templates
+[2025-08-12 01:55:00] INFO: Migrating 5 rows from email_templates...
+[2025-08-12 01:55:00] WARNING: Error migrating final batch to email_templates: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'category' column of 'email_templates' in the schema cache"}
+[2025-08-12 01:55:00] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'category' column of 'email_templates' in the schema cache"}
+[2025-08-12 01:55:00] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'category' column of 'email_templates' in the schema cache"}
+[2025-08-12 01:55:00] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'category' column of 'email_templates' in the schema cache"}
+[2025-08-12 01:55:00] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'category' column of 'email_templates' in the schema cache"}
+[2025-08-12 01:55:00] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'category' column of 'email_templates' in the schema cache"}
+[2025-08-12 01:55:00] INFO: Successfully migrated 0/5 rows to email_templates
+[2025-08-12 01:55:00] INFO: 
+Processing table: employers
+[2025-08-12 01:55:00] INFO: Migrating 7 rows from employers...
+[2025-08-12 01:55:00] WARNING: Error migrating final batch to employers: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'company_email' column of 'employers' in the schema cache"}
+[2025-08-12 01:55:00] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'company_email' column of 'employers' in the schema cache"}
+[2025-08-12 01:55:00] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'company_email' column of 'employers' in the schema cache"}
+[2025-08-12 01:55:01] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'company_email' column of 'employers' in the schema cache"}
+[2025-08-12 01:55:01] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'company_email' column of 'employers' in the schema cache"}
+[2025-08-12 01:55:01] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'company_email' column of 'employers' in the schema cache"}
+[2025-08-12 01:55:01] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'company_email' column of 'employers' in the schema cache"}
+[2025-08-12 01:55:01] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'company_email' column of 'employers' in the schema cache"}
+[2025-08-12 01:55:01] INFO: Successfully migrated 0/7 rows to employers
+[2025-08-12 01:55:01] INFO: 
+Processing table: job_seekers
+[2025-08-12 01:55:01] INFO: Migrating 3 rows from job_seekers...
+[2025-08-12 01:55:01] WARNING: Error migrating final batch to job_seekers: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'cover_letter_template' column of 'job_seekers' in the schema cache"}
+[2025-08-12 01:55:01] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'cover_letter_template' column of 'job_seekers' in the schema cache"}
+[2025-08-12 01:55:01] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'cover_letter_template' column of 'job_seekers' in the schema cache"}
+[2025-08-12 01:55:01] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'cover_letter_template' column of 'job_seekers' in the schema cache"}
+[2025-08-12 01:55:01] INFO: Successfully migrated 0/3 rows to job_seekers
+[2025-08-12 01:55:01] INFO: 
+Processing table: job_posts
+[2025-08-12 01:55:01] INFO: Migrating 4 rows from job_posts...
+[2025-08-12 01:55:01] WARNING: Error migrating final batch to job_posts: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'admin_priority' column of 'job_posts' in the schema cache"}
+[2025-08-12 01:55:01] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'admin_priority' column of 'job_posts' in the schema cache"}
+[2025-08-12 01:55:01] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'admin_priority' column of 'job_posts' in the schema cache"}
+[2025-08-12 01:55:01] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'admin_priority' column of 'job_posts' in the schema cache"}
+[2025-08-12 01:55:01] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'admin_priority' column of 'job_posts' in the schema cache"}
+[2025-08-12 01:55:01] INFO: Successfully migrated 0/4 rows to job_posts
+[2025-08-12 01:55:01] INFO: 
+Processing table: job_applications
+[2025-08-12 01:55:01] INFO: Table job_applications is empty, skipping
+[2025-08-12 01:55:01] INFO: 
+Processing table: saved_jobs
+[2025-08-12 01:55:01] INFO: Table saved_jobs is empty, skipping
+[2025-08-12 01:55:01] INFO: 
+Processing table: interviews
+[2025-08-12 01:55:01] INFO: Table interviews is empty, skipping
+[2025-08-12 01:55:01] INFO: 
+Processing table: auto_apply_settings
+[2025-08-12 01:55:01] INFO: Table auto_apply_settings is empty, skipping
+[2025-08-12 01:55:01] INFO: 
+Processing table: contact_information
+[2025-08-12 01:55:01] INFO: Table contact_information is empty, skipping
+[2025-08-12 01:55:01] INFO: 
+Processing table: seo_settings
+[2025-08-12 01:55:01] INFO: Table seo_settings is empty, skipping
+[2025-08-12 01:55:01] INFO: 
+Processing table: reviews
+[2025-08-12 01:55:01] INFO: Table reviews is empty, skipping
+[2025-08-12 01:55:01] INFO: 
+Processing table: ads
+[2025-08-12 01:55:01] INFO: Table ads is empty, skipping
+[2025-08-12 01:55:01] INFO: 
+Processing table: admin_logs
+[2025-08-12 01:55:01] INFO: Table admin_logs is empty, skipping
+[2025-08-12 01:55:01] INFO: 
+Processing table: contact_submissions
+[2025-08-12 01:55:01] INFO: Table contact_submissions is empty, skipping
+[2025-08-12 01:55:01] INFO: 
+Processing table: email_attachments
+[2025-08-12 01:55:01] INFO: Table email_attachments is empty, skipping
+[2025-08-12 01:55:01] INFO: 
+Processing table: email_folders
+[2025-08-12 01:55:01] INFO: Table email_folders is empty, skipping
+[2025-08-12 01:55:01] INFO: 
+Processing table: email_logs
+[2025-08-12 01:55:01] INFO: Migrating 8 rows from email_logs...
+[2025-08-12 01:55:01] WARNING: Error migrating final batch to email_logs: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'template_name' column of 'email_logs' in the schema cache"}
+[2025-08-12 01:55:01] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'template_name' column of 'email_logs' in the schema cache"}
+[2025-08-12 01:55:01] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'template_name' column of 'email_logs' in the schema cache"}
+[2025-08-12 01:55:01] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'template_name' column of 'email_logs' in the schema cache"}
+[2025-08-12 01:55:02] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'template_name' column of 'email_logs' in the schema cache"}
+[2025-08-12 01:55:02] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'template_name' column of 'email_logs' in the schema cache"}
+[2025-08-12 01:55:02] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'template_name' column of 'email_logs' in the schema cache"}
+[2025-08-12 01:55:02] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'template_name' column of 'email_logs' in the schema cache"}
+[2025-08-12 01:55:02] WARNING: Error migrating individual row: {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'template_name' column of 'email_logs' in the schema cache"}
+[2025-08-12 01:55:02] INFO: Successfully migrated 0/8 rows to email_logs
+[2025-08-12 01:55:02] INFO: 
+Processing table: email_message_folders
+[2025-08-12 01:55:02] INFO: Table email_message_folders is empty, skipping
+[2025-08-12 01:55:02] INFO: 
+Processing table: email_messages
+[2025-08-12 01:55:02] INFO: Table email_messages is empty, skipping
+[2025-08-12 01:55:02] INFO: 
+Processing table: email_signatures
+[2025-08-12 01:55:02] INFO: Table email_signatures is empty, skipping
+[2025-08-12 01:55:02] INFO: 
+Processing table: email_users
+[2025-08-12 01:55:02] INFO: Table email_users is empty, skipping
+[2025-08-12 01:55:02] INFO: 
+Processing table: email_verification_tokens
+[2025-08-12 01:55:02] INFO: Table email_verification_tokens is empty, skipping
+[2025-08-12 01:55:02] INFO: 
+Processing table: job_workflow_logs
+[2025-08-12 01:55:02] INFO: Table job_workflow_logs is empty, skipping
+[2025-08-12 01:55:02] INFO: 
+Processing table: login_attempts
+[2025-08-12 01:55:02] INFO: Migrating 90 rows from login_attempts...
+[2025-08-12 01:55:02] WARNING: Error migrating final batch to login_attempts: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:02] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:02] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:02] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:02] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:02] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:02] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:02] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:02] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:02] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:02] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:02] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:02] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:03] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:03] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:03] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:03] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:03] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:03] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:03] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:03] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:03] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:03] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:03] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:03] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:03] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:03] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:03] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:03] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:03] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:03] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:03] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:04] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:04] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:04] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:04] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:04] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:04] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:04] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:04] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:04] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:04] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:04] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:04] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:04] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:04] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:04] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:04] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:04] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:04] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:04] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:05] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:05] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:05] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:05] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:05] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:05] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:05] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:05] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:05] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:05] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:05] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:05] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:05] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:05] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:05] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:05] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:05] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:05] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:05] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:06] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:06] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:06] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:06] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:06] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:06] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:06] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:06] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:06] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:06] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:06] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:06] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:06] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:06] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:06] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:06] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:06] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:06] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:07] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:07] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:07] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.email_templates'", 'message': "Could not find the table 'public.login_attempts' in the schema cache"}
+[2025-08-12 01:55:07] INFO: Successfully migrated 0/90 rows to login_attempts
+[2025-08-12 01:55:07] INFO: 
+Processing table: role_permissions
+[2025-08-12 01:55:07] INFO: Table role_permissions is empty, skipping
+[2025-08-12 01:55:07] INFO: 
+Processing table: scraper_configs
+[2025-08-12 01:55:07] INFO: Table scraper_configs is empty, skipping
+[2025-08-12 01:55:07] INFO: 
+Processing table: scraper_logs
+[2025-08-12 01:55:07] INFO: Table scraper_logs is empty, skipping
+[2025-08-12 01:55:07] INFO: 
+Processing table: scraper_memory
+[2025-08-12 01:55:07] INFO: Table scraper_memory is empty, skipping
+[2025-08-12 01:55:07] INFO: 
+Processing table: user_sessions
+[2025-08-12 01:55:07] INFO: Migrating 82 rows from user_sessions...
+[2025-08-12 01:55:07] WARNING: Error migrating final batch to user_sessions: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:07] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:07] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:07] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:07] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:07] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:07] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:07] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:07] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:07] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:07] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:07] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:07] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:07] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:07] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:08] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:08] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:08] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:08] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:08] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:08] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:08] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:08] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:08] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:08] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:08] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:08] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:08] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:08] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:08] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:08] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:08] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:08] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:09] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:09] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:09] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:09] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:09] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:09] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:09] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:09] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:09] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:09] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:09] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:09] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:09] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:09] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:09] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:09] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:09] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:09] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:09] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:10] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:10] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:10] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:10] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:10] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:10] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:10] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:10] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:10] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:10] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:10] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:10] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:10] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:10] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:10] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:10] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:10] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:10] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:10] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:11] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:11] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:11] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:11] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:11] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:11] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:11] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:11] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:11] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:11] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:11] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:11] WARNING: Error migrating individual row: {'code': 'PGRST205', 'details': None, 'hint': "Perhaps you meant the table 'public.contact_submissions'", 'message': "Could not find the table 'public.user_sessions' in the schema cache"}
+[2025-08-12 01:55:11] INFO: Successfully migrated 0/82 rows to user_sessions
+[2025-08-12 01:55:11] INFO: 
+============================================================
+[2025-08-12 01:55:11] INFO: Migration completed!
+[2025-08-12 01:55:11] INFO: Tables processed: 32
+[2025-08-12 01:55:11] INFO: Tables with data migrated: 0
+[2025-08-12 01:55:11] INFO: Total rows migrated: 0
+[2025-08-12 01:55:11] INFO: Database connections closed

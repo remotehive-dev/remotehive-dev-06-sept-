@@ -1,0 +1,46 @@
+apiVersion: 1
+
+providers:
+  # RemoteHive Dashboards Provider
+  - name: 'remotehive-dashboards'
+    orgId: 1
+    folder: 'RemoteHive'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards
+
+  # System Dashboards Provider
+  - name: 'system-dashboards'
+    orgId: 1
+    folder: 'System'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/system
+
+  # Application Dashboards Provider
+  - name: 'application-dashboards'
+    orgId: 1
+    folder: 'Applications'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/applications
+
+  # Business Metrics Dashboards Provider
+  - name: 'business-dashboards'
+    orgId: 1
+    folder: 'Business Metrics'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/business

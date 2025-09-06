@@ -1,0 +1,328 @@
+# Filebeat Configuration for RemoteHive Docker/Kubernetes Logging
+
+# ============================== Filebeat inputs ===============================
+filebeat.inputs:
+
+# Docker container logs
+- type: container
+  enabled: true
+  paths:
+    - '/var/lib/docker/containers/*/*.log'
+  
+  # Multiline configuration for stack traces
+  multiline.pattern: '^\d{4}-\d{2}-\d{2}'
+  multiline.negate: true
+  multiline.match: after
+  multiline.timeout: 5s
+  
+  # Add container metadata
+  processors:
+    - add_docker_metadata:
+        host: "unix:///var/run/docker.sock"
+        match_fields: ["container.id"]
+        match_pids: ["process.pid"]
+        match_source: true
+        match_source_index: 4
+        match_short_id: false
+        cleanup_timeout: 60
+        labels.dedot: false
+        # When this option is enabled, Filebeat checks if the source file belongs to a Docker container.
+        # If it does, the container ID is used to get the container name. Otherwise, the "container.name" field is set to the source file name.
+        skip_older: 0
+        
+    - add_kubernetes_metadata:
+        host: ${NODE_NAME}
+        matchers:
+        - logs_path:
+            logs_path: "/var/log/containers/"
+        
+    # Add custom fields based on container labels
+    - script:
+        lang: javascript
+        id: container_enrichment
+        source: >
+          function process(event) {
+            var containerName = event.Get("container.name");
+            var containerLabels = event.Get("container.labels");
+            
+            if (containerName) {
+              // Set service name based on container name
+              if (containerName.includes("remotehive-backend")) {
+                event.Put("fields.service", "backend-api");
+                event.Put("fields.service_type", "api");
+              } else if (containerName.includes("remotehive-autoscraper")) {
+                event.Put("fields.service", "autoscraper");
+                event.Put("fields.service_type", "scraper");
+              } else if (containerName.includes("remotehive-admin")) {
+                event.Put("fields.service", "admin-panel");
+                event.Put("fields.service_type", "frontend");
+              } else if (containerName.includes("remotehive-public")) {
+                event.Put("fields.service", "public-website");
+                event.Put("fields.service_type", "frontend");
+              } else if (containerName.includes("celery-worker")) {
+                event.Put("fields.service", "celery-worker");
+                event.Put("fields.service_type", "worker");
+              } else if (containerName.includes("celery-beat")) {
+                event.Put("fields.service", "celery-beat");
+                event.Put("fields.service_type", "scheduler");
+              } else if (containerName.includes("mongodb")) {
+                event.Put("fields.service", "mongodb");
+                event.Put("fields.service_type", "database");
+              } else if (containerName.includes("redis")) {
+                event.Put("fields.service", "redis");
+                event.Put("fields.service_type", "cache");
+              } else if (containerName.includes("nginx")) {
+                event.Put("fields.service", "nginx");
+                event.Put("fields.service_type", "proxy");
+              }
+              
+              // Set environment from labels
+              if (containerLabels && containerLabels["com.docker.compose.project"]) {
+                event.Put("fields.environment", containerLabels["com.docker.compose.project"]);
+              }
+            }
+          }
+
+# Application log files (for non-containerized deployments)
+- type: log
+  enabled: false
+  paths:
+    - /var/log/remotehive/*.log
+    - /app/logs/*.log
+  fields:
+    service: "remotehive"
+    log_type: "application"
+  fields_under_root: true
+  multiline.pattern: '^\d{4}-\d{2}-\d{2}'
+  multiline.negate: true
+  multiline.match: after
+
+# System logs
+- type: log
+  enabled: false
+  paths:
+    - /var/log/syslog
+    - /var/log/messages
+  fields:
+    service: "system"
+    log_type: "system"
+  fields_under_root: true
+
+# Nginx access logs
+- type: log
+  enabled: false
+  paths:
+    - /var/log/nginx/access.log
+  fields:
+    service: "nginx"
+    log_type: "access"
+  fields_under_root: true
+
+# Nginx error logs
+- type: log
+  enabled: false
+  paths:
+    - /var/log/nginx/error.log
+  fields:
+    service: "nginx"
+    log_type: "error"
+  fields_under_root: true
+  multiline.pattern: '^\d{4}/\d{2}/\d{2}'
+  multiline.negate: true
+  multiline.match: after
+
+# ============================== Filebeat modules ===============================
+filebeat.config.modules:
+  path: ${path.config}/modules.d/*.yml
+  reload.enabled: false
+
+# ================================== General ===================================
+
+# The name of the shipper that publishes the network data. It can be used to group
+# all the transactions sent by a single shipper in the web interface.
+name: "filebeat-remotehive"
+
+# The tags of the shipper are included in their own field with each
+# transaction published.
+tags: ["remotehive", "docker", "logs"]
+
+# Optional fields that you can specify to add additional information to the
+# output.
+fields:
+  cluster: "remotehive-cluster"
+  environment: "${ENVIRONMENT:development}"
+  datacenter: "${DATACENTER:local}"
+  
+fields_under_root: true
+
+# ================================= Dashboards =================================
+setup.dashboards.enabled: false
+
+# ================================== Template ==================================
+setup.template.settings:
+  index.number_of_shards: 1
+  index.codec: best_compression
+  _source.enabled: true
+
+# ================================== Kibana ===================================
+setup.kibana:
+  host: "kibana:5601"
+  username: "${KIBANA_USERNAME:}"
+  password: "${KIBANA_PASSWORD:}"
+
+# ================================== Outputs ===================================
+
+# ---------------------------- Elasticsearch Output ----------------------------
+# Uncomment to output directly to Elasticsearch
+# output.elasticsearch:
+#   hosts: ["elasticsearch:9200"]
+#   username: "${ELASTICSEARCH_USERNAME:}"
+#   password: "${ELASTICSEARCH_PASSWORD:}"
+#   index: "remotehive-logs-%{+yyyy.MM.dd}"
+#   template.name: "remotehive"
+#   template.pattern: "remotehive-*"
+
+# ------------------------------ Logstash Output -------------------------------
+output.logstash:
+  hosts: ["logstash:5044"]
+  
+  # Optional load balancing
+  loadbalance: true
+  
+  # Compression
+  compression_level: 3
+  
+  # Connection settings
+  timeout: 30
+  
+  # Bulk settings
+  bulk_max_size: 2048
+  
+  # Worker settings
+  worker: 1
+
+# ================================= Processors =================================
+processors:
+  # Add hostname
+  - add_host_metadata:
+      when.not.contains.tags: forwarded
+      
+  # Add Docker metadata
+  - add_docker_metadata:
+      host: "unix:///var/run/docker.sock"
+      
+  # Add Kubernetes metadata (when running in Kubernetes)
+  - add_kubernetes_metadata:
+      host: ${NODE_NAME}
+      matchers:
+      - logs_path:
+          logs_path: "/var/log/containers/"
+          
+  # Drop empty events
+  - drop_event:
+      when:
+        equals:
+          message: ""
+          
+  # Drop debug logs in production
+  - drop_event:
+      when:
+        and:
+          - equals:
+              fields.environment: "production"
+          - regexp:
+              message: "^DEBUG"
+              
+  # Rename fields
+  - rename:
+      fields:
+        - from: "container.name"
+          to: "container_name"
+        - from: "container.id"
+          to: "container_id"
+          
+  # Add timestamp
+  - timestamp:
+      field: "@timestamp"
+      layouts:
+        - '2006-01-02T15:04:05.000Z'
+        - '2006-01-02T15:04:05Z'
+        - 'Jan _2 15:04:05'
+      test:
+        - '2023-12-25T10:30:45.123Z'
+        - '2023-12-25T10:30:45Z'
+        - 'Dec 25 10:30:45'
+
+# ================================== Logging ===================================
+logging.level: info
+logging.to_files: true
+logging.files:
+  path: /var/log/filebeat
+  name: filebeat
+  keepfiles: 7
+  permissions: 0644
+  rotateeverybytes: 10485760 # = 10MB
+
+# ============================= X-Pack Monitoring =============================
+monitoring.enabled: false
+
+# ================================= Migration ==================================
+migration.6_to_7.enabled: true
+
+# ================================== HTTP Endpoint =============================
+http.enabled: true
+http.host: "0.0.0.0"
+http.port: 5066
+
+# ================================== Autodiscover =============================
+filebeat.autodiscover:
+  providers:
+    - type: docker
+      hints.enabled: true
+      hints.default_config:
+        type: container
+        paths:
+          - /var/lib/docker/containers/${data.docker.container.id}/*.log
+      templates:
+        - condition:
+            contains:
+              docker.container.image: "remotehive"
+          config:
+            - type: container
+              paths:
+                - /var/lib/docker/containers/${data.docker.container.id}/*.log
+              processors:
+                - add_docker_metadata:
+                    host: "unix:///var/run/docker.sock"
+                    
+    # Kubernetes autodiscovery
+    - type: kubernetes
+      node: ${NODE_NAME}
+      hints.enabled: true
+      hints.default_config:
+        type: container
+        paths:
+          - /var/log/containers/*${data.kubernetes.container.id}.log
+      templates:
+        - condition:
+            contains:
+              kubernetes.labels.app: "remotehive"
+          config:
+            - type: container
+              paths:
+                - /var/log/containers/*${data.kubernetes.container.id}.log
+              processors:
+                - add_kubernetes_metadata:
+                    host: ${NODE_NAME}
+                    matchers:
+                    - logs_path:
+                        logs_path: "/var/log/containers/"
+
+# ================================== Queue Settings =============================
+queue.mem:
+  events: 4096
+  flush.min_events: 512
+  flush.timeout: 1s
+
+# ================================== Performance ============================
+max_procs: 1
