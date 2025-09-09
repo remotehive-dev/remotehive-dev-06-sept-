@@ -14,10 +14,14 @@ from pathlib import Path
 from typing import Dict, List, Optional
 from dataclasses import dataclass
 from loguru import logger
+from dotenv import load_dotenv
 
 # Add the project root to Python path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
+
+# Load environment variables from .env file
+load_dotenv(project_root / ".env")
 
 from app.utils.service_discovery import (
     get_service_registry, 

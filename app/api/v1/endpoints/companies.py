@@ -1,8 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import List, Optional, Dict, Any
 from loguru import logger
-from sqlalchemy.orm import Session
-from sqlalchemy import func, desc
+from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.core.database import get_db
 from app.database.services import EmployerService
@@ -18,12 +17,12 @@ async def get_companies(
     skip: int = Query(0, description="Number of companies to skip"),
     search: Optional[str] = Query(None, description="Search companies by name"),
     industry: Optional[str] = Query(None, description="Filter by industry"),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Get companies (public endpoint)"""
     try:
         # Get employers from database
-        employers = EmployerService.get_employers(
+        employers = await EmployerService.get_employers(
             db,
             search=search,
             skip=skip,
@@ -64,7 +63,7 @@ async def get_companies(
 @router.get("/{company_id}")
 async def get_company_by_id(
     company_id: str,
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Get a specific company by ID"""
     try:
@@ -105,7 +104,7 @@ async def get_company_by_id(
 @router.post("/")
 async def create_company(
     company_data: Dict[str, Any],
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Create a new company (public endpoint)"""
     try:

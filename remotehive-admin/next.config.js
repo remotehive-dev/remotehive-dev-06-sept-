@@ -8,11 +8,7 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  experimental: {
-    ssr: false,
-    outputFileTracingRoot: undefined,
-    serverComponentsExternalPackages: ['@supabase/supabase-js'],
-  },
+  serverExternalPackages: ['@supabase/supabase-js'],
   serverRuntimeConfig: {
     // Will only be available on the server side
   },
@@ -26,7 +22,7 @@ const nextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: 'http://localhost:8000/api/:path*',
+        destination: 'http://172.16.10.34:8000/api/:path*',
       },
     ];
   },

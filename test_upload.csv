@@ -1,3 +1,0 @@
-website_url,scraper_config,tags,description
-https://example.com,"{""selectors"":{""job_title"":"".title""}}","test,example","Test website pattern"
-https://test.com,"{""selectors"":{""company"":"".company""}}","test","Another test pattern"

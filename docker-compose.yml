@@ -7,14 +7,14 @@ services:
     container_name: remotehive-mongodb
     restart: unless-stopped
     environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: password123
-      MONGO_INITDB_DATABASE: remotehive
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-password123}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE:-remotehive}
     ports:
       - "27017:27017"
     volumes:
       - mongodb_data:/data/db
-      - ./scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+      - ./init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
     networks:
       - remotehive-network
     healthcheck:
@@ -23,6 +23,14 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
 
   # Redis Cache
   redis:
@@ -41,141 +49,190 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
     command: redis-server --appendonly yes --requirepass redis123
 
-  # Main Backend API
-  backend:
+  # Backend API
+  backend-api:
     build:
       context: .
       dockerfile: Dockerfile
+      target: production
     container_name: remotehive-backend
     restart: unless-stopped
     environment:
-      - MONGODB_URL=mongodb://admin:password123@mongodb:27017/remotehive?authSource=admin
-      - REDIS_URL=redis://:redis123@redis:6379/0
-      - JWT_SECRET_KEY=your-super-secret-jwt-key-change-in-production
-      - JWT_ALGORITHM=HS256
-      - JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
-      - ENVIRONMENT=development
-      - LOG_LEVEL=INFO
-      - CORS_ORIGINS=http://localhost:3000,http://localhost:5173
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - MONGODB_URL=mongodb://${MONGO_ROOT_USERNAME:-admin}:${MONGO_ROOT_PASSWORD:-password123}@mongodb:27017/${MONGO_DATABASE:-remotehive}?authSource=admin
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis123}@redis:6379/0
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-super-secret-jwt-key-change-in-production}
+      - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
+      - JWT_ACCESS_TOKEN_EXPIRE_MINUTES=${JWT_EXPIRE_MINUTES:-30}
+      - CORS_ORIGINS=${CORS_ORIGINS:-["http://localhost:3000","http://localhost:5173"]}
+      - SMTP_SERVER=${SMTP_SERVER:-smtp.gmail.com}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USERNAME=${SMTP_USERNAME}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
     ports:
       - "8000:8000"
-    volumes:
-      - ./logs:/app/logs
-      - ./uploads:/app/uploads
-    networks:
-      - remotehive-network
     depends_on:
       mongodb:
         condition: service_healthy
       redis:
         condition: service_healthy
+    networks:
+      - remotehive-network
+    volumes:
+      - ./logs:/app/logs
+      - ./uploads:/app/uploads
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
 
   # Autoscraper Service
   autoscraper:
     build:
       context: ./autoscraper-service
       dockerfile: Dockerfile
+      target: production
     container_name: remotehive-autoscraper
     restart: unless-stopped
     environment:
+      - ENVIRONMENT=${ENVIRONMENT:-production}
       - DATABASE_URL=sqlite:///app/data/autoscraper.db
-      - REDIS_URL=redis://:redis123@redis:6379/1
-      - BACKEND_API_URL=http://backend:8000
-      - LOG_LEVEL=INFO
-      - SCRAPER_CONCURRENT_JOBS=5
-      - SCRAPER_DELAY_BETWEEN_REQUESTS=2
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis123}@redis:6379/1
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - SCRAPER_DELAY=${SCRAPER_DELAY:-5}
+      - MAX_CONCURRENT_SCRAPERS=${MAX_CONCURRENT_SCRAPERS:-3}
+      - PLAYWRIGHT_HEADLESS=${PLAYWRIGHT_HEADLESS:-true}
     ports:
       - "8001:8001"
-    volumes:
-      - ./autoscraper-service/data:/app/data
-      - ./autoscraper-service/logs:/app/logs
-      - ./autoscraper-service/scraped_data:/app/scraped_data
-    networks:
-      - remotehive-network
     depends_on:
       redis:
         condition: service_healthy
-      backend:
-        condition: service_healthy
+    networks:
+      - remotehive-network
+    volumes:
+      - ./autoscraper-service/data:/app/data
+      - ./logs:/app/logs
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
 
   # Admin Panel
   admin:
     build:
       context: ./remotehive-admin
       dockerfile: Dockerfile
+      target: production
     container_name: remotehive-admin
     restart: unless-stopped
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
-      - NEXT_PUBLIC_AUTOSCRAPER_URL=http://localhost:8001
       - NODE_ENV=production
-      - NEXTAUTH_SECRET=your-nextauth-secret-change-in-production
-      - NEXTAUTH_URL=http://localhost:3000
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+      - NEXT_PUBLIC_AUTOSCRAPER_API_URL=${NEXT_PUBLIC_AUTOSCRAPER_API_URL:-http://localhost:8001}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-your-nextauth-secret-change-in-production}
+      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
+      - NEXT_TELEMETRY_DISABLED=1
     ports:
       - "3000:3000"
+    depends_on:
+      backend-api:
+        condition: service_healthy
     networks:
       - remotehive-network
-    depends_on:
-      backend:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
 
   # Public Website
-  public:
+  public-website:
     build:
       context: ./remotehive-public
       dockerfile: Dockerfile
+      target: production
     container_name: remotehive-public
     restart: unless-stopped
     environment:
-      - VITE_API_URL=http://localhost:8000
-      - VITE_APP_ENV=production
+      - NODE_ENV=production
+      - VITE_API_URL=${VITE_API_URL:-http://localhost:8000}
+      - VITE_AUTOSCRAPER_API_URL=${VITE_AUTOSCRAPER_API_URL:-http://localhost:8001}
     ports:
       - "5173:5173"
+    depends_on:
+      backend-api:
+        condition: service_healthy
     networks:
       - remotehive-network
-    depends_on:
-      backend:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5173/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 30s
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
 
   # Celery Worker
   celery-worker:
     build:
       context: .
       dockerfile: Dockerfile
+      target: production
     container_name: remotehive-celery-worker
     restart: unless-stopped
     environment:
-      - MONGODB_URL=mongodb://admin:password123@mongodb:27017/remotehive?authSource=admin
-      - REDIS_URL=redis://:redis123@redis:6379/0
-      - CELERY_BROKER_URL=redis://:redis123@redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://:redis123@redis:6379/0
-      - LOG_LEVEL=INFO
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - MONGODB_URL=mongodb://${MONGO_ROOT_USERNAME:-admin}:${MONGO_ROOT_PASSWORD:-password123}@mongodb:27017/${MONGO_DATABASE:-remotehive}?authSource=admin
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis123}@redis:6379/0
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-redis123}@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-redis123}@redis:6379/0
+      - CELERY_WORKER_CONCURRENCY=${CELERY_WORKER_CONCURRENCY:-4}
     volumes:
       - ./logs:/app/logs
     networks:
@@ -185,27 +242,36 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=4
+    command: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=${CELERY_WORKER_CONCURRENCY:-4}
     healthcheck:
       test: ["CMD", "celery", "-A", "app.tasks.celery_app", "inspect", "ping"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
 
   # Celery Beat Scheduler
   celery-beat:
     build:
       context: .
       dockerfile: Dockerfile
+      target: production
     container_name: remotehive-celery-beat
     restart: unless-stopped
     environment:
-      - MONGODB_URL=mongodb://admin:password123@mongodb:27017/remotehive?authSource=admin
-      - REDIS_URL=redis://:redis123@redis:6379/0
-      - CELERY_BROKER_URL=redis://:redis123@redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://:redis123@redis:6379/0
-      - LOG_LEVEL=INFO
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - MONGODB_URL=mongodb://${MONGO_ROOT_USERNAME:-admin}:${MONGO_ROOT_PASSWORD:-password123}@mongodb:27017/${MONGO_DATABASE:-remotehive}?authSource=admin
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis123}@redis:6379/0
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-redis123}@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-redis123}@redis:6379/0
     volumes:
       - ./logs:/app/logs
       - celery_beat_data:/app/celerybeat-schedule
@@ -223,6 +289,14 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
 
   # Nginx Load Balancer (Optional)
   nginx:
