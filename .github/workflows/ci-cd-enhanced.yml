@@ -1,0 +1,675 @@
+name: RemoteHive Enhanced CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop, staging, production]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+      deployment_type:
+        description: 'Deployment type'
+        required: true
+        default: 'docker-compose'
+        type: choice
+        options:
+          - docker-compose
+          - kubernetes
+      force_deploy:
+        description: 'Force deployment (skip tests)'
+        required: false
+        default: false
+        type: boolean
+      run_security_scan:
+        description: 'Run security vulnerability scan'
+        required: false
+        default: true
+        type: boolean
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}/remotehive
+  VPC_HOST: ${{ secrets.VPC_HOST }}
+  VPC_USER: ${{ secrets.VPC_USER }}
+  VPC_SSH_KEY: ${{ secrets.VPC_SSH_KEY }}
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
+
+jobs:
+  # =============================================================================
+  # SECURITY AND VULNERABILITY SCANNING
+  # =============================================================================
+  security-scan:
+    name: Security Vulnerability Scan
+    runs-on: ubuntu-latest
+    if: ${{ inputs.run_security_scan != false }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+          
+      - name: Run Snyk security scan
+        uses: snyk/actions/python@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high --file=requirements.txt
+        continue-on-error: true
+
+  # =============================================================================
+  # CODE QUALITY AND TESTING
+  # =============================================================================
+  code-quality:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+    if: ${{ !inputs.force_deploy }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+          cache: 'pip'
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install black isort flake8 bandit pytest mypy
+          pip install -r requirements.txt
+          
+      - name: Run Black (Code Formatting)
+        run: black --check --diff .
+        
+      - name: Run isort (Import Sorting)
+        run: isort --check-only --diff .
+        
+      - name: Run Flake8 (Linting)
+        run: |
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        
+      - name: Run MyPy (Type Checking)
+        run: mypy app/ --ignore-missing-imports --no-strict-optional
+        continue-on-error: true
+        
+      - name: Run Bandit (Security)
+        run: |
+          bandit -r . -f json -o bandit-report.json || true
+          bandit -r . -ll
+        
+      - name: Upload Security Report
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-reports
+          path: |
+            bandit-report.json
+            trivy-results.sarif
+
+  backend-tests:
+    name: Backend API Tests
+    runs-on: ubuntu-latest
+    if: ${{ !inputs.force_deploy }}
+    
+    services:
+      mongodb:
+        image: mongo:7.0
+        env:
+          MONGO_INITDB_ROOT_USERNAME: admin
+          MONGO_INITDB_ROOT_PASSWORD: testpass
+          MONGO_INITDB_DATABASE: remotehive_test
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.adminCommand(\"ping\")'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+          
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+          
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+          cache: 'pip'
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio pytest-cov pytest-xdist
+          
+      - name: Run Backend Tests
+        env:
+          MONGODB_URL: mongodb://admin:testpass@localhost:27017/remotehive_test?authSource=admin
+          REDIS_URL: redis://localhost:6379/0
+          JWT_SECRET_KEY: test-secret-key-for-ci
+          ENVIRONMENT: test
+        run: |
+          pytest app/tests/ -v --cov=app --cov-report=xml --cov-report=html --junitxml=pytest-report.xml -n auto
+          
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: backend-test-results
+          path: |
+            coverage.xml
+            htmlcov/
+            pytest-report.xml
+            
+      - name: Upload Coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: backend
+          name: backend-coverage
+
+  autoscraper-tests:
+    name: Autoscraper Service Tests
+    runs-on: ubuntu-latest
+    if: ${{ !inputs.force_deploy }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+          cache: 'pip'
+          
+      - name: Install dependencies
+        working-directory: autoscraper-service
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio pytest-cov
+          
+      - name: Run Autoscraper Tests
+        working-directory: autoscraper-service
+        env:
+          ENVIRONMENT: test
+        run: |
+          pytest tests/ -v --cov=app --cov-report=xml --junitxml=pytest-report.xml
+          
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: autoscraper-test-results
+          path: |
+            autoscraper-service/coverage.xml
+            autoscraper-service/pytest-report.xml
+
+  frontend-tests:
+    name: Frontend Tests
+    runs-on: ubuntu-latest
+    if: ${{ !inputs.force_deploy }}
+    
+    strategy:
+      matrix:
+        app: [remotehive-admin, remotehive-public]
+        
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: ${{ matrix.app }}/package-lock.json
+          
+      - name: Install dependencies
+        working-directory: ${{ matrix.app }}
+        run: npm ci
+        
+      - name: Run ESLint
+        working-directory: ${{ matrix.app }}
+        run: npm run lint -- --format=json --output-file=eslint-report.json
+        continue-on-error: true
+        
+      - name: Run TypeScript type checking
+        working-directory: ${{ matrix.app }}
+        run: npm run type-check
+        
+      - name: Run tests with coverage
+        working-directory: ${{ matrix.app }}
+        run: npm run test:coverage || true
+        
+      - name: Build application
+        working-directory: ${{ matrix.app }}
+        run: npm run build
+        
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: ${{ matrix.app }}-test-results
+          path: |
+            ${{ matrix.app }}/coverage/
+            ${{ matrix.app }}/eslint-report.json
+
+  # =============================================================================
+  # DOCKER IMAGE BUILDING AND SCANNING
+  # =============================================================================
+  build-and-scan-images:
+    name: Build and Scan Docker Images
+    runs-on: ubuntu-latest
+    needs: [code-quality, backend-tests, autoscraper-tests, frontend-tests]
+    if: always() && (needs.code-quality.result == 'success' || needs.code-quality.result == 'skipped') && (needs.backend-tests.result == 'success' || needs.backend-tests.result == 'skipped') && (needs.autoscraper-tests.result == 'success' || needs.autoscraper-tests.result == 'skipped') && (needs.frontend-tests.result == 'success' || needs.frontend-tests.result == 'skipped')
+    
+    strategy:
+      matrix:
+        service:
+          - name: backend-api
+            context: .
+            dockerfile: Dockerfile
+          - name: autoscraper-service
+            context: autoscraper-service
+            dockerfile: autoscraper-service/Dockerfile
+          - name: admin-panel
+            context: remotehive-admin
+            dockerfile: remotehive-admin/Dockerfile
+          - name: public-website
+            context: remotehive-public
+            dockerfile: remotehive-public/Dockerfile
+            
+    outputs:
+      backend-api-tag: ${{ steps.meta-backend-api.outputs.tags }}
+      autoscraper-service-tag: ${{ steps.meta-autoscraper-service.outputs.tags }}
+      admin-panel-tag: ${{ steps.meta-admin-panel.outputs.tags }}
+      public-website-tag: ${{ steps.meta-public-website.outputs.tags }}
+      
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Extract metadata
+        id: meta-${{ matrix.service.name }}
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.service.name }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ inputs.environment }},enable=${{ github.event_name == 'workflow_dispatch' }}
+            
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.service.context }}
+          file: ${{ matrix.service.dockerfile }}
+          load: true
+          tags: ${{ steps.meta-${{ matrix.service.name }}.outputs.tags }}
+          labels: ${{ steps.meta-${{ matrix.service.name }}.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+          
+      - name: Run Trivy vulnerability scanner on image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.service.name }}:${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-image-${{ matrix.service.name }}.sarif'
+          
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-image-${{ matrix.service.name }}.sarif'
+          
+      - name: Push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.service.context }}
+          file: ${{ matrix.service.dockerfile }}
+          push: true
+          tags: ${{ steps.meta-${{ matrix.service.name }}.outputs.tags }}
+          labels: ${{ steps.meta-${{ matrix.service.name }}.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
+  # =============================================================================
+  # DEPLOYMENT TO VPC
+  # =============================================================================
+  deploy-docker-compose:
+    name: Deploy with Docker Compose
+    runs-on: ubuntu-latest
+    needs: [build-and-scan-images]
+    if: ${{ inputs.deployment_type == 'docker-compose' || inputs.deployment_type == '' }}
+    environment: ${{ inputs.environment || 'staging' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPC_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ env.VPC_HOST }} >> ~/.ssh/known_hosts
+          
+      - name: Copy deployment files to VPC
+        run: |
+          scp -r docker-compose.yml .env.example deploy-to-vpc.sh setup-deployment.sh ${{ env.VPC_USER }}@${{ env.VPC_HOST }}:~/remotehive-deployment/
+          
+      - name: Deploy to VPC with Docker Compose
+        run: |
+          ssh ${{ env.VPC_USER }}@${{ env.VPC_HOST }} << 'EOF'
+            cd ~/remotehive-deployment
+            
+            # Make scripts executable
+            chmod +x deploy-to-vpc.sh setup-deployment.sh
+            
+            # Setup environment if needed
+            if [ ! -f .env ]; then
+              ./setup-deployment.sh
+            fi
+            
+            # Pull latest images
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-backend-api:latest
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-autoscraper-service:latest
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-admin-panel:latest
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-public-website:latest
+            
+            # Deploy with enhanced script
+            ./deploy-to-vpc.sh --environment=${{ inputs.environment || 'staging' }} --deployment-type=docker-compose
+          EOF
+          
+      - name: Run Health Checks
+        run: |
+          ssh ${{ env.VPC_USER }}@${{ env.VPC_HOST }} << 'EOF'
+            cd ~/remotehive-deployment
+            
+            # Wait for services to be ready
+            echo "Waiting for services to start..."
+            sleep 60
+            
+            # Comprehensive health checks
+            ./deploy-to-vpc.sh --health-check
+          EOF
+
+  deploy-kubernetes:
+    name: Deploy to Kubernetes
+    runs-on: ubuntu-latest
+    needs: [build-and-scan-images]
+    if: ${{ inputs.deployment_type == 'kubernetes' }}
+    environment: ${{ inputs.environment || 'staging' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPC_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ env.VPC_HOST }} >> ~/.ssh/known_hosts
+          
+      - name: Copy Kubernetes manifests to VPC
+        run: |
+          scp -r k8s/ ${{ env.VPC_USER }}@${{ env.VPC_HOST }}:~/remotehive-deployment/
+          
+      - name: Deploy to Kubernetes
+        run: |
+          ssh ${{ env.VPC_USER }}@${{ env.VPC_HOST }} << 'EOF'
+            cd ~/remotehive-deployment
+            
+            # Make deployment script executable
+            chmod +x k8s/deploy-k8s.sh
+            
+            # Deploy with Kubernetes
+            ./k8s/deploy-k8s.sh --environment=${{ inputs.environment || 'staging' }} --registry=${{ env.REGISTRY }} --image-prefix=${{ env.IMAGE_PREFIX }}
+            
+            # Wait for rollout to complete
+            kubectl rollout status deployment/backend-api -n remotehive --timeout=600s
+            kubectl rollout status deployment/autoscraper-service -n remotehive --timeout=600s
+            kubectl rollout status deployment/admin-panel -n remotehive --timeout=600s
+            kubectl rollout status deployment/public-website -n remotehive --timeout=600s
+            
+            # Show deployment status
+            kubectl get pods -n remotehive -o wide
+            kubectl get services -n remotehive
+            kubectl get ingress -n remotehive
+          EOF
+          
+      - name: Deploy Monitoring Stack
+        run: |
+          ssh ${{ env.VPC_USER }}@${{ env.VPC_HOST }} << 'EOF'
+            cd ~/remotehive-deployment
+            
+            # Deploy monitoring components
+            kubectl apply -f k8s/monitoring/
+            
+            # Wait for monitoring services
+            kubectl rollout status deployment/prometheus -n remotehive-monitoring --timeout=300s
+            kubectl rollout status deployment/grafana -n remotehive-monitoring --timeout=300s
+            
+            echo "Monitoring stack deployed successfully"
+          EOF
+
+  # =============================================================================
+  # INTEGRATION TESTS
+  # =============================================================================
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [deploy-docker-compose, deploy-kubernetes]
+    if: always() && (needs.deploy-docker-compose.result == 'success' || needs.deploy-kubernetes.result == 'success')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPC_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ env.VPC_HOST }} >> ~/.ssh/known_hosts
+          
+      - name: Run Integration Tests
+        run: |
+          ssh ${{ env.VPC_USER }}@${{ env.VPC_HOST }} << 'EOF'
+            cd ~/remotehive-deployment
+            
+            echo "Running comprehensive integration tests..."
+            
+            # Test API endpoints
+            echo "Testing Backend API..."
+            curl -f http://localhost:8000/health || exit 1
+            curl -f http://localhost:8000/api/v1/health || exit 1
+            
+            echo "Testing Autoscraper Service..."
+            curl -f http://localhost:8001/health || exit 1
+            
+            echo "Testing Frontend Applications..."
+            curl -f http://localhost:3000 || exit 1
+            curl -f http://localhost:5173 || exit 1
+            
+            # Test database connectivity
+            echo "Testing Database Connectivity..."
+            if command -v docker-compose &> /dev/null; then
+              docker-compose exec -T backend-api python -c "from app.database.database import get_database; print('MongoDB connected:', get_database() is not None)"
+            elif command -v kubectl &> /dev/null; then
+              kubectl exec -n remotehive deployment/backend-api -- python -c "from app.database.database import get_database; print('MongoDB connected:', get_database() is not None)"
+            fi
+            
+            echo "All integration tests passed!"
+          EOF
+
+  # =============================================================================
+  # PERFORMANCE TESTS
+  # =============================================================================
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: [integration-tests]
+    if: ${{ inputs.environment == 'production' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPC_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ env.VPC_HOST }} >> ~/.ssh/known_hosts
+          
+      - name: Run Performance Tests
+        run: |
+          ssh ${{ env.VPC_USER }}@${{ env.VPC_HOST }} << 'EOF'
+            cd ~/remotehive-deployment
+            
+            # Install Apache Bench if not available
+            if ! command -v ab &> /dev/null; then
+              sudo apt-get update && sudo apt-get install -y apache2-utils
+            fi
+            
+            echo "Running performance tests..."
+            
+            # Test API performance
+            echo "Testing API performance (100 requests, 10 concurrent)..."
+            ab -n 100 -c 10 http://localhost:8000/health
+            
+            # Test frontend performance
+            echo "Testing frontend performance..."
+            ab -n 50 -c 5 http://localhost:3000/
+            ab -n 50 -c 5 http://localhost:5173/
+            
+            echo "Performance tests completed"
+          EOF
+
+  # =============================================================================
+  # NOTIFICATION AND REPORTING
+  # =============================================================================
+  notify-success:
+    name: Send Success Notification
+    runs-on: ubuntu-latest
+    needs: [deploy-docker-compose, deploy-kubernetes, integration-tests]
+    if: always() && (needs.deploy-docker-compose.result == 'success' || needs.deploy-kubernetes.result == 'success') && needs.integration-tests.result == 'success'
+    
+    steps:
+      - name: Send Success Notification
+        run: |
+          echo "🚀 RemoteHive deployment successful!"
+          echo "Environment: ${{ inputs.environment || 'staging' }}"
+          echo "Deployment Type: ${{ inputs.deployment_type || 'docker-compose' }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Triggered by: ${{ github.actor }}"
+          echo "Workflow: ${{ github.workflow }}"
+          
+      # Add Slack/Discord/Email notification here if needed
+      # - name: Slack Notification
+      #   uses: 8398a7/action-slack@v3
+      #   with:
+      #     status: success
+      #     webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+
+  notify-failure:
+    name: Send Failure Notification
+    runs-on: ubuntu-latest
+    needs: [security-scan, code-quality, backend-tests, autoscraper-tests, frontend-tests, build-and-scan-images, deploy-docker-compose, deploy-kubernetes, integration-tests]
+    if: always() && (needs.security-scan.result == 'failure' || needs.code-quality.result == 'failure' || needs.backend-tests.result == 'failure' || needs.autoscraper-tests.result == 'failure' || needs.frontend-tests.result == 'failure' || needs.build-and-scan-images.result == 'failure' || needs.deploy-docker-compose.result == 'failure' || needs.deploy-kubernetes.result == 'failure' || needs.integration-tests.result == 'failure')
+    
+    steps:
+      - name: Send Failure Notification
+        run: |
+          echo "❌ RemoteHive deployment failed!"
+          echo "Environment: ${{ inputs.environment || 'staging' }}"
+          echo "Deployment Type: ${{ inputs.deployment_type || 'docker-compose' }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Triggered by: ${{ github.actor }}"
+          echo "Workflow: ${{ github.workflow }}"
+          echo "Please check the logs for more details."
+          
+      # Add Slack/Discord/Email notification here if needed
+      # - name: Slack Notification
+      #   uses: 8398a7/action-slack@v3
+      #   with:
+      #     status: failure
+      #     webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+
+  # =============================================================================
+  # CLEANUP
+  # =============================================================================
+  cleanup:
+    name: Cleanup Resources
+    runs-on: ubuntu-latest
+    needs: [notify-success, notify-failure]
+    if: always()
+    
+    steps:
+      - name: Cleanup SSH keys
+        run: |
+          rm -f ~/.ssh/id_rsa
+          
+      - name: Cleanup Docker images (if needed)
+        run: |
+          docker system prune -f || true

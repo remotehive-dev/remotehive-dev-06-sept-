@@ -1,0 +1,202 @@
+# MongoDB Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongodb
+  namespace: remotehive
+  labels:
+    app: mongodb
+    tier: database
+    version: "6.0"
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: mongodb
+      tier: database
+  template:
+    metadata:
+      labels:
+        app: mongodb
+        tier: database
+        version: "6.0"
+    spec:
+      containers:
+      - name: mongodb
+        image: mongo:6.0
+        ports:
+        - containerPort: 27017
+          name: mongodb
+        env:
+        - name: MONGO_INITDB_ROOT_USERNAME
+          valueFrom:
+            configMapKeyRef:
+              name: mongodb-config
+              key: MONGO_INITDB_ROOT_USERNAME
+        - name: MONGO_INITDB_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mongodb-secret
+              key: MONGO_INITDB_ROOT_PASSWORD
+        - name: MONGO_INITDB_DATABASE
+          valueFrom:
+            configMapKeyRef:
+              name: mongodb-config
+              key: MONGO_INITDB_DATABASE
+        volumeMounts:
+        - name: mongodb-storage
+          mountPath: /data/db
+        - name: mongodb-init
+          mountPath: /docker-entrypoint-initdb.d
+          readOnly: true
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1"
+        livenessProbe:
+          exec:
+            command:
+            - mongosh
+            - --eval
+            - "db.adminCommand('ping')"
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - mongosh
+            - --eval
+            - "db.adminCommand('ping')"
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+      volumes:
+      - name: mongodb-storage
+        persistentVolumeClaim:
+          claimName: mongodb-pvc
+      - name: mongodb-init
+        configMap:
+          name: mongodb-init-script
+      restartPolicy: Always
+---
+# MongoDB Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb
+  namespace: remotehive
+  labels:
+    app: mongodb
+    tier: database
+spec:
+  type: ClusterIP
+  ports:
+  - port: 27017
+    targetPort: 27017
+    protocol: TCP
+    name: mongodb
+  selector:
+    app: mongodb
+    tier: database
+---
+# MongoDB Init Script ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mongodb-init-script
+  namespace: remotehive
+  labels:
+    app: mongodb
+data:
+  mongo-init.js: |
+    // MongoDB initialization script for RemoteHive
+    // This script runs when MongoDB container starts for the first time
+
+    // Switch to the remotehive database
+    db = db.getSiblingDB('remotehive');
+
+    // Create application user with read/write permissions
+    db.createUser({
+      user: 'remotehive_user',
+      pwd: 'remotehive_password',
+      roles: [
+        {
+          role: 'readWrite',
+          db: 'remotehive'
+        }
+      ]
+    });
+
+    // Create collections with validation schemas
+    db.createCollection('users', {
+      validator: {
+        $jsonSchema: {
+          bsonType: 'object',
+          required: ['email', 'created_at'],
+          properties: {
+            email: {
+              bsonType: 'string',
+              pattern: '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$'
+            },
+            role: {
+              enum: ['job_seeker', 'employer', 'admin']
+            },
+            is_active: {
+              bsonType: 'bool'
+            },
+            created_at: {
+              bsonType: 'date'
+            }
+          }
+        }
+      }
+    });
+
+    // Create indexes
+    db.users.createIndex({ 'email': 1 }, { unique: true });
+    db.users.createIndex({ 'role': 1 });
+    db.users.createIndex({ 'is_active': 1 });
+    db.users.createIndex({ 'created_at': -1 });
+
+    // Create default admin user
+    db.users.insertOne({
+      email: 'admin@remotehive.in',
+      password_hash: '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj/RK.PJ/...',
+      role: 'admin',
+      is_active: true,
+      is_verified: true,
+      first_name: 'Admin',
+      last_name: 'User',
+      created_at: new Date(),
+      updated_at: new Date()
+    });
+
+    print('RemoteHive database initialized successfully!');
+---
+# MongoDB Headless Service for StatefulSet (if needed for clustering)
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-headless
+  namespace: remotehive
+  labels:
+    app: mongodb
+    tier: database
+spec:
+  clusterIP: None
+  ports:
+  - port: 27017
+    targetPort: 27017
+    protocol: TCP
+    name: mongodb
+  selector:
+    app: mongodb
+    tier: database

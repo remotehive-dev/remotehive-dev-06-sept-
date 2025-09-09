@@ -1,0 +1,596 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jaeger-config
+  namespace: remotehive-monitoring
+  labels:
+    app: jaeger
+data:
+  jaeger.yml: |
+    # Jaeger configuration for RemoteHive distributed tracing
+    
+    # Collector configuration
+    collector:
+      zipkin:
+        host-port: ":9411"
+      
+      # OTLP receivers
+      otlp:
+        grpc:
+          endpoint: "0.0.0.0:4317"
+        http:
+          endpoint: "0.0.0.0:4318"
+      
+      # Jaeger receivers
+      jaeger:
+        protocols:
+          grpc:
+            endpoint: "0.0.0.0:14250"
+          thrift_http:
+            endpoint: "0.0.0.0:14268"
+          thrift_compact:
+            endpoint: "0.0.0.0:6831"
+          thrift_binary:
+            endpoint: "0.0.0.0:6832"
+    
+    # Storage configuration
+    storage:
+      type: elasticsearch
+      elasticsearch:
+        server-urls: http://elasticsearch:9200
+        index-prefix: jaeger
+        create-index-templates: true
+        version: 7
+        max-span-age: 168h  # 7 days
+        num-shards: 1
+        num-replicas: 0
+        bulk:
+          size: 5000000  # 5MB
+          workers: 1
+          flush-interval: 200ms
+        timeout: 0s
+        sniffer: false
+        tags-as-fields:
+          all: false
+          dot-replacement: "@"
+          include: "http.method,http.status_code,component,error"
+    
+    # Query configuration
+    query:
+      base-path: /
+      static-files: /go/jaeger-ui/
+      ui-config: /etc/jaeger/ui.json
+      max-clock-skew-adjustment: 0s
+    
+    # Agent configuration
+    agent:
+      strategies:
+        file: /etc/jaeger/strategies.json
+      
+      # Sampling strategies
+      sampling:
+        strategies-file: /etc/jaeger/strategies.json
+        strategies-reload-interval: 10s
+  
+  ui.json: |
+    {
+      "monitor": {
+        "menuEnabled": true
+      },
+      "dependencies": {
+        "dagMaxNumServices": 200,
+        "menuEnabled": true
+      },
+      "archiveEnabled": true,
+      "tracking": {
+        "gaID": null,
+        "trackErrors": true
+      },
+      "menu": [
+        {
+          "label": "RemoteHive Docs",
+          "url": "https://docs.remotehive.com",
+          "anchorTarget": "_blank"
+        }
+      ],
+      "linkPatterns": [
+        {
+          "type": "logs",
+          "key": "trace_id",
+          "url": "http://localhost:3000/explore?orgId=1&left=%5B%22now-1h%22,%22now%22,%22Loki%22,%7B%22expr%22:%22%7Btrace_id%3D%5C%22#traceID%5C%22%7D%22%7D%5D",
+          "text": "View logs for this trace"
+        }
+      ]
+    }
+  
+  strategies.json: |
+    {
+      "default_strategy": {
+        "type": "probabilistic",
+        "param": 0.1
+      },
+      "per_service_strategies": [
+        {
+          "service": "remotehive-backend",
+          "type": "probabilistic",
+          "param": 0.5,
+          "max_traces_per_second": 100,
+          "operation_strategies": [
+            {
+              "operation": "POST /api/v1/jobs",
+              "type": "probabilistic",
+              "param": 1.0
+            },
+            {
+              "operation": "GET /api/v1/jobs",
+              "type": "probabilistic",
+              "param": 0.1
+            },
+            {
+              "operation": "POST /api/v1/auth/login",
+              "type": "probabilistic",
+              "param": 1.0
+            }
+          ]
+        },
+        {
+          "service": "remotehive-autoscraper",
+          "type": "probabilistic",
+          "param": 0.8,
+          "max_traces_per_second": 50,
+          "operation_strategies": [
+            {
+              "operation": "POST /scrape",
+              "type": "probabilistic",
+              "param": 1.0
+            },
+            {
+              "operation": "GET /scrapers",
+              "type": "probabilistic",
+              "param": 0.2
+            }
+          ]
+        },
+        {
+          "service": "remotehive-admin",
+          "type": "probabilistic",
+          "param": 0.3,
+          "max_traces_per_second": 20
+        },
+        {
+          "service": "remotehive-public",
+          "type": "probabilistic",
+          "param": 0.2,
+          "max_traces_per_second": 30
+        },
+        {
+          "service": "celery-worker",
+          "type": "probabilistic",
+          "param": 0.7,
+          "max_traces_per_second": 25
+        }
+      ]
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger-collector
+  namespace: remotehive-monitoring
+  labels:
+    app: jaeger
+    component: collector
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jaeger
+      component: collector
+  template:
+    metadata:
+      labels:
+        app: jaeger
+        component: collector
+    spec:
+      containers:
+      - name: jaeger-collector
+        image: jaegertracing/jaeger-collector:1.50
+        args:
+        - "--config-file=/etc/jaeger/jaeger.yml"
+        - "--es.server-urls=http://elasticsearch:9200"
+        - "--es.num-shards=1"
+        - "--es.num-replicas=0"
+        - "--es.index-prefix=jaeger"
+        - "--collector.zipkin.host-port=:9411"
+        - "--collector.otlp.grpc.host-port=:4317"
+        - "--collector.otlp.http.host-port=:4318"
+        - "--log-level=info"
+        env:
+        - name: SPAN_STORAGE_TYPE
+          value: elasticsearch
+        - name: ES_SERVER_URLS
+          value: http://elasticsearch:9200
+        - name: ES_INDEX_PREFIX
+          value: jaeger
+        ports:
+        - containerPort: 9411
+          name: zipkin
+          protocol: TCP
+        - containerPort: 4317
+          name: otlp-grpc
+          protocol: TCP
+        - containerPort: 4318
+          name: otlp-http
+          protocol: TCP
+        - containerPort: 14250
+          name: grpc
+          protocol: TCP
+        - containerPort: 14268
+          name: http
+          protocol: TCP
+        - containerPort: 14269
+          name: admin
+          protocol: TCP
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 200m
+            memory: 256Mi
+        volumeMounts:
+        - name: config
+          mountPath: /etc/jaeger
+          readOnly: true
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 14269
+          initialDelaySeconds: 30
+          periodSeconds: 15
+          timeoutSeconds: 10
+          failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 14269
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 10
+          failureThreshold: 3
+      volumes:
+      - name: config
+        configMap:
+          name: jaeger-config
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger-query
+  namespace: remotehive-monitoring
+  labels:
+    app: jaeger
+    component: query
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jaeger
+      component: query
+  template:
+    metadata:
+      labels:
+        app: jaeger
+        component: query
+    spec:
+      containers:
+      - name: jaeger-query
+        image: jaegertracing/jaeger-query:1.50
+        args:
+        - "--config-file=/etc/jaeger/jaeger.yml"
+        - "--es.server-urls=http://elasticsearch:9200"
+        - "--es.num-shards=1"
+        - "--es.num-replicas=0"
+        - "--es.index-prefix=jaeger"
+        - "--query.base-path=/"
+        - "--query.ui-config=/etc/jaeger/ui.json"
+        - "--log-level=info"
+        env:
+        - name: SPAN_STORAGE_TYPE
+          value: elasticsearch
+        - name: ES_SERVER_URLS
+          value: http://elasticsearch:9200
+        - name: ES_INDEX_PREFIX
+          value: jaeger
+        ports:
+        - containerPort: 16686
+          name: query
+          protocol: TCP
+        - containerPort: 16687
+          name: admin
+          protocol: TCP
+        resources:
+          limits:
+            cpu: 300m
+            memory: 256Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        volumeMounts:
+        - name: config
+          mountPath: /etc/jaeger
+          readOnly: true
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 16687
+          initialDelaySeconds: 30
+          periodSeconds: 15
+          timeoutSeconds: 10
+          failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 16687
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 10
+          failureThreshold: 3
+      volumes:
+      - name: config
+        configMap:
+          name: jaeger-config
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: jaeger-agent
+  namespace: remotehive-monitoring
+  labels:
+    app: jaeger
+    component: agent
+spec:
+  selector:
+    matchLabels:
+      app: jaeger
+      component: agent
+  template:
+    metadata:
+      labels:
+        app: jaeger
+        component: agent
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+      - name: jaeger-agent
+        image: jaegertracing/jaeger-agent:1.50
+        args:
+        - "--config-file=/etc/jaeger/jaeger.yml"
+        - "--reporter.grpc.host-port=jaeger-collector:14250"
+        - "--processor.jaeger-compact.server-host-port=:6831"
+        - "--processor.jaeger-binary.server-host-port=:6832"
+        - "--processor.zipkin-compact.server-host-port=:5775"
+        - "--admin.http.host-port=:14271"
+        - "--log-level=info"
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        ports:
+        - containerPort: 5775
+          name: zipkin-compact
+          protocol: UDP
+        - containerPort: 6831
+          name: jaeger-compact
+          protocol: UDP
+        - containerPort: 6832
+          name: jaeger-binary
+          protocol: UDP
+        - containerPort: 14271
+          name: admin
+          protocol: TCP
+        resources:
+          limits:
+            cpu: 100m
+            memory: 128Mi
+          requests:
+            cpu: 50m
+            memory: 64Mi
+        volumeMounts:
+        - name: config
+          mountPath: /etc/jaeger
+          readOnly: true
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 14271
+          initialDelaySeconds: 30
+          periodSeconds: 15
+          timeoutSeconds: 10
+          failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 14271
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 10
+          failureThreshold: 3
+      volumes:
+      - name: config
+        configMap:
+          name: jaeger-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger-collector
+  namespace: remotehive-monitoring
+  labels:
+    app: jaeger
+    component: collector
+  annotations:
+    prometheus.io/scrape: 'true'
+    prometheus.io/port: '14269'
+    prometheus.io/path: '/metrics'
+spec:
+  type: ClusterIP
+  ports:
+  - port: 9411
+    targetPort: 9411
+    protocol: TCP
+    name: zipkin
+  - port: 4317
+    targetPort: 4317
+    protocol: TCP
+    name: otlp-grpc
+  - port: 4318
+    targetPort: 4318
+    protocol: TCP
+    name: otlp-http
+  - port: 14250
+    targetPort: 14250
+    protocol: TCP
+    name: grpc
+  - port: 14268
+    targetPort: 14268
+    protocol: TCP
+    name: http
+  - port: 14269
+    targetPort: 14269
+    protocol: TCP
+    name: admin
+  selector:
+    app: jaeger
+    component: collector
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger-query
+  namespace: remotehive-monitoring
+  labels:
+    app: jaeger
+    component: query
+  annotations:
+    prometheus.io/scrape: 'true'
+    prometheus.io/port: '16687'
+    prometheus.io/path: '/metrics'
+spec:
+  type: ClusterIP
+  ports:
+  - port: 16686
+    targetPort: 16686
+    protocol: TCP
+    name: query
+  - port: 16687
+    targetPort: 16687
+    protocol: TCP
+    name: admin
+  selector:
+    app: jaeger
+    component: query
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger-agent
+  namespace: remotehive-monitoring
+  labels:
+    app: jaeger
+    component: agent
+  annotations:
+    prometheus.io/scrape: 'true'
+    prometheus.io/port: '14271'
+    prometheus.io/path: '/metrics'
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - port: 5775
+    targetPort: 5775
+    protocol: UDP
+    name: zipkin-compact
+  - port: 6831
+    targetPort: 6831
+    protocol: UDP
+    name: jaeger-compact
+  - port: 6832
+    targetPort: 6832
+    protocol: UDP
+    name: jaeger-binary
+  - port: 14271
+    targetPort: 14271
+    protocol: TCP
+    name: admin
+  selector:
+    app: jaeger
+    component: agent
+---
+# ServiceAccount for Jaeger
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: jaeger
+  namespace: remotehive-monitoring
+---
+# ClusterRole for Jaeger
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: jaeger
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "endpoints"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch"]
+---
+# ClusterRoleBinding for Jaeger
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: jaeger
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: jaeger
+subjects:
+- kind: ServiceAccount
+  name: jaeger
+  namespace: remotehive-monitoring
+---
+# Ingress for Jaeger Query UI
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: jaeger-query
+  namespace: remotehive-monitoring
+  labels:
+    app: jaeger
+    component: query
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: jaeger.remotehive.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: jaeger-query
+            port:
+              number: 16686
+  # Uncomment for TLS
+  # tls:
+  # - hosts:
+  #   - jaeger.remotehive.local
+  #   secretName: jaeger-tls
