@@ -3,6 +3,8 @@ import React, { createContext, useContext, useEffect, useState, ReactNode } from
 import { useAuth } from './AuthContext'
 import { toast } from 'react-hot-toast'
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://210.79.129.193:8000/api/v1';
+
 export interface Notification {
   id: number
   user_id: string
@@ -73,7 +75,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       const token = localStorage.getItem('token')
       if (!token) return
 
-      const response = await fetch('http://localhost:8000/api/v1/notifications/', {
+      const response = await fetch(`${API_BASE_URL}/notifications/`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -100,7 +102,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       const token = localStorage.getItem('token')
       if (!token) return
 
-      const response = await fetch('http://localhost:8000/api/v1/notifications/preferences', {
+      const response = await fetch(`${API_BASE_URL}/notifications/preferences`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -124,7 +126,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       const token = localStorage.getItem('token')
       if (!token) return
 
-      const response = await fetch('http://localhost:8000/api/v1/notifications/mark-read', {
+      const response = await fetch(`${API_BASE_URL}/notifications/mark-read`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -165,7 +167,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       const token = localStorage.getItem('token')
       if (!token) return
 
-      const response = await fetch(`http://localhost:8000/api/v1/notifications/${notificationId}`, {
+      const response = await fetch(`${API_BASE_URL}/notifications/${notificationId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -194,7 +196,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       const token = localStorage.getItem('token')
       if (!token) return
 
-      const response = await fetch('http://localhost:8000/api/v1/notifications/preferences', {
+      const response = await fetch(`${API_BASE_URL}/notifications/preferences`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
