@@ -8,7 +8,7 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  serverExternalPackages: ['@supabase/supabase-js'],
+  // MongoDB Atlas backend configuration
   serverRuntimeConfig: {
     // Will only be available on the server side
   },

@@ -1,4 +1,11 @@
-import { SupabaseService, TABLES, STATUS_TYPES } from './supabase';
+import { apiClient } from '../../lib/api-client';
+
+const STATUS_TYPES = {
+  ACTIVE: 'active',
+  INACTIVE: 'inactive',
+  PENDING: 'pending',
+  SUSPENDED: 'suspended'
+};
 
 export interface JobSeeker {
   id: string;
@@ -67,103 +74,75 @@ export class JobSeekerService {
       sortOrder = 'desc'
     } = options;
 
-    const offset = (page - 1) * limit;
     const filters: Record<string, any> = {};
 
     if (status) filters.status = status;
     if (experience_level) filters.experience_level = experience_level;
     if (location) filters.location = location;
 
-    let jobSeekers: JobSeeker[];
+    const response = await apiClient.getItems('jobseekers', {
+      page,
+      limit,
+      filters,
+      search,
+      sortBy,
+      sortOrder
+    });
 
-    if (search) {
-      jobSeekers = await SupabaseService.search<JobSeeker>(
-        TABLES.JOB_SEEKERS,
-        search,
-        ['first_name', 'last_name', 'email', 'location', 'skills'],
-        {
-          select: `
-            *,
-            total_applications:applications(count),
-            successful_applications:applications(count).eq(status,hired)
-          `,
-          filters,
-          limit
-        }
-      );
-    } else {
-      jobSeekers = await SupabaseService.read<JobSeeker>(
-        TABLES.JOB_SEEKERS,
-        {
-          select: `
-            *,
-            total_applications:applications(count),
-            successful_applications:applications(count).eq(status,hired)
-          `,
-          filters,
-          orderBy: { column: sortBy, ascending: sortOrder === 'asc' },
-          limit,
-          offset
-        }
-      );
+    if (response.error) {
+      throw new Error(response.error);
     }
 
-    const total = await SupabaseService.count(TABLES.JOB_SEEKERS, filters);
-
-    return { jobSeekers, total };
+    return {
+      jobSeekers: response.data || [],
+      total: response.total || 0
+    };
   }
 
   // Get job seeker by ID
   static async getJobSeekerById(id: string): Promise<JobSeeker> {
-    const jobSeekers = await SupabaseService.read<JobSeeker>(
-      TABLES.JOB_SEEKERS,
-      {
-        select: `
-          *,
-          total_applications:applications(count),
-          successful_applications:applications(count).eq(status,hired),
-          user:users(*)
-        `,
-        filters: { id }
-      }
-    );
+    const response = await apiClient.getItem('jobseekers', id);
 
-    if (!jobSeekers.length) {
+    if (response.error) {
+      throw new Error(response.error);
+    }
+
+    if (!response.data) {
       throw new Error('Job seeker not found');
     }
 
-    return jobSeekers[0];
+    return response.data;
   }
 
   // Get job seeker statistics
   static async getJobSeekerStats(): Promise<JobSeekerStats> {
-    const [total, active, inactive, premium] = await Promise.all([
-      SupabaseService.count(TABLES.JOB_SEEKERS),
-      SupabaseService.count(TABLES.JOB_SEEKERS, { status: STATUS_TYPES.ACTIVE }),
-      SupabaseService.count(TABLES.JOB_SEEKERS, { status: STATUS_TYPES.INACTIVE }),
-      SupabaseService.count(TABLES.JOB_SEEKERS, { is_premium: true })
+    const [totalResponse, activeResponse, inactiveResponse, premiumResponse] = await Promise.all([
+      apiClient.getCount('jobseekers'),
+      apiClient.getCount('jobseekers', { status: STATUS_TYPES.ACTIVE }),
+      apiClient.getCount('jobseekers', { status: STATUS_TYPES.INACTIVE }),
+      apiClient.getCount('jobseekers', { is_premium: true })
     ]);
 
     // Get new job seekers this month
     const thisMonth = new Date();
     thisMonth.setDate(1);
-    const new_this_month = await SupabaseService.count(TABLES.JOB_SEEKERS, {
+    const newThisMonthResponse = await apiClient.getCount('jobseekers', {
       created_at: `gte.${thisMonth.toISOString()}`
     });
 
     // Get high performers (profile completion > 80% and active)
-    const high_performers = await SupabaseService.count(TABLES.JOB_SEEKERS, {
+    const highPerformersResponse = await apiClient.getCount('jobseekers', {
       status: STATUS_TYPES.ACTIVE,
       profile_completion: 'gte.80'
     });
 
     return {
-      total,
-      active,
-      inactive,
-      premium,
-      new_this_month,
-      high_performers
+      total: totalResponse.data?.count || 0,
+      active: activeResponse.data?.count || 0,
+      inactive: inactiveResponse.data?.count || 0,
+      premium: premiumResponse.data?.count || 0,
+      new_this_month: newThisMonthResponse.data?.count || 0,
+      high_performers: highPerformersResponse.data?.count || 0
     };
   }
 
@@ -172,72 +151,83 @@ export class JobSeekerService {
     id: string,
     data: Partial<JobSeeker>
   ): Promise<JobSeeker> {
-    return await SupabaseService.update<JobSeeker>(
-      TABLES.JOB_SEEKERS,
-      id,
-      {
-        ...data,
-        updated_at: new Date().toISOString()
-      }
-    );
+    const response = await apiClient.updateItem('jobseekers', id, {
+      ...data,
+      updated_at: new Date().toISOString()
+    });
+
+    if (response.error) {
+      throw new Error(response.error);
+    }
+
+    return response.data;
   }
 
   // Toggle premium status
   static async togglePremium(id: string, isPremium: boolean): Promise<JobSeeker> {
-    return await SupabaseService.update<JobSeeker>(
-      TABLES.JOB_SEEKERS,
-      id,
-      {
-        is_premium: isPremium,
-        updated_at: new Date().toISOString()
-      }
-    );
+    const response = await apiClient.updateItem('jobseekers', id, {
+      is_premium: isPremium,
+      updated_at: new Date().toISOString()
+    });
+
+    if (response.error) {
+      throw new Error(response.error);
+    }
+
+    return response.data;
   }
 
   // Suspend job seeker
   static async suspendJobSeeker(id: string): Promise<JobSeeker> {
-    return await SupabaseService.update<JobSeeker>(
-      TABLES.JOB_SEEKERS,
-      id,
-      {
-        status: 'suspended',
-        updated_at: new Date().toISOString()
-      }
-    );
+    const response = await apiClient.updateItem('jobseekers', id, {
+      status: 'suspended',
+      updated_at: new Date().toISOString()
+    });
+
+    if (response.error) {
+      throw new Error(response.error);
+    }
+
+    return response.data;
   }
 
   // Activate job seeker
   static async activateJobSeeker(id: string): Promise<JobSeeker> {
-    return await SupabaseService.update<JobSeeker>(
-      TABLES.JOB_SEEKERS,
-      id,
-      {
-        status: STATUS_TYPES.ACTIVE,
-        updated_at: new Date().toISOString()
-      }
-    );
+    const response = await apiClient.updateItem('jobseekers', id, {
+      status: STATUS_TYPES.ACTIVE,
+      updated_at: new Date().toISOString()
+    });
+
+    if (response.error) {
+      throw new Error(response.error);
+    }
+
+    return response.data;
   }
 
   // Delete job seeker
   static async deleteJobSeeker(id: string): Promise<void> {
-    await SupabaseService.delete(TABLES.JOB_SEEKERS, id);
+    const response = await apiClient.deleteItem('jobseekers', id);
+
+    if (response.error) {
+      throw new Error(response.error);
+    }
   }
 
   // Get top performing job seekers
   static async getTopPerformers(limit: number = 10): Promise<JobSeeker[]> {
-    return await SupabaseService.read<JobSeeker>(
-      TABLES.JOB_SEEKERS,
-      {
-        select: `
-          *,
-          total_applications:applications(count),
-          successful_applications:applications(count).eq(status,hired)
-        `,
-        filters: { status: STATUS_TYPES.ACTIVE },
-        orderBy: { column: 'profile_completion', ascending: false },
-        limit
-      }
-    );
+    const response = await apiClient.getItems('jobseekers', {
+      filters: { status: STATUS_TYPES.ACTIVE },
+      sortBy: 'profile_completion',
+      sortOrder: 'desc',
+      limit
+    });
+
+    if (response.error) {
+      throw new Error(response.error);
+    }
+
+    return response.data || [];
   }
 
   // Get job seekers by experience level
@@ -246,10 +236,11 @@ export class JobSeekerService {
     const counts: Record<string, number> = {};
 
     for (const level of experienceLevels) {
-      counts[level] = await SupabaseService.count(TABLES.JOB_SEEKERS, {
+      const response = await apiClient.getCount('jobseekers', {
         experience_level: level,
         status: STATUS_TYPES.ACTIVE
       });
+      counts[level] = response.data?.count || 0;
     }
 
     return counts;
@@ -257,18 +248,17 @@ export class JobSeekerService {
 
   // Get job seekers by location
   static async getJobSeekersByLocation(limit: number = 10): Promise<Record<string, number>> {
-    const { data, error } = await SupabaseService.read<{ location: string }>(
-      TABLES.JOB_SEEKERS,
-      {
-        select: 'location',
-        filters: { status: STATUS_TYPES.ACTIVE }
-      }
-    );
+    const response = await apiClient.getItems('jobseekers', {
+      filters: { status: STATUS_TYPES.ACTIVE },
+      select: 'location'
+    });
 
-    if (error) throw error;
+    if (response.error) {
+      throw new Error(response.error);
+    }
 
     const locationCounts: Record<string, number> = {};
-    data.forEach(item => {
+    (response.data || []).forEach((item: any) => {
       if (item.location) {
         locationCounts[item.location] = (locationCounts[item.location] || 0) + 1;
       }
@@ -286,39 +276,41 @@ export class JobSeekerService {
     return sortedLocations;
   }
 
-  // Get recent job seeker activity
-  static async getRecentActivity(limit: number = 10): Promise<JobSeeker[]> {
-    return await SupabaseService.read<JobSeeker>(
-      TABLES.JOB_SEEKERS,
-      {
-        select: 'id, first_name, last_name, last_active, created_at',
-        orderBy: { column: 'last_active', ascending: false },
-        limit
-      }
-    );
-  }
-
-  // Search job seekers by skills
-  static async searchBySkills(skills: string[]): Promise<JobSeeker[]> {
-    const { data, error } = await SupabaseService.read<JobSeeker>(
-      TABLES.JOB_SEEKERS,
-      {
-        select: '*',
-        filters: { status: STATUS_TYPES.ACTIVE }
-      }
-    );
-
-    if (error) throw error;
-
-    // Filter by skills (this would be better done with a proper full-text search)
-    const filteredJobSeekers = data.filter(jobSeeker => {
-      return skills.some(skill => 
-        jobSeeker.skills.some(js => 
-          js.toLowerCase().includes(skill.toLowerCase())
-        )
-      );
+  // Get recent activity
+  static async getRecentActivity(limit: number = 20): Promise<JobSeeker[]> {
+    const response = await apiClient.getItems('jobseekers', {
+      sortBy: 'updated_at',
+      sortOrder: 'desc',
+      limit
     });
 
-    return filteredJobSeekers;
+    if (response.error) {
+      throw new Error(response.error);
+    }
+
+    return response.data || [];
+  }
+
+  // Search by skills
+  static async searchBySkills(skills: string[], page: number = 1, limit: number = 20): Promise<{ jobSeekers: JobSeeker[]; total: number }> {
+    const response = await apiClient.getItems('jobseekers', {
+      filters: { 
+        status: STATUS_TYPES.ACTIVE,
+        skills: { $in: skills }
+      },
+      sortBy: 'created_at',
+      sortOrder: 'desc',
+      page,
+      limit
+    });
+
+    if (response.error) {
+      throw new Error(response.error);
+    }
+
+    return { 
+      jobSeekers: response.data || [], 
+      total: response.total || 0 
+    };
   }
 }

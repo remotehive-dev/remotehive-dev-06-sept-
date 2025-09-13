@@ -33,7 +33,7 @@ import {
   RefreshCw,
   Loader2
 } from 'lucide-react';
-import { websiteManagerApi } from '@/lib/supabase';
+import { apiService } from '@/lib/api';
 import { useRetry, retryConditions } from '@/hooks/useRetry';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';

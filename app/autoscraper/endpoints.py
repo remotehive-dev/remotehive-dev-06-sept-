@@ -5,7 +5,7 @@ from loguru import logger
 import json
 
 from app.core.deps import get_current_user
-from app.database.models import User
+from app.models.mongodb_models import User
 from app.autoscraper.schemas import (
     JobBoardCreate, JobBoardUpdate, JobBoardResponse,
     ScrapeJobResponse, ScrapeRunResponse, EngineStateResponse,

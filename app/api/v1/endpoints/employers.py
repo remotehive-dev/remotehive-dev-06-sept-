@@ -1,19 +1,18 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import Dict, Any
 from loguru import logger
-from sqlalchemy.orm import Session
+# from sqlalchemy.orm import Session  # Removed for MongoDB migration
 
-from app.core.database import get_db
+# from app.core.database import get_db  # Removed for MongoDB migration
 from app.core.auth import get_current_user
 from app.database.services import EmployerService
-from app.database.models import User, Employer, UserRole
+from app.models.mongodb_models import User, Employer, UserRole
 
 router = APIRouter()
 
 @router.get("/profile")
 async def get_employer_profile(
-    current_user: Dict[str, Any] = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """Get current employer's profile"""
     # Check if user is an employer
@@ -23,7 +22,8 @@ async def get_employer_profile(
             detail="Access denied. Employer role required."
         )
     
-    employer = EmployerService.get_employer_by_user_id(db, current_user.get("id"))
+    employer_service = EmployerService()
+    employer = await employer_service.get_employer_by_user_id(current_user.get("id"))
     
     if not employer:
         raise HTTPException(
@@ -49,8 +49,7 @@ async def get_employer_profile(
 @router.post("/profile")
 async def create_employer_profile(
     profile_data: Dict[str, Any],
-    current_user: Dict[str, Any] = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """Create employer profile"""
     # Check if user is an employer
@@ -114,8 +113,7 @@ async def get_employers(
     search: str = None,
     employer_status: str = None,
     industry: str = None,
-    current_user: Dict[str, Any] = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """Get all employers with pagination and filters (admin only)"""
     # Check if user is admin
@@ -156,8 +154,7 @@ async def get_employers(
 @router.put("/profile")
 async def update_employer_profile(
     profile_data: Dict[str, Any],
-    current_user: Dict[str, Any] = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """Update employer profile"""
     # Check if user is an employer
@@ -167,7 +164,8 @@ async def update_employer_profile(
             detail="Access denied. Employer role required."
         )
     
-    employer = EmployerService.get_employer_by_user_id(db, current_user.get("id"))
+    employer_service = EmployerService()
+    employer = await employer_service.get_employer_by_user_id(current_user.get("id"))
     
     if not employer:
         raise HTTPException(
@@ -193,7 +191,7 @@ async def update_employer_profile(
         if "logo_url" in profile_data:
             update_data["logo_url"] = profile_data["logo_url"]
         
-        updated_employer = EmployerService.update_employer(db, employer.id, update_data)
+        updated_employer = await employer_service.update_employer(employer.id, update_data)
         
         return {
             "id": updated_employer.id,

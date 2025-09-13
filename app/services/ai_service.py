@@ -4,7 +4,7 @@ import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 from motor.motor_asyncio import AsyncIOMotorDatabase
-from bson import ObjectId
+# from bson import ObjectId  # Removed to fix Pydantic schema generation
 
 try:
     import google.generativeai as genai
@@ -39,7 +39,7 @@ class AIService:
         """Generate personalized job recommendations for a user"""
         try:
             # Get user profile and preferences
-            user = await db.users.find_one({"_id": ObjectId(user_id)})
+            user = await db.users.find_one({"_id": user_id})
             if not user or not user.get("job_seeker"):
                 return []
             
@@ -47,12 +47,12 @@ class AIService:
             
             # Get recent job applications to understand preferences
             recent_applications = await db.job_applications.find(
-                {"job_seeker_id": ObjectId(job_seeker.get("_id"))}
+                {"job_seeker_id": job_seeker.get("_id")}
             ).sort("created_at", -1).limit(5).to_list(length=5)
             
             # Get saved jobs
             saved_jobs = await db.saved_jobs.find(
-                {"user_id": ObjectId(user_id)}
+                {"user_id": user_id}
             ).limit(5).to_list(length=5)
             
             # Get available jobs (excluding already applied)
@@ -243,7 +243,7 @@ class AIService:
     async def analyze_profile_strength(self, db: AsyncIOMotorDatabase, user_id: str) -> Dict[str, Any]:
         """Analyze user profile completeness and provide suggestions"""
         try:
-            user = await db.users.find_one({"_id": ObjectId(user_id)})
+            user = await db.users.find_one({"_id": user_id})
             if not user or not user.get("job_seeker"):
                 return {"score": 0, "suggestions": ["Profile not found"]}
             
@@ -341,7 +341,7 @@ class AIService:
             if not self.available:
                 return "AI career advisor is currently unavailable. Please try again later."
             
-            user = await db.users.find_one({"_id": ObjectId(user_id)})
+            user = await db.users.find_one({"_id": user_id})
             if not user or not user.get("job_seeker"):
                 return "Please complete your profile to get personalized advice."
             
@@ -349,7 +349,7 @@ class AIService:
             
             # Get recent applications for context
             recent_applications = await db.job_applications.find(
-                {"job_seeker_id": ObjectId(user_id)}
+                {"job_seeker_id": user_id}
             ).sort("created_at", -1).limit(3).to_list(length=3)
             
             context = {

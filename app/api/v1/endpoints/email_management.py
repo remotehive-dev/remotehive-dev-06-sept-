@@ -7,7 +7,10 @@ import json
 
 from app.core.database import get_db_session as get_db
 from app.core.auth import get_admin
-from app.database.models import EmailTemplate, EmailLog, SystemSettings
+# from app.database.models import EmailTemplate, EmailLog, SystemSettings
+# TODO: Implement EmailTemplate and EmailLog models in MongoDB
+# TODO: Import SystemSettings from deployment_package or implement in current MongoDB models
+# Note: EmailTemplate and EmailLog are currently handled as dictionaries in email_management_service.py
 from app.schemas.email import (
     EmailTemplate as EmailTemplateSchema,
     EmailTemplateCreate,

@@ -1,22 +1,27 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase';
+import { apiClient } from '@/lib/api';
 
 export async function GET() {
   try {
-    const supabaseAdmin = createAdminClient();
-    
     const [usersCount, jobsCount, applicationsCount, activeJobsCount] = await Promise.all([
-      supabaseAdmin.from('users').select('*', { count: 'exact', head: true }),
-      supabaseAdmin.from('job_posts').select('*', { count: 'exact', head: true }),
-      supabaseAdmin.from('job_applications').select('*', { count: 'exact', head: true }),
-      supabaseAdmin.from('job_posts').select('*', { count: 'exact', head: true }).eq('status', 'active')
+      apiClient.getCount('users'),
+      apiClient.getCount('job_posts'),
+      apiClient.getCount('job_applications'),
+      apiClient.getCount('job_posts', { status: 'active' })
     ]);
 
+    // Check for errors in responses
+    const responses = [usersCount, jobsCount, applicationsCount, activeJobsCount];
+    const errorResponse = responses.find(response => response.error);
+    if (errorResponse) {
+      throw new Error(errorResponse.error);
+    }
+
     const stats = {
-      totalUsers: usersCount.count || 0,
-      totalJobs: jobsCount.count || 0,
-      totalApplications: applicationsCount.count || 0,
-      activeJobs: activeJobsCount.count || 0
+      totalUsers: usersCount.data?.count || 0,
+      totalJobs: jobsCount.data?.count || 0,
+      totalApplications: applicationsCount.data?.count || 0,
+      activeJobs: activeJobsCount.data?.count || 0
     };
 
     return NextResponse.json(stats);

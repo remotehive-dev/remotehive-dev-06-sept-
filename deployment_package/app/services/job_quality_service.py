@@ -10,8 +10,8 @@ logger = logging.getLogger(__name__)
 class JobQualityService:
     """Service for job deduplication, quality scoring, and content enhancement."""
     
-    def __init__(self, supabase=None):
-        self.supabase = supabase
+    def __init__(self, db=None):
+        self.db = db
         
         # Quality scoring weights
         self.quality_weights = {
@@ -87,21 +87,23 @@ class JobQualityService:
     def check_duplicate(self, job_data: Dict, similarity_threshold: float = 0.85) -> Optional[Dict]:
         """Check if a job is a duplicate of existing jobs."""
         try:
-            if not self.supabase:
+            if not self.db:
                 return {'is_duplicate': False, 'error': 'No database connection'}
                 
             fingerprint = self.generate_job_fingerprint(job_data)
             
             # First check exact fingerprint match
-            thirty_days_ago = (datetime.utcnow() - timedelta(days=30)).isoformat()
-            exact_response = self.supabase.table('job_posts').select('id, title, company, location, created_at').eq('fingerprint', fingerprint).gte('created_at', thirty_days_ago).limit(1).execute()
+            thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+            exact_match = await self.db.job_posts.find_one({
+                'fingerprint': fingerprint,
+                'created_at': {'$gte': thirty_days_ago}
+            })
             
-            if exact_response.data:
-                exact_match = exact_response.data[0]
+            if exact_match:
                 return {
                     'is_duplicate': True,
                     'match_type': 'exact',
-                    'existing_job_id': exact_match['id'],
+                    'existing_job_id': str(exact_match['_id']),
                     'similarity_score': 1.0,
                     'existing_job': {
                         'title': exact_match['title'],
@@ -116,11 +118,14 @@ class JobQualityService:
             if not company:
                 return {'is_duplicate': False}
             
-            seven_days_ago = (datetime.utcnow() - timedelta(days=7)).isoformat()
-            similar_response = self.supabase.table('job_posts').select('id, title, company, location, created_at').ilike('company', f'%{company}%').gte('created_at', seven_days_ago).order('created_at', desc=True).limit(20).execute()
+            seven_days_ago = datetime.utcnow() - timedelta(days=7)
+            similar_jobs = await self.db.job_posts.find({
+                'company': {'$regex': company, '$options': 'i'},
+                'created_at': {'$gte': seven_days_ago}
+            }).sort('created_at', -1).limit(20).to_list()
             
             # Check similarity with each job
-            for job in similar_response.data:
+            for job in similar_jobs:
                 similarity = self._calculate_similarity(job_data, {
                     'title': job['title'],
                     'company': job['company'],
@@ -131,7 +136,7 @@ class JobQualityService:
                     return {
                         'is_duplicate': True,
                         'match_type': 'similar',
-                        'existing_job_id': job['id'],
+                        'existing_job_id': str(job['_id']),
                         'similarity_score': similarity,
                         'existing_job': {
                             'title': job['title'],

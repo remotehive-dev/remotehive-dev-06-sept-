@@ -1,0 +1,514 @@
+# RemoteHive Monitoring and Logging Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: monitoring-config
+  namespace: remotehive
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+    
+    rule_files:
+      - "alert_rules.yml"
+    
+    alerting:
+      alertmanagers:
+        - static_configs:
+            - targets:
+              - alertmanager:9093
+    
+    scrape_configs:
+      - job_name: 'prometheus'
+        static_configs:
+          - targets: ['localhost:9090']
+      
+      - job_name: 'remotehive-backend'
+        static_configs:
+          - targets: ['backend-api:8000']
+        metrics_path: '/metrics'
+        scrape_interval: 30s
+      
+      - job_name: 'remotehive-autoscraper'
+        static_configs:
+          - targets: ['autoscraper:8001']
+        metrics_path: '/metrics'
+        scrape_interval: 30s
+      
+      - job_name: 'nginx-proxy'
+        static_configs:
+          - targets: ['nginx-proxy:80']
+        metrics_path: '/nginx_status'
+      
+      - job_name: 'mongodb'
+        static_configs:
+          - targets: ['mongodb:27017']
+      
+      - job_name: 'redis'
+        static_configs:
+          - targets: ['redis:6379']
+      
+      - job_name: 'kubernetes-pods'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - remotehive
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+  
+  alert_rules.yml: |
+    groups:
+      - name: remotehive_alerts
+        rules:
+          - alert: HighErrorRate
+            expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.1
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "High error rate detected"
+              description: "Error rate is {{ $value }} errors per second"
+          
+          - alert: HighMemoryUsage
+            expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes > 0.85
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High memory usage"
+              description: "Memory usage is above 85%"
+          
+          - alert: HighCPUUsage
+            expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High CPU usage"
+              description: "CPU usage is above 80%"
+          
+          - alert: ServiceDown
+            expr: up == 0
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Service is down"
+              description: "{{ $labels.job }} service is down"
+          
+          - alert: DatabaseConnectionFailure
+            expr: mongodb_connections{state="current"} == 0
+            for: 2m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Database connection failure"
+              description: "No active MongoDB connections"
+          
+          - alert: RedisConnectionFailure
+            expr: redis_connected_clients == 0
+            for: 2m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Redis connection failure"
+              description: "No Redis client connections"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: remotehive
+data:
+  remotehive-dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "RemoteHive Monitoring Dashboard",
+        "tags": ["remotehive"],
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "API Response Time",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))",
+                "legendFormat": "95th percentile"
+              },
+              {
+                "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket[5m]))",
+                "legendFormat": "50th percentile"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Response Time (seconds)"
+              }
+            ]
+          },
+          {
+            "id": 2,
+            "title": "Request Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(http_requests_total[5m])",
+                "legendFormat": "{{ method }} {{ status }}"
+              }
+            ]
+          },
+          {
+            "id": 3,
+            "title": "Error Rate",
+            "type": "singlestat",
+            "targets": [
+              {
+                "expr": "rate(http_requests_total{status=~\"5..\"}[5m]) / rate(http_requests_total[5m]) * 100",
+                "legendFormat": "Error Rate %"
+              }
+            ]
+          },
+          {
+            "id": 4,
+            "title": "Active Users",
+            "type": "singlestat",
+            "targets": [
+              {
+                "expr": "active_users_total",
+                "legendFormat": "Active Users"
+              }
+            ]
+          },
+          {
+            "id": 5,
+            "title": "Database Connections",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "mongodb_connections{state=\"current\"}",
+                "legendFormat": "MongoDB Current"
+              },
+              {
+                "expr": "redis_connected_clients",
+                "legendFormat": "Redis Clients"
+              }
+            ]
+          },
+          {
+            "id": 6,
+            "title": "Memory Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100",
+                "legendFormat": "Memory Usage %"
+              }
+            ]
+          },
+          {
+            "id": 7,
+            "title": "CPU Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "100 - (avg by(instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+                "legendFormat": "CPU Usage %"
+              }
+            ]
+          },
+          {
+            "id": 8,
+            "title": "Disk Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "(node_filesystem_size_bytes - node_filesystem_free_bytes) / node_filesystem_size_bytes * 100",
+                "legendFormat": "Disk Usage %"
+              }
+            ]
+          }
+        ],
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "refresh": "30s"
+      }
+    }
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluentd-config
+  namespace: remotehive
+data:
+  fluent.conf: |
+    <source>
+      @type tail
+      path /var/log/containers/*remotehive*.log
+      pos_file /var/log/fluentd-containers.log.pos
+      tag kubernetes.*
+      format json
+      time_key time
+      time_format %Y-%m-%dT%H:%M:%S.%NZ
+    </source>
+    
+    <filter kubernetes.**>
+      @type kubernetes_metadata
+    </filter>
+    
+    <filter kubernetes.**>
+      @type parser
+      key_name log
+      reserve_data true
+      <parse>
+        @type json
+      </parse>
+    </filter>
+    
+    <match kubernetes.**>
+      @type elasticsearch
+      host elasticsearch
+      port 9200
+      index_name remotehive-logs
+      type_name _doc
+      include_tag_key true
+      tag_key @log_name
+      flush_interval 1s
+      <buffer>
+        @type memory
+        flush_thread_count 2
+        flush_interval 5s
+        chunk_limit_size 2M
+        queue_limit_length 32
+        retry_max_interval 30
+        retry_forever true
+      </buffer>
+    </match>
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: remotehive
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      containers:
+      - name: prometheus
+        image: prom/prometheus:v2.45.0
+        ports:
+        - containerPort: 9090
+        volumeMounts:
+        - name: config
+          mountPath: /etc/prometheus
+        - name: storage
+          mountPath: /prometheus
+        args:
+          - '--config.file=/etc/prometheus/prometheus.yml'
+          - '--storage.tsdb.path=/prometheus'
+          - '--web.console.libraries=/etc/prometheus/console_libraries'
+          - '--web.console.templates=/etc/prometheus/consoles'
+          - '--storage.tsdb.retention.time=15d'
+          - '--web.enable-lifecycle'
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+      volumes:
+      - name: config
+        configMap:
+          name: monitoring-config
+      - name: storage
+        persistentVolumeClaim:
+          claimName: prometheus-storage
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: remotehive
+spec:
+  selector:
+    app: prometheus
+  ports:
+  - port: 9090
+    targetPort: 9090
+  type: ClusterIP
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: remotehive
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+      - name: grafana
+        image: grafana/grafana:10.0.0
+        ports:
+        - containerPort: 3000
+        env:
+        - name: GF_SECURITY_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: grafana-secret
+              key: admin-password
+        - name: GF_INSTALL_PLUGINS
+          value: "grafana-kubernetes-app"
+        volumeMounts:
+        - name: grafana-storage
+          mountPath: /var/lib/grafana
+        - name: dashboards
+          mountPath: /etc/grafana/provisioning/dashboards
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "200m"
+      volumes:
+      - name: grafana-storage
+        persistentVolumeClaim:
+          claimName: grafana-storage
+      - name: dashboards
+        configMap:
+          name: grafana-dashboards
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: remotehive
+spec:
+  selector:
+    app: grafana
+  ports:
+  - port: 3000
+    targetPort: 3000
+  type: LoadBalancer
+
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fluentd
+  namespace: remotehive
+spec:
+  selector:
+    matchLabels:
+      app: fluentd
+  template:
+    metadata:
+      labels:
+        app: fluentd
+    spec:
+      containers:
+      - name: fluentd
+        image: fluent/fluentd-kubernetes-daemonset:v1.16-debian-elasticsearch7-1
+        env:
+        - name: FLUENT_ELASTICSEARCH_HOST
+          value: "elasticsearch"
+        - name: FLUENT_ELASTICSEARCH_PORT
+          value: "9200"
+        volumeMounts:
+        - name: varlog
+          mountPath: /var/log
+        - name: varlibdockercontainers
+          mountPath: /var/lib/docker/containers
+          readOnly: true
+        - name: config
+          mountPath: /fluentd/etc
+        resources:
+          requests:
+            memory: "200Mi"
+            cpu: "100m"
+          limits:
+            memory: "400Mi"
+            cpu: "200m"
+      volumes:
+      - name: varlog
+        hostPath:
+          path: /var/log
+      - name: varlibdockercontainers
+        hostPath:
+          path: /var/lib/docker/containers
+      - name: config
+        configMap:
+          name: fluentd-config
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: prometheus-storage
+  namespace: remotehive
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-storage
+  namespace: remotehive
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: grafana-secret
+  namespace: remotehive
+type: Opaque
+data:
+  admin-password: UmVtb3RlSGl2ZUFkbWluMTIz  # RemoteHiveAdmin123 in base64

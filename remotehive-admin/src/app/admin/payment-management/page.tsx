@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../../lib/supabase';
+import { apiService } from '@/lib/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -170,38 +170,20 @@ export default function PaymentManagement() {
 
   const fetchDashboardData = async () => {
     try {
-      // Fetch analytics data
-      const { data: analyticsData, error: analyticsError } = await supabase
-        .from('payment_analytics')
-        .select('*')
-        .order('date', { ascending: false })
-        .limit(30);
-
-      if (analyticsError) throw analyticsError;
-
-      // Calculate totals
-      const totalRevenue = analyticsData?.reduce((sum, day) => sum + (day.total_amount || 0), 0) || 0;
-      const totalTransactions = analyticsData?.reduce((sum, day) => sum + (day.total_transactions || 0), 0) || 0;
-      const successfulTransactions = analyticsData?.reduce((sum, day) => sum + (day.successful_transactions || 0), 0) || 0;
-      const successRate = totalTransactions > 0 ? (successfulTransactions / totalTransactions) * 100 : 0;
-
-      // Fetch fraud data from fraud_detection_logs table
-      const { data: fraudData, error: fraudError } = await supabase
-        .from('fraud_detection_logs')
-        .select('*')
-        .gte('risk_score', 70)
-        .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
-
-      if (fraudError) {
-        console.warn('Error fetching fraud data:', fraudError);
-        // Continue without fraud data instead of throwing
+      // Fetch analytics data from FastAPI backend
+      const response = await apiService.get('/admin/payments/analytics');
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch analytics data');
       }
-
+      
+      const data = await response.json();
+      
       setRealTimeStats({
-        totalRevenue,
-        totalTransactions,
-        successRate,
-        fraudDetected: fraudData?.length || 0
+        totalRevenue: data.totalRevenue || 0,
+        totalTransactions: data.totalTransactions || 0,
+        successRate: data.successRate || 0,
+        fraudDetected: data.fraudDetected || 0
       });
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -212,16 +194,14 @@ export default function PaymentManagement() {
 
   const fetchTransactions = async () => {
     try {
-      const { data, error } = await supabase
-        .from('transactions')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(100);
-
-      if (error) throw error;
+      const response = await apiService.get('/admin/payments/transactions');
       
-      // Set transactions data directly since fraudScore is handled separately
-      setTransactions(data || []);
+      if (!response.ok) {
+        throw new Error('Failed to fetch transactions');
+      }
+      
+      const data = await response.json();
+      setTransactions(data.transactions || []);
     } catch (error) {
       console.error('Error fetching transactions:', error);
       setTransactions([]); // Ensure state is set to empty array on error
@@ -230,15 +210,16 @@ export default function PaymentManagement() {
 
   const fetchGateways = async () => {
     try {
-      const { data, error } = await supabase
-        .from('payment_gateways')
-        .select('*')
-        .order('name');
-
-      if (error) throw error;
+      const response = await apiService.get('/admin/payments/gateways');
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch gateways');
+      }
+      
+      const data = await response.json();
       
       // Ensure arrays properties are always arrays for each gateway
-      const gatewaysWithArrays = (data || []).map(gateway => ({
+      const gatewaysWithArrays = (data.gateways || []).map((gateway: any) => ({
         ...gateway,
         supportedCurrencies: Array.isArray(gateway.supportedCurrencies) ? gateway.supportedCurrencies : [],
         features: Array.isArray(gateway.features) ? gateway.features : [],
@@ -254,20 +235,21 @@ export default function PaymentManagement() {
 
   const fetchPaymentPlans = async () => {
     try {
-      const { data, error } = await supabase
-        .from('payment_plans')
-        .select('*')
-        .order('price');
-
-      if (error) throw error;
+      const response = await apiService.get('/admin/payments/plans');
       
-      // Ensure features is always an array for each plan
-      const plansWithFeatures = (data || []).map(plan => ({
+      if (!response.ok) {
+        throw new Error('Failed to fetch payment plans');
+      }
+      
+      const data = await response.json();
+      
+      // Ensure features array is always an array for each plan
+      const plansWithArrays = (data.plans || []).map((plan: any) => ({
         ...plan,
         features: Array.isArray(plan.features) ? plan.features : []
       }));
       
-      setPaymentPlans(plansWithFeatures);
+      setPaymentPlans(plansWithArrays);
     } catch (error) {
       console.error('Error fetching payment plans:', error);
       setPaymentPlans([]); // Ensure state is set to empty array on error

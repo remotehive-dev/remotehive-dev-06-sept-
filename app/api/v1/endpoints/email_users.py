@@ -9,7 +9,8 @@ from app.schemas.email_users import (
 )
 from app.services.email_management_service import EmailManagementService
 from app.services.email_service import EmailService
-from app.models.email import EmailUser, EmailMessage
+# TODO: Migrate email models to MongoDB or handle differently
+# from app.models.email import EmailUser, EmailMessage
 from datetime import datetime
 import uuid
 

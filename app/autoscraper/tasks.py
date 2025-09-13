@@ -1,11 +1,13 @@
 from celery import current_app as celery_app
 from app.database.database import get_database_manager
-from app.database.models import JobPost
-from app.database.models import (
-    JobBoard, ScheduleConfig, AutoScrapeScrapeJob as ScrapeJob, AutoScrapeScrapeRun as ScrapeRun, 
-    AutoScrapeRawJob as RawJob, AutoScrapeNormalizedJob as NormalizedJob, 
-    AutoScrapeEngineState as EngineState, ScrapeJobStatus, ScrapeJobMode, EngineStatus
-)
+# from app.database.models import JobPost
+from app.models.mongodb_models import JobPost
+# from app.database.models import (
+#     JobBoard, ScheduleConfig, AutoScrapeScrapeJob as ScrapeJob, AutoScrapeScrapeRun as ScrapeRun, 
+#     AutoScrapeRawJob as RawJob, AutoScrapeNormalizedJob as NormalizedJob, 
+#     AutoScrapeEngineState as EngineState, ScrapeJobStatus, ScrapeJobMode, EngineStatus
+# )
+# Note: These autoscraper models need to be implemented in MongoDB or use the autoscraper service
 from datetime import datetime, timedelta
 import logging
 from typing import List, Dict, Any, Optional
@@ -422,7 +424,7 @@ def html_scrape(self, board_id: str, job_id: str, run_id: str):
         logger.error(f"HTML scrape failed for board {board_id}: {exc}")
         raise self.retry(exc=exc, countdown=120, max_retries=3)
 
-def extract_job_data(job_element, board: JobBoard, page_url: str) -> Dict[str, Any]:
+def extract_job_data(job_element, board: Any, page_url: str) -> Dict[str, Any]:
     """
     Extract job data from HTML element using board selectors
     

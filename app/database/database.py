@@ -6,11 +6,6 @@ from contextlib import contextmanager
 import logging
 from typing import Generator, Dict, Any, Optional
 
-# Import SQLAlchemy components
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.pool import StaticPool
-
 # Import MongoDB manager
 from .mongodb_manager import MongoDBManager
 from app.core.config import settings
@@ -18,7 +13,7 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 class DatabaseManager:
-    """Unified database manager for MongoDB and SQLAlchemy operations."""
+    """MongoDB database manager for RemoteHive application."""
     def __init__(self):
         self.mongodb_manager = MongoDBManager()
         self._metrics = {
@@ -31,39 +26,8 @@ class DatabaseManager:
         }
         self._lock = threading.Lock()
         self._initialized = False
-        
-        # SQLAlchemy components
-        self.engine = None
-        self.SessionLocal = None
-        self._init_sqlalchemy()
     
-    def _init_sqlalchemy(self):
-        """Initialize SQLAlchemy engine and session factory."""
-        try:
-            database_url = getattr(settings, 'DATABASE_URL', None)
-            if database_url:
-                # Create SQLAlchemy engine
-                self.engine = create_engine(
-                    database_url,
-                    pool_pre_ping=True,
-                    pool_recycle=3600,
-                    echo=False
-                )
-                
-                # Create session factory
-                self.SessionLocal = sessionmaker(
-                    autocommit=False,
-                    autoflush=False,
-                    bind=self.engine
-                )
-                
-                logger.info("SQLAlchemy engine initialized successfully")
-            else:
-                logger.warning("DATABASE_URL not found in settings, SQLAlchemy not initialized")
-        except Exception as e:
-            logger.error(f"Failed to initialize SQLAlchemy: {e}")
-            self.engine = None
-            self.SessionLocal = None
+
     
     async def initialize(self):
         """Initialize MongoDB connection."""
@@ -113,22 +77,7 @@ class DatabaseManager:
             logger.error(f"Error getting MongoDB session: {e}")
             raise
     
-    def get_sqlalchemy_session(self) -> Session:
-        """Get SQLAlchemy session for ORM operations."""
-        if not self.SessionLocal:
-            raise Exception("SQLAlchemy not initialized. Check DATABASE_URL configuration.")
-        
-        with self._lock:
-            self._metrics['total_connections'] += 1
-        
-        try:
-            session = self.SessionLocal()
-            return session
-        except Exception as e:
-            with self._lock:
-                self._metrics['failed_connections'] += 1
-            logger.error(f"Error creating SQLAlchemy session: {e}")
-            raise
+
     
     @contextmanager
     def session_scope(self):
@@ -149,25 +98,7 @@ class DatabaseManager:
             if db:
                 logger.debug("MongoDB session completed")
     
-    @contextmanager
-    def sqlalchemy_session_scope(self):
-        """Provide a transactional scope around SQLAlchemy operations."""
-        session = None
-        try:
-            session = self.get_sqlalchemy_session()
-            with self._lock:
-                self._metrics['query_count'] += 1
-            yield session
-            session.commit()
-        except Exception as e:
-            if session:
-                session.rollback()
-            logger.error(f"SQLAlchemy session error: {e}")
-            raise
-        finally:
-            if session:
-                session.close()
-                logger.debug("SQLAlchemy session closed")
+
     
     async def health_check(self) -> Dict[str, Any]:
         """Enhanced health check for MongoDB connection."""
@@ -310,17 +241,13 @@ class DatabaseManager:
 db_manager = DatabaseManager()
 
 def get_db_session():
-    """Dependency to get SQLAlchemy session for FastAPI and autoscraper tasks."""
-    session = None
+    """Dependency to get MongoDB database for FastAPI (legacy compatibility)."""
     try:
-        session = db_manager.get_sqlalchemy_session()
-        yield session
+        db = db_manager.get_session()
+        yield db
     except Exception as e:
-        logger.error(f"Error getting SQLAlchemy session: {e}")
+        logger.error(f"Error getting MongoDB database: {e}")
         raise
-    finally:
-        if session:
-            session.close()
 
 def get_mongodb_session():
     """Dependency to get MongoDB database for FastAPI."""

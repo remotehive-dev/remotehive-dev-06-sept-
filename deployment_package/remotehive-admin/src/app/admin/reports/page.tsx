@@ -5,7 +5,8 @@ import { motion } from 'framer-motion';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { getDashboardStats } from '@/lib/supabase';
+// FastAPI backend integration completed - reports data fetched from /admin/dashboard/stats endpoint
+// import { reportsApi } from '@/services/api/reports';
 import {
   Download,
   TrendingUp,

@@ -1,0 +1,677 @@
+# RemoteHive High Availability and Fault Tolerance Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ha-config
+  namespace: remotehive
+data:
+  nginx-ha.conf: |
+    upstream backend_api {
+        least_conn;
+        server backend-api-1:8000 max_fails=3 fail_timeout=30s;
+        server backend-api-2:8000 max_fails=3 fail_timeout=30s;
+        server backend-api-3:8000 max_fails=3 fail_timeout=30s backup;
+    }
+    
+    upstream autoscraper_service {
+        least_conn;
+        server autoscraper-1:8001 max_fails=3 fail_timeout=30s;
+        server autoscraper-2:8001 max_fails=3 fail_timeout=30s;
+    }
+    
+    upstream admin_panel {
+        least_conn;
+        server admin-panel-1:3000 max_fails=3 fail_timeout=30s;
+        server admin-panel-2:3000 max_fails=3 fail_timeout=30s;
+    }
+    
+    upstream public_website {
+        least_conn;
+        server public-website-1:5173 max_fails=3 fail_timeout=30s;
+        server public-website-2:5173 max_fails=3 fail_timeout=30s;
+    }
+    
+    # Health check configuration
+    server {
+        listen 8080;
+        location /health {
+            access_log off;
+            return 200 "healthy\n";
+            add_header Content-Type text/plain;
+        }
+    }
+
+---
+# MongoDB Replica Set Configuration
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongodb-replica
+  namespace: remotehive
+spec:
+  serviceName: mongodb-replica
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mongodb-replica
+  template:
+    metadata:
+      labels:
+        app: mongodb-replica
+    spec:
+      containers:
+      - name: mongodb
+        image: mongo:7.0
+        command:
+        - mongod
+        - --replSet
+        - rs0
+        - --bind_ip_all
+        - --auth
+        - --keyFile
+        - /etc/mongodb/keyfile
+        ports:
+        - containerPort: 27017
+        env:
+        - name: MONGO_INITDB_ROOT_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: mongodb-secret
+              key: username
+        - name: MONGO_INITDB_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mongodb-secret
+              key: password
+        volumeMounts:
+        - name: mongodb-data
+          mountPath: /data/db
+        - name: mongodb-keyfile
+          mountPath: /etc/mongodb
+          readOnly: true
+        - name: mongodb-config
+          mountPath: /docker-entrypoint-initdb.d
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          exec:
+            command:
+            - mongosh
+            - --eval
+            - "db.adminCommand('ping')"
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - mongosh
+            - --eval
+            - "db.adminCommand('ping')"
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+      volumes:
+      - name: mongodb-keyfile
+        secret:
+          secretName: mongodb-keyfile
+          defaultMode: 0400
+      - name: mongodb-config
+        configMap:
+          name: mongodb-init-config
+  volumeClaimTemplates:
+  - metadata:
+      name: mongodb-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 20Gi
+
+---
+# Redis Sentinel Configuration for High Availability
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis-master
+  namespace: remotehive
+spec:
+  serviceName: redis-master
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis-master
+  template:
+    metadata:
+      labels:
+        app: redis-master
+        role: master
+    spec:
+      containers:
+      - name: redis
+        image: redis:7.2-alpine
+        command:
+        - redis-server
+        - /etc/redis/redis.conf
+        - --requirepass
+        - $(REDIS_PASSWORD)
+        ports:
+        - containerPort: 6379
+        env:
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: redis-secret
+              key: password
+        volumeMounts:
+        - name: redis-config
+          mountPath: /etc/redis
+        - name: redis-data
+          mountPath: /data
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "200m"
+        livenessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: redis-config
+        configMap:
+          name: redis-config
+  volumeClaimTemplates:
+  - metadata:
+      name: redis-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 5Gi
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis-replica
+  namespace: remotehive
+spec:
+  serviceName: redis-replica
+  replicas: 2
+  selector:
+    matchLabels:
+      app: redis-replica
+  template:
+    metadata:
+      labels:
+        app: redis-replica
+        role: replica
+    spec:
+      containers:
+      - name: redis
+        image: redis:7.2-alpine
+        command:
+        - redis-server
+        - /etc/redis/redis.conf
+        - --replicaof
+        - redis-master
+        - "6379"
+        - --requirepass
+        - $(REDIS_PASSWORD)
+        - --masterauth
+        - $(REDIS_PASSWORD)
+        ports:
+        - containerPort: 6379
+        env:
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: redis-secret
+              key: password
+        volumeMounts:
+        - name: redis-config
+          mountPath: /etc/redis
+        - name: redis-data
+          mountPath: /data
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "200m"
+      volumes:
+      - name: redis-config
+        configMap:
+          name: redis-config
+  volumeClaimTemplates:
+  - metadata:
+      name: redis-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 5Gi
+
+---
+# Redis Sentinel for automatic failover
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-sentinel
+  namespace: remotehive
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: redis-sentinel
+  template:
+    metadata:
+      labels:
+        app: redis-sentinel
+    spec:
+      containers:
+      - name: sentinel
+        image: redis:7.2-alpine
+        command:
+        - redis-sentinel
+        - /etc/redis/sentinel.conf
+        ports:
+        - containerPort: 26379
+        volumeMounts:
+        - name: sentinel-config
+          mountPath: /etc/redis
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+      volumes:
+      - name: sentinel-config
+        configMap:
+          name: redis-sentinel-config
+
+---
+# Backend API with High Availability
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-api-ha
+  namespace: remotehive
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: backend-api
+  template:
+    metadata:
+      labels:
+        app: backend-api
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - backend-api
+              topologyKey: kubernetes.io/hostname
+      containers:
+      - name: backend-api
+        image: remotehive/backend-api:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: MONGODB_URL
+          value: "mongodb://mongodb-replica-0.mongodb-replica:27017,mongodb-replica-1.mongodb-replica:27017,mongodb-replica-2.mongodb-replica:27017/remotehive?replicaSet=rs0"
+        - name: REDIS_URL
+          value: "redis://redis-sentinel:26379"
+        - name: REDIS_SENTINEL_SERVICE
+          value: "mymaster"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+
+---
+# Autoscraper Service with High Availability
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: autoscraper-ha
+  namespace: remotehive
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: autoscraper
+  template:
+    metadata:
+      labels:
+        app: autoscraper
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - autoscraper
+              topologyKey: kubernetes.io/hostname
+      containers:
+      - name: autoscraper
+        image: remotehive/autoscraper:latest
+        ports:
+        - containerPort: 8001
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 5
+          periodSeconds: 5
+
+---
+# Horizontal Pod Autoscaler for Backend API
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: backend-api-hpa
+  namespace: remotehive
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: backend-api-ha
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+
+---
+# Pod Disruption Budget
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: backend-api-pdb
+  namespace: remotehive
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: backend-api
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: mongodb-pdb
+  namespace: remotehive
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: mongodb-replica
+
+---
+# Network Policies for Security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-api-netpol
+  namespace: remotehive
+spec:
+  podSelector:
+    matchLabels:
+      app: backend-api
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: nginx-proxy
+    ports:
+    - protocol: TCP
+      port: 8000
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: mongodb-replica
+    ports:
+    - protocol: TCP
+      port: 27017
+  - to:
+    - podSelector:
+        matchLabels:
+          app: redis-master
+    ports:
+    - protocol: TCP
+      port: 6379
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+
+---
+# ConfigMaps for Redis Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-config
+  namespace: remotehive
+data:
+  redis.conf: |
+    bind 0.0.0.0
+    port 6379
+    tcp-backlog 511
+    timeout 0
+    tcp-keepalive 300
+    daemonize no
+    supervised no
+    pidfile /var/run/redis_6379.pid
+    loglevel notice
+    logfile ""
+    databases 16
+    always-show-logo yes
+    save 900 1
+    save 300 10
+    save 60 10000
+    stop-writes-on-bgsave-error yes
+    rdbcompression yes
+    rdbchecksum yes
+    dbfilename dump.rdb
+    dir /data
+    replica-serve-stale-data yes
+    replica-read-only yes
+    repl-diskless-sync no
+    repl-diskless-sync-delay 5
+    repl-ping-replica-period 10
+    repl-timeout 60
+    repl-disable-tcp-nodelay no
+    repl-backlog-size 1mb
+    repl-backlog-ttl 3600
+    replica-priority 100
+    maxmemory-policy allkeys-lru
+    lazyfree-lazy-eviction no
+    lazyfree-lazy-expire no
+    lazyfree-lazy-server-del no
+    replica-lazy-flush no
+    appendonly yes
+    appendfilename "appendonly.aof"
+    appendfsync everysec
+    no-appendfsync-on-rewrite no
+    auto-aof-rewrite-percentage 100
+    auto-aof-rewrite-min-size 64mb
+    aof-load-truncated yes
+    aof-use-rdb-preamble yes
+    lua-time-limit 5000
+    slowlog-log-slower-than 10000
+    slowlog-max-len 128
+    latency-monitor-threshold 0
+    notify-keyspace-events ""
+    hash-max-ziplist-entries 512
+    hash-max-ziplist-value 64
+    list-max-ziplist-size -2
+    list-compress-depth 0
+    set-max-intset-entries 512
+    zset-max-ziplist-entries 128
+    zset-max-ziplist-value 64
+    hll-sparse-max-bytes 3000
+    stream-node-max-bytes 4096
+    stream-node-max-entries 100
+    activerehashing yes
+    client-output-buffer-limit normal 0 0 0
+    client-output-buffer-limit replica 256mb 64mb 60
+    client-output-buffer-limit pubsub 32mb 8mb 60
+    hz 10
+    dynamic-hz yes
+    aof-rewrite-incremental-fsync yes
+    rdb-save-incremental-fsync yes
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-sentinel-config
+  namespace: remotehive
+data:
+  sentinel.conf: |
+    port 26379
+    sentinel monitor mymaster redis-master 6379 2
+    sentinel auth-pass mymaster $(REDIS_PASSWORD)
+    sentinel down-after-milliseconds mymaster 5000
+    sentinel parallel-syncs mymaster 1
+    sentinel failover-timeout mymaster 10000
+    sentinel deny-scripts-reconfig yes
+
+---
+# Secrets
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mongodb-secret
+  namespace: remotehive
+type: Opaque
+data:
+  username: YWRtaW4=  # admin
+  password: UmVtb3RlSGl2ZU1vbmdvMTIz  # RemoteHiveMongo123
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: redis-secret
+  namespace: remotehive
+type: Opaque
+data:
+  password: UmVtb3RlSGl2ZVJlZGlzMTIz  # RemoteHiveRedis123
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mongodb-keyfile
+  namespace: remotehive
+type: Opaque
+data:
+  keyfile: UmVtb3RlSGl2ZU1vbmdvS2V5RmlsZTEyMzQ1Njc4OTBhYmNkZWZnaGlqa2xtbm9wcXJzdHV2d3h5ejEyMzQ1Njc4OTA=

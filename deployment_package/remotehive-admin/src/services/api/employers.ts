@@ -1,4 +1,5 @@
-import { SupabaseService, TABLES, STATUS_TYPES } from './supabase';
+import { apiClient, ApiResponse, PaginatedResponse } from './base-api';
+import { API_ENDPOINTS, STATUS_TYPES, PAGINATION } from './constants';
 
 export interface Employer {
   id: string;
@@ -45,123 +46,99 @@ export class EmployerService {
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
   } = {}): Promise<{ employers: Employer[]; total: number }> {
-    const {
-      page = 1,
-      limit = 10,
-      status,
-      industry,
-      search,
-      sortBy = 'created_at',
-      sortOrder = 'desc'
-    } = options;
-
-    const offset = (page - 1) * limit;
-    const filters: Record<string, any> = {};
-
-    if (status) filters.status = status;
-    if (industry) filters.industry = industry;
-
-    let employers: Employer[];
-
-    if (search) {
-      employers = await SupabaseService.search<Employer>(
-        TABLES.EMPLOYERS,
+    try {
+      const {
+        page = PAGINATION.DEFAULT_PAGE,
+        limit = PAGINATION.DEFAULT_LIMIT,
+        status,
+        industry,
         search,
-        ['company_name', 'contact_email', 'location'],
-        {
-          select: `
-            *,
-            total_job_posts:job_posts(count),
-            active_job_posts:job_posts(count).eq(status,active)
-          `,
-          filters,
-          limit
-        }
+        sortBy = 'created_at',
+        sortOrder = 'desc'
+      } = options;
+
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+        sort_by: sortBy,
+        sort_order: sortOrder
+      });
+
+      if (status) params.append('status', status);
+      if (industry) params.append('industry', industry);
+      if (search) params.append('search', search);
+
+      const response = await apiClient.get<PaginatedResponse<Employer>>(
+        `${API_ENDPOINTS.EMPLOYERS.BASE}?${params.toString()}`
       );
-    } else {
-      employers = await SupabaseService.read<Employer>(
-        TABLES.EMPLOYERS,
-        {
-          select: `
-            *,
-            total_job_posts:job_posts(count),
-            active_job_posts:job_posts(count).eq(status,active)
-          `,
-          filters,
-          orderBy: { column: sortBy, ascending: sortOrder === 'asc' },
-          limit,
-          offset
-        }
-      );
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Failed to fetch employers');
+      }
+
+      return {
+        employers: response.data.data!,
+        total: response.data.total!
+      };
+    } catch (error: any) {
+      console.error('Error fetching employers:', error);
+      throw new Error(error.message || 'Failed to fetch employers');
     }
-
-    const total = await SupabaseService.count(TABLES.EMPLOYERS, filters);
-
-    return { employers, total };
   }
 
   // Get employer by ID
   static async getEmployerById(id: string): Promise<Employer> {
-    const employers = await SupabaseService.read<Employer>(
-      TABLES.EMPLOYERS,
-      {
-        select: `
-          *,
-          total_job_posts:job_posts(count),
-          active_job_posts:job_posts(count).eq(status,active),
-          user:users(*)
-        `,
-        filters: { id }
+    try {
+      const response = await apiClient.get<ApiResponse<Employer>>(
+        API_ENDPOINTS.EMPLOYERS.BY_ID(id)
+      );
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Employer not found');
       }
-    );
 
-    if (!employers.length) {
-      throw new Error('Employer not found');
+      return response.data.data!;
+    } catch (error: any) {
+      console.error('Error fetching employer by ID:', error);
+      throw new Error(error.message || 'Employer not found');
     }
-
-    return employers[0];
   }
 
   // Get employer statistics
   static async getEmployerStats(): Promise<EmployerStats> {
-    const [total, pending, approved, rejected, premium] = await Promise.all([
-      SupabaseService.count(TABLES.EMPLOYERS),
-      SupabaseService.count(TABLES.EMPLOYERS, { status: STATUS_TYPES.PENDING }),
-      SupabaseService.count(TABLES.EMPLOYERS, { status: STATUS_TYPES.APPROVED }),
-      SupabaseService.count(TABLES.EMPLOYERS, { status: STATUS_TYPES.REJECTED }),
-      SupabaseService.count(TABLES.EMPLOYERS, { is_premium: true })
-    ]);
+    try {
+      const response = await apiClient.get<ApiResponse<EmployerStats>>(
+        API_ENDPOINTS.EMPLOYERS.STATS
+      );
 
-    // Get active employers this month
-    const thisMonth = new Date();
-    thisMonth.setDate(1);
-    const active_this_month = await SupabaseService.count(TABLES.EMPLOYERS, {
-      status: STATUS_TYPES.APPROVED,
-      created_at: `gte.${thisMonth.toISOString()}`
-    });
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Failed to fetch employer stats');
+      }
 
-    return {
-      total,
-      pending,
-      approved,
-      rejected,
-      premium,
-      active_this_month
-    };
+      return response.data.data!;
+    } catch (error: any) {
+      console.error('Error fetching employer stats:', error);
+      throw new Error(error.message || 'Failed to fetch employer stats');
+    }
   }
 
   // Approve employer
   static async approveEmployer(id: string, adminId: string): Promise<Employer> {
-    return await SupabaseService.update<Employer>(
-      TABLES.EMPLOYERS,
-      id,
-      {
-        status: STATUS_TYPES.APPROVED,
-        approved_at: new Date().toISOString(),
-        approved_by: adminId,
-        rejection_reason: null
+    try {
+      const response = await apiClient.patch<ApiResponse<Employer>>(
+        `${API_ENDPOINTS.EMPLOYERS.BY_ID(id)}/approve`,
+        { admin_id: adminId }
+      );
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Failed to approve employer');
       }
-    );
+
+      return response.data.data!;
+    } catch (error: any) {
+      console.error('Error approving employer:', error);
+      throw new Error(error.message || 'Failed to approve employer');
+    }
   }
 
   // Reject employer
@@ -170,16 +147,21 @@ export class EmployerService {
     adminId: string,
     reason: string
   ): Promise<Employer> {
-    return await SupabaseService.update<Employer>(
-      TABLES.EMPLOYERS,
-      id,
-      {
-        status: STATUS_TYPES.REJECTED,
-        approved_by: adminId,
-        rejection_reason: reason,
-        approved_at: null
+    try {
+      const response = await apiClient.patch<ApiResponse<Employer>>(
+        `${API_ENDPOINTS.EMPLOYERS.BY_ID(id)}/reject`,
+        { admin_id: adminId, reason }
+      );
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Failed to reject employer');
       }
-    );
+
+      return response.data.data!;
+    } catch (error: any) {
+      console.error('Error rejecting employer:', error);
+      throw new Error(error.message || 'Failed to reject employer');
+    }
   }
 
   // Update employer
@@ -187,85 +169,110 @@ export class EmployerService {
     id: string,
     data: Partial<Employer>
   ): Promise<Employer> {
-    return await SupabaseService.update<Employer>(
-      TABLES.EMPLOYERS,
-      id,
-      {
-        ...data,
-        updated_at: new Date().toISOString()
+    try {
+      const response = await apiClient.put<ApiResponse<Employer>>(
+        API_ENDPOINTS.EMPLOYERS.BY_ID(id),
+        data
+      );
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Failed to update employer');
       }
-    );
+
+      return response.data.data!;
+    } catch (error: any) {
+      console.error('Error updating employer:', error);
+      throw new Error(error.message || 'Failed to update employer');
+    }
   }
 
   // Toggle premium status
   static async togglePremium(id: string, isPremium: boolean): Promise<Employer> {
-    const updateData: Partial<Employer> = {
-      is_premium: isPremium,
-      updated_at: new Date().toISOString()
-    };
+    try {
+      const response = await apiClient.patch<ApiResponse<Employer>>(
+        `${API_ENDPOINTS.EMPLOYERS.BY_ID(id)}/premium`,
+        { is_premium: isPremium }
+      );
 
-    if (isPremium) {
-      // Set premium expiry to 1 year from now
-      const expiryDate = new Date();
-      expiryDate.setFullYear(expiryDate.getFullYear() + 1);
-      updateData.subscription_expires_at = expiryDate.toISOString();
-      updateData.subscription_plan = 'premium';
-    } else {
-      updateData.subscription_expires_at = null;
-      updateData.subscription_plan = null;
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Failed to toggle premium status');
+      }
+
+      return response.data.data!;
+    } catch (error: any) {
+      console.error('Error toggling premium status:', error);
+      throw new Error(error.message || 'Failed to toggle premium status');
     }
-
-    return await SupabaseService.update<Employer>(
-      TABLES.EMPLOYERS,
-      id,
-      updateData
-    );
   }
 
   // Suspend employer
-  static async suspendEmployer(id: string, reason: string): Promise<Employer> {
-    return await SupabaseService.update<Employer>(
-      TABLES.EMPLOYERS,
-      id,
-      {
-        status: 'suspended',
-        rejection_reason: reason,
-        updated_at: new Date().toISOString()
+  static async suspendEmployer(id: string): Promise<Employer> {
+    try {
+      const response = await apiClient.patch<ApiResponse<Employer>>(
+        `${API_ENDPOINTS.EMPLOYERS.BY_ID(id)}/suspend`,
+        {}
+      );
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Failed to suspend employer');
       }
-    );
+
+      return response.data.data!;
+    } catch (error: any) {
+      console.error('Error suspending employer:', error);
+      throw new Error(error.message || 'Failed to suspend employer');
+    }
   }
 
   // Delete employer
   static async deleteEmployer(id: string): Promise<void> {
-    await SupabaseService.delete(TABLES.EMPLOYERS, id);
+    try {
+      const response = await apiClient.delete<ApiResponse<void>>(
+        API_ENDPOINTS.EMPLOYERS.BY_ID(id)
+      );
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Failed to delete employer');
+      }
+    } catch (error: any) {
+      console.error('Error deleting employer:', error);
+      throw new Error(error.message || 'Failed to delete employer');
+    }
   }
 
   // Get pending employers for approval queue
   static async getPendingEmployers(): Promise<Employer[]> {
-    return await SupabaseService.read<Employer>(
-      TABLES.EMPLOYERS,
-      {
-        filters: { status: STATUS_TYPES.PENDING },
-        orderBy: { column: 'created_at', ascending: true }
+    try {
+      const response = await apiClient.get<ApiResponse<Employer[]>>(
+        `${API_ENDPOINTS.EMPLOYERS.BASE}/pending`
+      );
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Failed to fetch pending employers');
       }
-    );
+
+      return response.data.data || [];
+    } catch (error: any) {
+      console.error('Error fetching pending employers:', error);
+      throw new Error(error.message || 'Failed to fetch pending employers');
+    }
   }
 
-  // Get employer industries for filters
+  // Get industries
   static async getIndustries(): Promise<string[]> {
-    const { data, error } = await SupabaseService.read<{ industry: string }>(
-      TABLES.EMPLOYERS,
-      {
-        select: 'industry',
+    try {
+      const response = await apiClient.get<ApiResponse<string[]>>(
+        `${API_ENDPOINTS.EMPLOYERS.BASE}/industries`
+      );
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Failed to fetch industries');
       }
-    );
 
-    if (error) throw error;
-
-    const industries = [...new Set(data.map(item => item.industry))]
-      .filter(Boolean)
-      .sort();
-
-    return industries;
+      return response.data.data || [];
+    } catch (error: any) {
+      console.error('Error fetching industries:', error);
+      throw new Error(error.message || 'Failed to fetch industries');
+    }
   }
 }

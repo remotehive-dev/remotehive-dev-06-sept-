@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase';
+import { API_CONFIG } from '@/utils/constants';
 
 /**
  * This API endpoint is called when a new user registers on the public website
@@ -24,104 +24,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabaseAdmin = createAdminClient();
-
-    // Create notification message based on role
-    const notificationTitle = role === 'employer' 
-      ? 'New Employer Registration'
-      : 'New Job Seeker Registration';
-    
-    const notificationMessage = role === 'employer'
-      ? `New employer ${full_name} has registered and is now available in the system`
-      : `New job seeker ${full_name} has registered and is now available in the system`;
-
-    // Create notification for admin users
-    const { data: notification, error: notificationError } = await supabaseAdmin
-      .from('notifications')
-      .insert({
-        title: notificationTitle,
-        message: notificationMessage,
-        type: 'new_user_registration',
-        priority: role === 'employer' ? 'high' : 'medium',
-        data: {
-          user_id,
-          email,
-          full_name,
-          role,
-          registration_source,
-          action_url: `/admin/users?search=${email}`
-        },
-        created_at: new Date().toISOString(),
-        read: false,
-        target_audience: 'admin' // This notification is for admin users
+    // Create notification via FastAPI backend
+    const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/notifications/new-user-registration`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        user_id,
+        email,
+        full_name,
+        role,
+        registration_source
       })
-      .select()
-      .single();
+    });
 
-    if (notificationError) {
-      console.error('Error creating notification:', notificationError);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Error creating notification:', errorText);
       return NextResponse.json(
         { error: 'Failed to create notification' },
         { status: 500 }
       );
     }
 
-    // Log the notification creation for analytics
-    const { error: analyticsError } = await supabaseAdmin
-      .from('admin_activity_logs')
-      .insert({
-        action: 'notification_created',
-        target_table: 'notifications',
-        target_id: notification.id,
-        details: {
-          type: 'new_user_registration',
-          user_role: role,
-          source: registration_source
-        },
-        created_at: new Date().toISOString()
-      });
-
-    if (analyticsError) {
-      console.error('Error logging analytics:', analyticsError);
-      // Don't fail the request if analytics logging fails
-    }
-
-    // Broadcast real-time notification to admin panel users
-    // This will be picked up by any admin users currently online
-    const { error: broadcastError } = await supabaseAdmin
-      .channel('admin-notifications')
-      .send({
-        type: 'broadcast',
-        event: 'new_user_registration',
-        payload: {
-          notification_id: notification.id,
-          title: notificationTitle,
-          message: notificationMessage,
-          type: 'new_user_registration',
-          priority: role === 'employer' ? 'high' : 'medium',
-          user_data: {
-            user_id,
-            email,
-            full_name,
-            role
-          },
-          timestamp: new Date().toISOString()
-        }
-      });
-
-    if (broadcastError) {
-      console.error('Error broadcasting notification:', broadcastError);
-      // Don't fail the request if broadcast fails
-    }
+    const result = await response.json();
 
     return NextResponse.json({
       message: 'Notification created successfully',
-      data: {
-        notification_id: notification.id,
-        type: 'new_user_registration',
-        role: role,
-        broadcast_sent: !broadcastError
-      }
+      data: result
     }, { status: 201 });
 
   } catch (error) {

@@ -2,11 +2,11 @@ from datetime import datetime, timedelta
 from typing import Any, Union, Dict
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import Session
+# from sqlalchemy.orm import Session  # Removed for MongoDB migration
 
 from .config import settings
 from .password_utils import verify_password, get_password_hash
-from app.database.database import get_db_session
+# from app.database.database import get_db_session  # Removed for MongoDB migration
 from app.database.services import UserService
 from app.utils.jwt_auth import get_jwt_manager, TokenExpiredError, TokenInvalidError, JWTError
 
@@ -25,9 +25,9 @@ def create_access_token(
 
 
 
-async def authenticate_user(db: Session, email: str, password: str) -> Union[Dict[str, Any], bool]:
+async def authenticate_user(email: str, password: str) -> Union[Dict[str, Any], bool]:
     """Authenticate user with email and password"""
-    user_service = UserService(db)
+    user_service = UserService()
     user = await user_service.get_user_by_email(email)
     
     if not user:
@@ -68,7 +68,7 @@ def create_user_token(user: Dict[str, Any]) -> str:
 
 security = HTTPBearer()
 
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db_session)):
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """Get current authenticated user from JWT token using centralized JWT manager"""
     try:
         token = credentials.credentials
@@ -89,7 +89,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    user_service = UserService(db)
+    user_service = UserService()
     # user_id contains the actual user ID from JWT 'sub' field
     user = await user_service.get_user_by_id(user_id)
     if user is None:
@@ -109,7 +109,9 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 
 def require_admin(current_user = Depends(get_current_user)):
     """Require admin or super_admin role"""
-    from app.database.models import UserRole
+    # TODO: MongoDB Migration - Update UserRole import to use MongoDB models
+    # from app.database.models import UserRole
+    from app.models.mongodb_models import UserRole
     if current_user.role not in [UserRole.ADMIN, UserRole.SUPER_ADMIN]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -119,7 +121,9 @@ def require_admin(current_user = Depends(get_current_user)):
 
 def require_super_admin(current_user = Depends(get_current_user)):
     """Require super_admin role"""
-    from app.database.models import UserRole
+    # TODO: MongoDB Migration - Update UserRole import to use MongoDB models
+    # from app.database.models import UserRole
+    from app.models.mongodb_models import UserRole
     if current_user.role != UserRole.SUPER_ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

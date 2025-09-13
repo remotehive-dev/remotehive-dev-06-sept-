@@ -8,7 +8,10 @@ from enum import Enum
 
 from sqlalchemy.orm import Session
 from ..database.database import get_db_session
-from ..database.models import JobPost, AnalyticsMetrics
+# TODO: Migrate to MongoDB models - JobPost exists in app.models.mongodb_models, AnalyticsMetrics needs to be created
+# from app.database.models import JobPost, AnalyticsMetrics
+from app.models.mongodb_models import JobPost
+# AnalyticsMetrics - needs to be implemented in MongoDB models
 from .ml_parsing_service import ParsedJobData
 
 logger = logging.getLogger(__name__)

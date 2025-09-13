@@ -87,25 +87,30 @@ async def get_users(
     try:
         offset = (page - 1) * limit
         
-        # Build query
-        query = supabase.table("users").select("*", count="exact")
+        # Build MongoDB query
+        query_filter = {}
         
         if search:
-            query = query.or_(f"email.ilike.%{search}%,full_name.ilike.%{search}%")
+            query_filter["$or"] = [
+                {"email": {"$regex": search, "$options": "i"}},
+                {"full_name": {"$regex": search, "$options": "i"}}
+            ]
         if role:
-            query = query.eq("role", role)
+            query_filter["role"] = role
         if user_status:
-            query = query.eq("is_active", user_status == "active")
+            query_filter["is_active"] = user_status == "active"
             
         # Get total count
-        count_result = await query.execute()
-        total = count_result.count
+        total = await User.count(query_filter)
         
         # Get paginated data
-        result = await query.range(offset, offset + limit - 1).execute()
+        users = await User.find(query_filter).sort("-created_at").skip(offset).limit(limit).to_list()
+        
+        # Convert to dict format for response
+        users_data = [user.dict() for user in users]
         
         return PaginatedResponse(
-            items=result.data,
+            items=users_data,
             total=total,
             page=page,
             limit=limit,
@@ -126,13 +131,13 @@ async def get_user_by_id(
 ):
     """Get user details by ID"""
     try:
-        result = await supabase.table("users").select("*").eq("id", user_id).execute()
-        if not result.data:
+        user = await User.find_one({"_id": user_id})
+        if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User not found"
             )
-        return result.data[0]
+        return user.dict()
     except HTTPException:
         raise
     except Exception as e:
@@ -152,8 +157,8 @@ async def update_user(
     """Update user details"""
     try:
         # Check if user exists
-        user_result = await supabase.table("users").select("*").eq("id", user_id).execute()
-        if not user_result.data:
+        user = await User.find_one({"_id": user_id})
+        if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User not found"
@@ -161,9 +166,10 @@ async def update_user(
         
         # Update user
         update_data = user_update.dict(exclude_unset=True)
-        update_data["updated_at"] = datetime.utcnow().isoformat()
+        update_data["updated_at"] = datetime.utcnow()
         
-        result = await supabase.table("users").update(update_data).eq("id", user_id).execute()
+        await User.find_one_and_update({"_id": user_id}, {"$set": update_data})
+        updated_user = await User.find_one({"_id": user_id})
         
         # Log admin action
         admin_service = AdminService(db)
@@ -177,7 +183,7 @@ async def update_user(
             )
         )
         
-        return result.data[0]
+        return updated_user.dict()
     except HTTPException:
         raise
     except Exception as e:
@@ -254,8 +260,8 @@ async def get_system_settings(
 ):
     """Get all system settings"""
     try:
-        result = await supabase.table("system_settings").select("*").execute()
-        return result.data
+        settings = await SystemSettings.find().to_list()
+        return [setting.dict() for setting in settings]
     except Exception as e:
         logger.error(f"Error fetching system settings: {e}")
         raise HTTPException(
@@ -273,8 +279,8 @@ async def update_system_setting(
     """Update a system setting"""
     try:
         # Check if setting exists
-        setting_result = await supabase.table("system_settings").select("*").eq("key", setting_key).execute()
-        if not setting_result.data:
+        setting = await SystemSettings.find_one({"key": setting_key})
+        if not setting:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Setting not found"
@@ -283,10 +289,11 @@ async def update_system_setting(
         # Update setting
         update_data = {
             "value": setting_update.value,
-            "updated_at": datetime.utcnow().isoformat()
+            "updated_at": datetime.utcnow()
         }
         
-        result = await supabase.table("system_settings").update(update_data).eq("key", setting_key).execute()
+        await SystemSettings.find_one_and_update({"key": setting_key}, {"$set": update_data})
+        updated_setting = await SystemSettings.find_one({"key": setting_key})
         
         # Log admin action
         admin_service = AdminService(db)
@@ -300,7 +307,7 @@ async def update_system_setting(
             )
         )
         
-        return result.data[0]
+        return updated_setting.dict()
     except HTTPException:
         raise
     except Exception as e:
@@ -319,14 +326,18 @@ async def get_announcements(
 ):
     """Get announcements"""
     try:
-        query = supabase.table("announcements").select("*").order("created_at", desc=True)
+        query_filter = {}
         
         if active_only:
-            now = datetime.utcnow().isoformat()
-            query = query.eq("is_active", True).lte("start_date", now).gte("end_date", now)
+            now = datetime.utcnow()
+            query_filter = {
+                "is_active": True,
+                "start_date": {"$lte": now},
+                "end_date": {"$gte": now}
+            }
             
-        result = await query.execute()
-        return result.data
+        announcements = await Announcement.find(query_filter).sort("-created_at").to_list()
+        return [announcement.dict() for announcement in announcements]
     except Exception as e:
         logger.error(f"Error fetching announcements: {e}")
         raise HTTPException(
@@ -342,7 +353,7 @@ async def create_announcement(
 ):
     """Create a new announcement"""
     try:
-        admin_service = AdminService(supabase)
+        admin_service = AdminService(db)
         announcement = await admin_service.create_announcement(
             announcement_data, current_admin["id"]
         )
@@ -787,7 +798,7 @@ async def get_daily_analytics(
 ):
     """Get daily analytics data"""
     try:
-        admin_service = AdminService(supabase)
+        admin_service = AdminService(db)
         analytics = await admin_service.get_daily_analytics(start_date, end_date)
         return analytics
     except Exception as e:
@@ -811,33 +822,35 @@ async def get_admin_logs(
 ):
     """Get admin activity logs"""
     try:
-        offset = (page - 1) * limit
+        offset = (page - 1) * per_page
         
-        # Build query
-        query = supabase.table("admin_logs").select("*", count="exact").order("created_at", desc=True)
+        # Build MongoDB query
+        query_filter = {}
         
         if action:
-            query = query.eq("action", action)
-        if admin_id:
-            query = query.eq("admin_id", admin_id)
+            query_filter["action"] = action
+        if admin_user_id:
+            query_filter["admin_user_id"] = admin_user_id
         if start_date:
-            query = query.gte("created_at", start_date.isoformat())
+            query_filter["created_at"] = {"$gte": start_date}
         if end_date:
-            query = query.lte("created_at", end_date.isoformat())
+            if "created_at" in query_filter:
+                query_filter["created_at"]["$lte"] = end_date
+            else:
+                query_filter["created_at"] = {"$lte": end_date}
             
         # Get total count
-        count_result = await query.execute()
-        total = count_result.count
+        total = await AdminLog.count(query_filter)
         
         # Get paginated data
-        result = await query.range(offset, offset + limit - 1).execute()
+        logs = await AdminLog.find(query_filter).sort("-created_at").skip(offset).limit(per_page).to_list()
         
         return PaginatedResponse(
-            items=result.data,
+            items=[log.dict() for log in logs],
             total=total,
             page=page,
-            limit=limit,
-            pages=(total + limit - 1) // limit
+            limit=per_page,
+            pages=(total + per_page - 1) // per_page
         )
     except Exception as e:
         logger.error(f"Error fetching admin logs: {e}")

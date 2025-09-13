@@ -106,7 +106,7 @@ async def root():
     """Root endpoint"""
     app_logger.info("Root endpoint accessed")
     return {
-        "message": "Welcome to RemoteHive API - Powered by Supabase",
+        "message": "Welcome to RemoteHive API - Powered by MongoDB Atlas",
         "version": "1.0.0",
         "docs": "/docs",
         "health": "/health",

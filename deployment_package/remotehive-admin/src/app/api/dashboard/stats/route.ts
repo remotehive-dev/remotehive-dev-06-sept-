@@ -1,24 +1,20 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase';
+import { API_CONFIG } from '@/utils/constants';
 
 export async function GET() {
   try {
-    const supabaseAdmin = createAdminClient();
-    
-    const [usersCount, jobsCount, applicationsCount, activeJobsCount] = await Promise.all([
-      supabaseAdmin.from('users').select('*', { count: 'exact', head: true }),
-      supabaseAdmin.from('job_posts').select('*', { count: 'exact', head: true }),
-      supabaseAdmin.from('job_applications').select('*', { count: 'exact', head: true }),
-      supabaseAdmin.from('job_posts').select('*', { count: 'exact', head: true }).eq('status', 'active')
-    ]);
+    const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/analytics/dashboard`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
 
-    const stats = {
-      totalUsers: usersCount.count || 0,
-      totalJobs: jobsCount.count || 0,
-      totalApplications: applicationsCount.count || 0,
-      activeJobs: activeJobsCount.count || 0
-    };
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
 
+    const stats = await response.json();
     return NextResponse.json(stats);
   } catch (error) {
     console.error('Error fetching dashboard stats:', error);

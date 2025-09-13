@@ -1,7 +1,7 @@
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 from motor.motor_asyncio import AsyncIOMotorDatabase
-from bson import ObjectId
+# from bson import ObjectId  # Removed to fix Pydantic schema generation
 
 from app.database.mongodb_models import JobPost, JobWorkflowLog, User
 from app.core.enums import JobStatus, JobAction, JobPriority, RejectionReason
@@ -49,7 +49,7 @@ class JobWorkflowService:
         notes: Optional[str] = None
     ) -> Dict[str, Any]:
         """Submit a job post for admin approval"""
-        job_post = await db.job_posts.find_one({"_id": ObjectId(job_post_id)})
+        job_post = await db.job_posts.find_one({"_id": job_post_id})
         if not job_post:
             raise HTTPException(status_code=404, detail="Job post not found")
         
@@ -68,7 +68,7 @@ class JobWorkflowService:
         }
         
         await db.job_posts.update_one(
-            {"_id": ObjectId(job_post_id)},
+            {"_id": job_post_id},
             {"$set": update_data}
         )
         
@@ -80,7 +80,7 @@ class JobWorkflowService:
         )
         
         # Return updated job post
-        updated_job_post = await db.job_posts.find_one({"_id": ObjectId(job_post_id)})
+        updated_job_post = await db.job_posts.find_one({"_id": job_post_id})
         return updated_job_post
     
     @staticmethod
@@ -91,7 +91,7 @@ class JobWorkflowService:
         approval_data: JobApprovalAction
     ) -> Dict[str, Any]:
         """Approve a job post"""
-        job_post = await db.job_posts.find_one({"_id": ObjectId(job_post_id)})
+        job_post = await db.job_posts.find_one({"_id": job_post_id})
         if not job_post:
             raise HTTPException(status_code=404, detail="Job post not found")
         
@@ -123,7 +123,7 @@ class JobWorkflowService:
             update_data["published_by"] = admin_user_id
         
         await db.job_posts.update_one(
-            {"_id": ObjectId(job_post_id)},
+            {"_id": job_post_id},
             {"$set": update_data}
         )
         
@@ -136,7 +136,7 @@ class JobWorkflowService:
         )
         
         # Return updated job post
-        updated_job_post = await db.job_posts.find_one({"_id": ObjectId(job_post_id)})
+        updated_job_post = await db.job_posts.find_one({"_id": job_post_id})
         return updated_job_post
     
     @staticmethod
@@ -147,7 +147,7 @@ class JobWorkflowService:
         rejection_data: JobRejectionAction
     ) -> Dict[str, Any]:
         """Reject a job post"""
-        job_post = await db.job_posts.find_one({"_id": ObjectId(job_post_id)})
+        job_post = await db.job_posts.find_one({"_id": job_post_id})
         if not job_post:
             raise HTTPException(status_code=404, detail="Job post not found")
         
@@ -173,7 +173,7 @@ class JobWorkflowService:
         }
         
         await db.job_posts.update_one(
-            {"_id": ObjectId(job_post_id)},
+            {"_id": job_post_id},
             {"$set": update_data}
         )
         
@@ -186,7 +186,7 @@ class JobWorkflowService:
         )
         
         # Return updated job post
-        updated_job_post = await db.job_posts.find_one({"_id": ObjectId(job_post_id)})
+        updated_job_post = await db.job_posts.find_one({"_id": job_post_id})
         return updated_job_post
     
     @staticmethod
@@ -197,7 +197,7 @@ class JobWorkflowService:
         publish_data: JobPublishAction
     ) -> Dict[str, Any]:
         """Publish an approved job post"""
-        job_post = await db.job_posts.find_one({"_id": ObjectId(job_post_id)})
+        job_post = await db.job_posts.find_one({"_id": job_post_id})
         if not job_post:
             raise HTTPException(status_code=404, detail="Job post not found")
         
@@ -219,7 +219,7 @@ class JobWorkflowService:
         }
         
         await db.job_posts.update_one(
-            {"_id": ObjectId(job_post_id)},
+            {"_id": job_post_id},
             {"$set": update_data}
         )
         
@@ -235,7 +235,7 @@ class JobWorkflowService:
         )
         
         # Return updated job post
-        updated_job_post = await db.job_posts.find_one({"_id": ObjectId(job_post_id)})
+        updated_job_post = await db.job_posts.find_one({"_id": job_post_id})
         return updated_job_post
     
     @staticmethod
@@ -246,7 +246,7 @@ class JobWorkflowService:
         reason: Optional[str] = None
     ) -> Dict[str, Any]:
         """Unpublish an active job post"""
-        job_post = await db.job_posts.find_one({"_id": ObjectId(job_post_id)})
+        job_post = await db.job_posts.find_one({"_id": job_post_id})
         if not job_post:
             raise HTTPException(status_code=404, detail="Job post not found")
         
@@ -265,7 +265,7 @@ class JobWorkflowService:
         }
         
         await db.job_posts.update_one(
-            {"_id": ObjectId(job_post_id)},
+            {"_id": job_post_id},
             {"$set": update_data}
         )
         
@@ -277,7 +277,7 @@ class JobWorkflowService:
         )
         
         # Return updated job post
-        updated_job_post = await db.job_posts.find_one({"_id": ObjectId(job_post_id)})
+        updated_job_post = await db.job_posts.find_one({"_id": job_post_id})
         return updated_job_post
     
     @staticmethod
@@ -288,7 +288,7 @@ class JobWorkflowService:
         reason: Optional[str] = None
     ) -> Dict[str, Any]:
         """Pause an active job post"""
-        job_post = await db.job_posts.find_one({"_id": ObjectId(job_post_id)})
+        job_post = await db.job_posts.find_one({"_id": job_post_id})
         if not job_post:
             raise HTTPException(status_code=404, detail="Job post not found")
         
@@ -305,7 +305,7 @@ class JobWorkflowService:
         }
         
         await db.job_posts.update_one(
-            {"_id": ObjectId(job_post_id)},
+            {"_id": job_post_id},
             {"$set": update_data}
         )
         
@@ -317,7 +317,7 @@ class JobWorkflowService:
         )
         
         # Return updated job post
-        updated_job_post = await db.job_posts.find_one({"_id": ObjectId(job_post_id)})
+        updated_job_post = await db.job_posts.find_one({"_id": job_post_id})
         return updated_job_post
     
     @staticmethod
@@ -328,7 +328,7 @@ class JobWorkflowService:
         reason: Optional[str] = None
     ) -> Dict[str, Any]:
         """Resume a paused job post"""
-        job_post = await db.job_posts.find_one({"_id": ObjectId(job_post_id)})
+        job_post = await db.job_posts.find_one({"_id": job_post_id})
         if not job_post:
             raise HTTPException(status_code=404, detail="Job post not found")
         
@@ -345,7 +345,7 @@ class JobWorkflowService:
         }
         
         await db.job_posts.update_one(
-            {"_id": ObjectId(job_post_id)},
+            {"_id": job_post_id},
             {"$set": update_data}
         )
         
@@ -357,7 +357,7 @@ class JobWorkflowService:
         )
         
         # Return updated job post
-        updated_job_post = await db.job_posts.find_one({"_id": ObjectId(job_post_id)})
+        updated_job_post = await db.job_posts.find_one({"_id": job_post_id})
         return updated_job_post
     
     @staticmethod
@@ -368,7 +368,7 @@ class JobWorkflowService:
         reason: Optional[str] = None
     ) -> Dict[str, Any]:
         """Close an active or paused job post"""
-        job_post = await db.job_posts.find_one({"_id": ObjectId(job_post_id)})
+        job_post = await db.job_posts.find_one({"_id": job_post_id})
         if not job_post:
             raise HTTPException(status_code=404, detail="Job post not found")
         
@@ -387,7 +387,7 @@ class JobWorkflowService:
         }
         
         await db.job_posts.update_one(
-            {"_id": ObjectId(job_post_id)},
+            {"_id": job_post_id},
             {"$set": update_data}
         )
         
@@ -399,7 +399,7 @@ class JobWorkflowService:
         )
         
         # Return updated job post
-        updated_job_post = await db.job_posts.find_one({"_id": ObjectId(job_post_id)})
+        updated_job_post = await db.job_posts.find_one({"_id": job_post_id})
         return updated_job_post
     
     @staticmethod
@@ -410,7 +410,7 @@ class JobWorkflowService:
         flag_data: JobFlagAction
     ) -> Dict[str, Any]:
         """Flag a job post for review"""
-        job_post = await db.job_posts.find_one({"_id": ObjectId(job_post_id)})
+        job_post = await db.job_posts.find_one({"_id": job_post_id})
         if not job_post:
             raise HTTPException(status_code=404, detail="Job post not found")
         
@@ -432,7 +432,7 @@ class JobWorkflowService:
             new_status = JobStatus.FLAGGED
         
         await db.job_posts.update_one(
-            {"_id": ObjectId(job_post_id)},
+            {"_id": job_post_id},
             {"$set": update_data}
         )
         
@@ -444,7 +444,7 @@ class JobWorkflowService:
         )
         
         # Return updated job post
-        updated_job_post = await db.job_posts.find_one({"_id": ObjectId(job_post_id)})
+        updated_job_post = await db.job_posts.find_one({"_id": job_post_id})
         return updated_job_post
     
     @staticmethod
@@ -455,7 +455,7 @@ class JobWorkflowService:
         notes: Optional[str] = None
     ) -> Dict[str, Any]:
         """Remove flag from a job post"""
-        job_post = await db.job_posts.find_one({"_id": ObjectId(job_post_id)})
+        job_post = await db.job_posts.find_one({"_id": job_post_id})
         if not job_post:
             raise HTTPException(status_code=404, detail="Job post not found")
         
@@ -480,7 +480,7 @@ class JobWorkflowService:
             new_status = JobStatus.ACTIVE
         
         await db.job_posts.update_one(
-            {"_id": ObjectId(job_post_id)},
+            {"_id": job_post_id},
             {"$set": update_data}
         )
         
@@ -492,7 +492,7 @@ class JobWorkflowService:
         )
         
         # Return updated job post
-        updated_job_post = await db.job_posts.find_one({"_id": ObjectId(job_post_id)})
+        updated_job_post = await db.job_posts.find_one({"_id": job_post_id})
         return updated_job_post
     
     @staticmethod
@@ -503,7 +503,7 @@ class JobWorkflowService:
         reason: Optional[str] = None
     ) -> Dict[str, Any]:
         """Cancel a job post (terminal action)"""
-        job_post = await db.job_posts.find_one({"_id": ObjectId(job_post_id)})
+        job_post = await db.job_posts.find_one({"_id": job_post_id})
         if not job_post:
             raise HTTPException(status_code=404, detail="Job post not found")
         
@@ -514,7 +514,7 @@ class JobWorkflowService:
         
         # Update job post
         await db.job_posts.update_one(
-            {"_id": ObjectId(job_post_id)},
+            {"_id": job_post_id},
             {"$set": {
                 "status": JobStatus.CANCELLED.value,
                 "updated_at": datetime.utcnow()
@@ -529,7 +529,7 @@ class JobWorkflowService:
         )
         
         # Return updated job post
-        updated_job_post = await db.job_posts.find_one({"_id": ObjectId(job_post_id)})
+        updated_job_post = await db.job_posts.find_one({"_id": job_post_id})
         return updated_job_post
     
     @staticmethod

@@ -5,7 +5,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 import json
 
-from app.database.models import CSVImport, CSVImportLog
+# from app.database.models import CSVImport, CSVImportLog  # TODO: Migrate CSVImport and CSVImportLog to MongoDB models
+# from app.models.mongodb_models import CSVImport, CSVImportLog  # TODO: Create CSVImport and CSVImportLog MongoDB models
 from app.core.enums import CSVImportStatus
 
 class CSVProgressTracker:
@@ -25,7 +26,7 @@ class CSVProgressTracker:
         total_rows: int,
         user_id: str,
         import_config: Dict[str, Any]
-    ) -> CSVImport:
+    ) -> Dict[str, Any]:  # TODO: Return CSVImport model when migrated to MongoDB
         """
         Initialize tracking for a new CSV import.
         
@@ -39,26 +40,28 @@ class CSVProgressTracker:
         Returns:
             Created CSVImport record
         """
-        csv_import = CSVImport(
-            upload_id=upload_id,
-            filename=filename,
-            user_id=user_id,
-            status=CSVImportStatus.PENDING,
-            total_count=total_rows,
-            processed_count=0,
-            progress_percentage=0.0,
-            config=json.dumps(import_config),
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
-        )
+        # TODO: Create CSVImport MongoDB model
+        csv_import_data = {
+            'upload_id': upload_id,
+            'filename': filename,
+            'user_id': user_id,
+            'status': CSVImportStatus.PENDING.value,
+            'total_count': total_rows,
+            'processed_count': 0,
+            'progress_percentage': 0.0,
+            'config': json.dumps(import_config),
+            'created_at': datetime.utcnow(),
+            'updated_at': datetime.utcnow()
+        }
         
-        self.db.add(csv_import)
-        self.db.commit()
+        # TODO: Implement MongoDB save operation when CSVImport model is migrated
+        # self.db.add(csv_import)
+        # self.db.commit()
         
         # Add to active imports
         self._active_imports.add(upload_id)
         
-        return csv_import
+        return csv_import_data
     
     async def update_progress(
         self,
@@ -76,39 +79,25 @@ class CSVProgressTracker:
             status: New status (optional)
             additional_data: Additional data to store (optional)
         """
-        csv_import = self.db.query(CSVImport).filter(
-            CSVImport.upload_id == upload_id
-        ).first()
+        # TODO: Implement MongoDB query when CSVImport model is migrated
+        # csv_import = self.db.query(CSVImport).filter(
+        #     CSVImport.upload_id == upload_id
+        # ).first()
         
-        if not csv_import:
-            return
+        # if not csv_import:
+        #     return
         
-        # Update progress
-        csv_import.processed_count = processed_count
-        if csv_import.total_count > 0:
-            csv_import.progress_percentage = (processed_count / csv_import.total_count) * 100
+        # TODO: Implement progress update logic with MongoDB
+        # For now, just update in-memory tracking
+        if upload_id in self._active_imports:
+            # Update progress tracking logic will be implemented with MongoDB
+            pass
         
-        # Update status if provided
-        if status:
-            csv_import.status = status
+        # TODO: Implement MongoDB save operation
+        # self.db.commit()
         
-        # Update additional data
-        if additional_data:
-            current_data = json.loads(csv_import.config or '{}')
-            current_data.update(additional_data)
-            csv_import.config = json.dumps(current_data)
-        
-        csv_import.updated_at = datetime.utcnow()
-        
-        # Auto-complete if all rows processed
-        if processed_count >= csv_import.total_count and csv_import.status == CSVImportStatus.PROCESSING:
-            csv_import.status = CSVImportStatus.COMPLETED
-            self._active_imports.discard(upload_id)
-        
-        self.db.commit()
-        
-        # Trigger progress callbacks
-        await self._trigger_progress_callbacks(upload_id, csv_import)
+        # TODO: Implement progress callbacks when MongoDB model is available
+        # await self._trigger_progress_callbacks(upload_id, csv_import)
     
     async def log_row_result(
         self,
@@ -132,19 +121,21 @@ class CSVProgressTracker:
             data: Original row data
             processing_time: Time taken to process this row
         """
-        log_entry = CSVImportLog(
-            upload_id=upload_id,
-            row_number=row_number,
-            status=status,
-            job_id=job_id,
-            error_message=error_message,
-            data=json.dumps(data) if data else None,
-            processing_time=processing_time,
-            created_at=datetime.utcnow()
-        )
+        # TODO: Create CSVImportLog MongoDB model and implement logging
+        # log_entry = CSVImportLog(
+        #     upload_id=upload_id,
+        #     row_number=row_number,
+        #     status=status,
+        #     job_id=job_id,
+        #     error_message=error_message,
+        #     data=json.dumps(data) if data else None,
+        #     processing_time=processing_time,
+        #     created_at=datetime.utcnow()
+        # )
         
-        self.db.add(log_entry)
-        self.db.commit()
+        # TODO: Implement MongoDB save operation
+        # self.db.add(log_entry)
+        # self.db.commit()
     
     async def get_import_progress(self, upload_id: str) -> Dict[str, Any]:
         """
@@ -156,50 +147,28 @@ class CSVProgressTracker:
         Returns:
             Dictionary with progress information
         """
-        csv_import = self.db.query(CSVImport).filter(
-            CSVImport.upload_id == upload_id
-        ).first()
+        # TODO: Implement MongoDB query when CSVImport model is migrated
+        # csv_import = self.db.query(CSVImport).filter(
+        #     CSVImport.upload_id == upload_id
+        # ).first()
         
-        if not csv_import:
+        # TODO: Implement proper progress tracking with MongoDB
+        if upload_id not in self._active_imports:
             return {'error': 'Import not found'}
         
-        # Get statistics from logs
-        log_stats = self.db.query(
-            CSVImportLog.status,
-            func.count(CSVImportLog.id).label('count'),
-            func.avg(CSVImportLog.processing_time).label('avg_time')
-        ).filter(
-            CSVImportLog.upload_id == upload_id
-        ).group_by(CSVImportLog.status).all()
-        
-        statistics = {}
-        total_processing_time = 0
-        for stat in log_stats:
-            statistics[stat.status] = {
-                'count': stat.count,
-                'avg_processing_time': float(stat.avg_time) if stat.avg_time else 0
-            }
-            if stat.avg_time:
-                total_processing_time += stat.avg_time * stat.count
-        
-        # Calculate estimated time remaining
-        estimated_time_remaining = None
-        if csv_import.processed_count > 0 and csv_import.status == CSVImportStatus.PROCESSING:
-            remaining_rows = csv_import.total_count - csv_import.processed_count
-            avg_time_per_row = total_processing_time / csv_import.processed_count
-            estimated_time_remaining = remaining_rows * avg_time_per_row
-        
+        # TODO: Implement statistics gathering from MongoDB logs
+        # For now, return basic progress information
         return {
             'upload_id': upload_id,
-            'filename': csv_import.filename,
-            'status': csv_import.status.value,
-            'total_count': csv_import.total_count,
-            'processed_count': csv_import.processed_count,
-            'progress_percentage': round(csv_import.progress_percentage, 2),
-            'created_at': csv_import.created_at.isoformat(),
-            'updated_at': csv_import.updated_at.isoformat(),
-            'statistics': statistics,
-            'estimated_time_remaining': estimated_time_remaining,
+            'filename': 'unknown',  # TODO: Get from MongoDB
+            'status': CSVImportStatus.PROCESSING.value,  # TODO: Get actual status
+            'total_count': 0,  # TODO: Get from MongoDB
+            'processed_count': 0,  # TODO: Get from MongoDB
+            'progress_percentage': 0.0,  # TODO: Calculate from MongoDB
+            'created_at': datetime.utcnow().isoformat(),  # TODO: Get from MongoDB
+            'updated_at': datetime.utcnow().isoformat(),  # TODO: Get from MongoDB
+            'statistics': {},  # TODO: Calculate from MongoDB logs
+            'estimated_time_remaining': None,  # TODO: Calculate from MongoDB data
             'is_active': upload_id in self._active_imports
         }
     
@@ -220,26 +189,21 @@ class CSVProgressTracker:
         Returns:
             List of log entries
         """
-        query = self.db.query(CSVImportLog).filter(
-            CSVImportLog.upload_id == upload_id
-        )
+        # TODO: Implement MongoDB query when CSVImportLog model is migrated
+        # query = self.db.query(CSVImportLog).filter(
+        #     CSVImportLog.upload_id == upload_id
+        # )
+        # 
+        # if status_filter:
+        #     query = query.filter(CSVImportLog.status == status_filter)
+        # 
+        # logs = query.order_by(
+        #     CSVImportLog.created_at.desc()
+        # ).limit(limit).all()
         
-        if status_filter:
-            query = query.filter(CSVImportLog.status == status_filter)
-        
-        logs = query.order_by(
-            CSVImportLog.created_at.desc()
-        ).limit(limit).all()
-        
-        return [{
-            'row_number': log.row_number,
-            'status': log.status,
-            'job_id': log.job_id,
-            'error_message': log.error_message,
-            'processing_time': log.processing_time,
-            'created_at': log.created_at.isoformat(),
-            'data': json.loads(log.data) if log.data else None
-        } for log in logs]
+        # TODO: Return actual logs from MongoDB
+        # For now, return empty list
+        return []
     
     async def cancel_import(self, upload_id: str, reason: str = 'User cancelled') -> bool:
         """
@@ -252,36 +216,24 @@ class CSVProgressTracker:
         Returns:
             True if cancelled successfully
         """
-        csv_import = self.db.query(CSVImport).filter(
-            CSVImport.upload_id == upload_id
-        ).first()
+        # TODO: Implement MongoDB query when CSVImport model is migrated
+        # csv_import = self.db.query(CSVImport).filter(
+        #     CSVImport.upload_id == upload_id
+        # ).first()
         
-        if not csv_import:
+        # TODO: Check if import exists in MongoDB
+        if upload_id not in self._active_imports:
             return False
         
-        # Only allow cancellation of active imports
-        if csv_import.status in [
-            CSVImportStatus.PENDING,
-            CSVImportStatus.VALIDATING,
-            CSVImportStatus.PROCESSING
-        ]:
-            csv_import.status = CSVImportStatus.CANCELLED
-            csv_import.updated_at = datetime.utcnow()
-            
-            # Update config with cancellation reason
-            config = json.loads(csv_import.config or '{}')
-            config['cancellation_reason'] = reason
-            config['cancelled_at'] = datetime.utcnow().isoformat()
-            csv_import.config = json.dumps(config)
-            
-            self.db.commit()
-            
-            # Remove from active imports
-            self._active_imports.discard(upload_id)
-            
-            return True
+        # TODO: Implement proper status checking with MongoDB
+        # For now, allow cancellation of any active import
+        # Remove from active imports
+        self._active_imports.discard(upload_id)
         
-        return False
+        # TODO: Update MongoDB document with cancellation status and reason
+        # TODO: Save cancellation reason and timestamp to MongoDB
+        
+        return True
     
     async def get_active_imports(self) -> List[Dict[str, Any]]:
         """
@@ -290,24 +242,27 @@ class CSVProgressTracker:
         Returns:
             List of active import information
         """
-        active_imports = self.db.query(CSVImport).filter(
-            CSVImport.status.in_([
-                CSVImportStatus.PENDING,
-                CSVImportStatus.VALIDATING,
-                CSVImportStatus.PROCESSING
-            ])
-        ).all()
+        # TODO: Implement MongoDB query when CSVImport model is migrated
+        # active_imports = self.db.query(CSVImport).filter(
+        #     CSVImport.status.in_([
+        #         CSVImportStatus.PENDING,
+        #         CSVImportStatus.VALIDATING,
+        #         CSVImportStatus.PROCESSING
+        #     ])
+        # ).all()
         
+        # TODO: Return actual active imports from MongoDB
+        # For now, return basic info for in-memory active imports
         return [{
-            'upload_id': imp.upload_id,
-            'filename': imp.filename,
-            'status': imp.status.value,
-            'progress_percentage': round(imp.progress_percentage, 2),
-            'processed_count': imp.processed_count,
-            'total_count': imp.total_count,
-            'created_at': imp.created_at.isoformat(),
-            'updated_at': imp.updated_at.isoformat()
-        } for imp in active_imports]
+            'upload_id': upload_id,
+            'filename': 'unknown',  # TODO: Get from MongoDB
+            'status': CSVImportStatus.PROCESSING.value,  # TODO: Get actual status
+            'progress_percentage': 0.0,  # TODO: Calculate from MongoDB
+            'processed_count': 0,  # TODO: Get from MongoDB
+            'total_count': 0,  # TODO: Get from MongoDB
+            'created_at': datetime.utcnow().isoformat(),  # TODO: Get from MongoDB
+            'updated_at': datetime.utcnow().isoformat()  # TODO: Get from MongoDB
+        } for upload_id in self._active_imports]
     
     async def register_progress_callback(self, upload_id: str, callback):
         """
@@ -337,24 +292,15 @@ class CSVProgressTracker:
             except ValueError:
                 pass
     
-    async def _trigger_progress_callbacks(self, upload_id: str, csv_import: CSVImport):
+    async def _trigger_progress_callbacks(self, upload_id: str, progress_data: Dict[str, Any]):
         """
         Trigger all registered callbacks for an import.
         
         Args:
             upload_id: Unique identifier for the import
-            csv_import: Updated CSVImport record
+            progress_data: Dictionary containing progress information
         """
         if upload_id in self._progress_callbacks:
-            progress_data = {
-                'upload_id': upload_id,
-                'status': csv_import.status.value,
-                'progress_percentage': csv_import.progress_percentage,
-                'processed_count': csv_import.processed_count,
-                'total_count': csv_import.total_count,
-                'updated_at': csv_import.updated_at.isoformat()
-            }
-            
             # Call all callbacks
             for callback in self._progress_callbacks[upload_id]:
                 try:
@@ -373,28 +319,29 @@ class CSVProgressTracker:
         Returns:
             Number of records cleaned up
         """
-        cutoff_date = datetime.utcnow() - timedelta(days=days_old)
+        # TODO: Implement MongoDB cleanup when models are migrated
+        # cutoff_date = datetime.utcnow() - timedelta(days=days_old)
         
-        # Delete old logs first (due to foreign key constraint)
-        old_logs = self.db.query(CSVImportLog).join(CSVImport).filter(
-            CSVImport.created_at < cutoff_date,
-            CSVImport.status.in_([
-                CSVImportStatus.COMPLETED,
-                CSVImportStatus.FAILED,
-                CSVImportStatus.CANCELLED
-            ])
-        ).delete(synchronize_session=False)
+        # TODO: Delete old logs from MongoDB
+        # old_logs = self.db.query(CSVImportLog).join(CSVImport).filter(
+        #     CSVImport.created_at < cutoff_date,
+        #     CSVImport.status.in_([
+        #         CSVImportStatus.COMPLETED,
+        #         CSVImportStatus.FAILED,
+        #         CSVImportStatus.CANCELLED
+        #     ])
+        # ).delete(synchronize_session=False)
         
-        # Delete old import records
-        old_imports = self.db.query(CSVImport).filter(
-            CSVImport.created_at < cutoff_date,
-            CSVImport.status.in_([
-                CSVImportStatus.COMPLETED,
-                CSVImportStatus.FAILED,
-                CSVImportStatus.CANCELLED
-            ])
-        ).delete(synchronize_session=False)
+        # TODO: Delete old import records from MongoDB
+        # old_imports = self.db.query(CSVImport).filter(
+        #     CSVImport.created_at < cutoff_date,
+        #     CSVImport.status.in_([
+        #         CSVImportStatus.COMPLETED,
+        #         CSVImportStatus.FAILED,
+        #         CSVImportStatus.CANCELLED
+        #     ])
+        # ).delete(synchronize_session=False)
         
-        self.db.commit()
+        # TODO: Implement MongoDB cleanup operations
         
-        return old_imports + old_logs
+        return 0  # TODO: Return actual count of cleaned up records

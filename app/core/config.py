@@ -23,15 +23,11 @@ class Settings(BaseSettings):
         "http://172.16.10.34:3002", "http://172.16.10.34:8080",
         "http://172.16.10.34:5173", "http://172.16.10.34:5174"
     ]
-    ALLOWED_HOSTS: List[str] = ["*"]
+    ALLOWED_HOSTS: List[str] = [host.strip() for host in os.getenv("ALLOWED_HOSTS", "*").split(",")] if os.getenv("ALLOWED_HOSTS") else ["*"]
     
-    # Legacy Supabase Settings (TEMPORARILY ENABLED FOR MIGRATION)
-    SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
-    SUPABASE_ANON_KEY: str = os.getenv("SUPABASE_ANON_KEY", "")
-    SUPABASE_SERVICE_ROLE_KEY: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
-    
-    # Database Settings
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "")
+    # MongoDB Atlas Configuration (Primary Database)
+    MONGODB_URL: str = os.getenv("MONGODB_URL", "mongodb://localhost:27017/remotehive")
+    MONGODB_DATABASE_NAME: str = os.getenv("MONGODB_DATABASE_NAME", "remotehive_main")
     
     # Database Connection Pool Settings
     DB_POOL_SIZE: int = int(os.getenv("DB_POOL_SIZE", "20"))

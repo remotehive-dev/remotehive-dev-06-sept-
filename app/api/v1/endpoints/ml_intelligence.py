@@ -13,7 +13,8 @@ from ....services.ml_intelligence import (
     SelectorPattern
 )
 from ....core.auth import get_current_user
-from ....database.models import User
+# from ....database.models import User
+from ....models.mongodb_models import User
 
 router = APIRouter()
 

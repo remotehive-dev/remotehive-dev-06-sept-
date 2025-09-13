@@ -6,7 +6,9 @@ import logging
 
 from ..database import get_db_session
 from ..database.services import EmployerService
-from ..database.models import Employer, User, UserRole
+# TODO: MongoDB Migration - Update imports to use MongoDB models
+# from ..database.models import Employer, User, UserRole
+from ..models.mongodb_models import Employer, User, UserRole
 
 logger = logging.getLogger(__name__)
 

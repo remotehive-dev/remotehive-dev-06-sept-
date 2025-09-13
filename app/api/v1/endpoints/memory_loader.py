@@ -10,7 +10,8 @@ import os
 import uuid
 
 from app.services.memory_loader import MemoryLoader, ProcessingProgress
-from app.database.models import MemoryUpload
+# from app.database.models import MemoryUpload  # TODO: Migrate MemoryUpload to MongoDB models
+# from app.models.mongodb_models import MemoryUpload  # TODO: Create MemoryUpload MongoDB model
 from app.core.enums import MemoryUploadStatus
 from app.core.auth import get_current_user
 from app.database import get_db_session

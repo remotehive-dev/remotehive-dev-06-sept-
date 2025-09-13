@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Mail, Lock, Eye, EyeOff, User, Building, UserPlus, AlertCircle, CheckCircle } from 'lucide-react'
@@ -22,7 +22,7 @@ interface RegisterForm {
 
 const Register: React.FC = () => {
   const navigate = useNavigate()
-  const { signUp, loading } = useAuth()
+  const { signUp } = useAuth()
   
   const [step, setStep] = useState(1) // 1: Role Selection, 2: Account Details
   const [formData, setFormData] = useState<RegisterForm>({
@@ -204,7 +204,7 @@ const Register: React.FC = () => {
                       ? 'border-blue-500 ring-4 ring-blue-100'
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
-                  onClick={() => setFormData(prev => ({ ...prev, role: option.value as 'jobseeker' | 'employer' }))}
+                  onClick={() => setFormData(prev => ({ ...prev, role: option.value as 'job_seeker' | 'employer' }))}
                 >
                   <div className="text-center mb-6">
                     <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-full p-4 w-16 h-16 mx-auto mb-4">

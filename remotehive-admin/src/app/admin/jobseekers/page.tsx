@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { getUsers, User } from '@/lib/supabase';
+import { apiService } from '@/lib/api';
 import {
   Search,
   Filter,
@@ -23,6 +23,20 @@ import {
   MapPin
 } from 'lucide-react';
 import { formatDate, getInitials } from '@/lib/utils';
+
+interface User {
+  id: string;
+  email: string;
+  full_name?: string;
+  avatar_url?: string;
+  job_title?: string;
+  location?: string;
+  status?: 'active' | 'inactive' | 'suspended' | 'pending';
+  created_at: string;
+  last_sign_in_at?: string;
+  applications_count?: number;
+  resume_url?: string;
+}
 
 const JobseekerCard = ({ jobseeker }: { jobseeker: User }) => {
   const statusColors = {
@@ -123,15 +137,16 @@ export default function JobseekersPage() {
   const fetchJobseekers = async () => {
     try {
       setLoading(true);
-      const { data, error, count } = await getUsers('jobseeker', currentPage, jobseekersPerPage, searchTerm);
+      const response = await apiService.get(`/admin/users/jobseekers?page=${currentPage}&limit=${jobseekersPerPage}&search=${searchTerm}`);
       
-      if (error) {
-        console.error('Error fetching jobseekers:', error);
+      if (!response.ok) {
+        console.error('Error fetching jobseekers:', response.statusText);
         return;
       }
       
-      setJobseekers(data || []);
-      setTotalJobseekers(count || 0);
+      const result = await response.json();
+      setJobseekers(result.data || []);
+      setTotalJobseekers(result.total || 0);
     } catch (error) {
       console.error('Error fetching jobseekers:', error);
     } finally {

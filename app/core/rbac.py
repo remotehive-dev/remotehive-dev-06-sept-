@@ -1,5 +1,5 @@
 from beanie import Document
-from pydantic import Field
+from pydantic import Field, ConfigDict
 from datetime import datetime
 from enum import Enum
 from typing import Dict, Set, List, Optional
@@ -167,6 +167,8 @@ ROLE_PERMISSIONS: Dict[str, Set[Permission]] = {
 
 # Database models for RBAC
 class RolePermission(Document):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     role: str
     permission: str
     is_active: bool = True
@@ -177,6 +179,8 @@ class RolePermission(Document):
         name = "role_permissions"
 
 class UserSession(Document):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     user_id: str
     session_token: str
     ip_address: Optional[str] = None
@@ -190,6 +194,8 @@ class UserSession(Document):
         name = "user_sessions"
 
 class LoginAttempt(Document):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     email: str
     ip_address: Optional[str] = None
     user_agent: Optional[str] = None

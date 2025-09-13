@@ -133,7 +133,9 @@ class NotificationService:
         try:
             # Get user details from database
             db = next(get_db())
-            from app.database.models import User
+            # TODO: MongoDB Migration - Update User import to use MongoDB models
+            # from app.database.models import User
+            from app.models.mongodb_models import User
             user = db.query(User).filter(User.id == user_id).first()
             
             if user:
@@ -164,7 +166,9 @@ class NotificationService:
         try:
             # Get job and company details from database
             db = next(get_db())
-            from app.database.models import Job
+            # TODO: MongoDB Migration - Update Job import to use MongoDB models
+            # from app.database.models import Job
+            from app.models.mongodb_models import Job
             job = db.query(Job).filter(Job.id == job_id).first()
             
             if job and job.company and job.company.contact_email:
@@ -195,7 +199,9 @@ class NotificationService:
         """Send system maintenance notice to all active users"""
         try:
             db = next(get_db())
-            from app.database.models import User
+            # TODO: MongoDB Migration - Update User import to use MongoDB models
+            # from app.database.models import User
+            from app.models.mongodb_models import User
             
             # Get all active users
             active_users = db.query(User).filter(User.is_active == True).all()

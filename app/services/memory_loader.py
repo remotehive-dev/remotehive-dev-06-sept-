@@ -7,7 +7,8 @@ from pathlib import Path
 import logging
 from dataclasses import dataclass
 
-from app.database.models import MemoryUpload
+# from app.database.models import MemoryUpload  # TODO: Migrate MemoryUpload to MongoDB models
+# from app.models.mongodb_models import MemoryUpload  # TODO: Create MemoryUpload MongoDB model
 # from app.core.enums import MemoryUploadStatus  # No longer needed, using string values
 from app.database import get_db_session
 from sqlalchemy.orm import Session

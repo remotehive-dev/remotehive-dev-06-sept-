@@ -92,7 +92,11 @@ check_requirements() {
     
     # Check SSH connectivity
     log_info "Testing SSH connectivity to $VPC_HOST..."
-    if ! ssh -o ConnectTimeout=10 -o BatchMode=yes "$VPC_USER@$VPC_HOST" "echo 'SSH connection successful'" 2>/dev/null; then
+    SSH_CMD="ssh -o ConnectTimeout=10 -o BatchMode=yes -o StrictHostKeyChecking=no"
+    if [[ -n "$VPC_SSH_KEY_PATH" ]]; then
+        SSH_CMD="$SSH_CMD -i $VPC_SSH_KEY_PATH"
+    fi
+    if ! $SSH_CMD "$VPC_USER@$VPC_HOST" "echo 'SSH connection successful'" 2>/dev/null; then
         log_error "Cannot connect to VPC via SSH"
         log_info "Please ensure:"
         echo "  1. VPC instance is running"
@@ -107,8 +111,14 @@ check_requirements() {
 setup_vpc_environment() {
     log_info "Setting up VPC environment..."
     
+    # Prepare SSH command with key
+    SSH_CMD="ssh -o StrictHostKeyChecking=no"
+    if [[ -n "$VPC_SSH_KEY_PATH" ]]; then
+        SSH_CMD="$SSH_CMD -i $VPC_SSH_KEY_PATH"
+    fi
+    
     # Install Docker and Docker Compose if not present
-    ssh "$VPC_USER@$VPC_HOST" << 'EOF'
+    $SSH_CMD "$VPC_USER@$VPC_HOST" << 'EOF'
         # Update system
         sudo apt-get update
         
@@ -141,7 +151,7 @@ setup_kubernetes() {
     if [[ "$USE_KUBERNETES" == "true" ]]; then
         log_info "Setting up Kubernetes environment..."
         
-        ssh "$VPC_USER@$VPC_HOST" << 'EOF'
+        $SSH_CMD "$VPC_USER@$VPC_HOST" << 'EOF'
             # Install kubectl if not present
             if ! command -v kubectl &> /dev/null; then
                 echo "Installing kubectl..."
@@ -185,7 +195,7 @@ copy_deployment_files() {
 setup_environment_config() {
     log_info "Setting up environment configuration..."
     
-    ssh "$VPC_USER@$VPC_HOST" << EOF
+    $SSH_CMD "$VPC_USER@$VPC_HOST" << EOF
         cd ~/$DEPLOYMENT_DIR
         
         # Create .env file if it doesn't exist
@@ -219,7 +229,7 @@ EOF
 deploy_with_docker_compose() {
     log_info "Deploying with Docker Compose..."
     
-    ssh "$VPC_USER@$VPC_HOST" << 'EOF'
+    $SSH_CMD "$VPC_USER@$VPC_HOST" << 'EOF'
         cd ~/remotehive-deployment
         
         # Pull latest images
@@ -255,7 +265,7 @@ EOF
 deploy_with_kubernetes() {
     log_info "Deploying with Kubernetes..."
     
-    ssh "$VPC_USER@$VPC_HOST" << 'EOF'
+    $SSH_CMD "$VPC_USER@$VPC_HOST" << 'EOF'
         cd ~/remotehive-deployment
         export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
         
@@ -308,7 +318,7 @@ EOF
 verify_deployment() {
     log_info "Verifying deployment..."
     
-    ssh "$VPC_USER@$VPC_HOST" << 'EOF'
+    $SSH_CMD "$VPC_USER@$VPC_HOST" << 'EOF'
         cd ~/remotehive-deployment
         
         echo "Testing service endpoints..."

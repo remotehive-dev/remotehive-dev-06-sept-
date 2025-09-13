@@ -2,7 +2,7 @@
 
 from .notifications import NotificationService, notification_service
 from .jwt_auth import *
-from .pagination import *
+# from .pagination import *  # Temporarily disabled for MongoDB migration
 from .service_discovery import *
 
 __all__ = [

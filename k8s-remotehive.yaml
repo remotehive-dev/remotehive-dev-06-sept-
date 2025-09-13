@@ -1,0 +1,705 @@
+# RemoteHive Kubernetes Configuration
+# This file contains all Kubernetes resources for RemoteHive deployment
+
+---
+# Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: remotehive
+  labels:
+    name: remotehive
+    environment: production
+
+---
+# MongoDB StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongodb
+  namespace: remotehive
+spec:
+  serviceName: mongodb
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongodb
+  template:
+    metadata:
+      labels:
+        app: mongodb
+    spec:
+      securityContext:
+        fsGroup: 999
+      containers:
+      - name: mongodb
+        image: mongo:7.0
+        ports:
+        - containerPort: 27017
+        env:
+        - name: MONGO_INITDB_ROOT_USERNAME
+          value: "admin"
+        - name: MONGO_INITDB_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mongodb-secret
+              key: password
+        volumeMounts:
+        - name: mongodb-storage
+          mountPath: /data/db
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          exec:
+            command:
+            - mongosh
+            - --eval
+            - "db.adminCommand('ping')"
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - mongosh
+            - --eval
+            - "db.adminCommand('ping')"
+          initialDelaySeconds: 5
+          periodSeconds: 5
+  volumeClaimTemplates:
+  - metadata:
+      name: mongodb-storage
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 10Gi
+
+---
+# MongoDB Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb
+  namespace: remotehive
+spec:
+  selector:
+    app: mongodb
+  ports:
+  - port: 27017
+    targetPort: 27017
+  clusterIP: None
+
+---
+# Redis Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: remotehive
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      securityContext:
+        fsGroup: 999
+      containers:
+      - name: redis
+        image: redis:7.2-alpine
+        ports:
+        - containerPort: 6379
+        command: ["redis-server"]
+        args: ["--requirepass", "$(REDIS_PASSWORD)"]
+        env:
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: redis-secret
+              key: password
+        volumeMounts:
+        - name: redis-storage
+          mountPath: /data
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "250m"
+        livenessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: redis-storage
+        persistentVolumeClaim:
+          claimName: redis-pvc
+
+---
+# Redis Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: remotehive
+spec:
+  selector:
+    app: redis
+  ports:
+  - port: 6379
+    targetPort: 6379
+
+---
+# Backend API Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-api
+  namespace: remotehive
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend-api
+  template:
+    metadata:
+      labels:
+        app: backend-api
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: backend-api
+        image: remotehive/backend-api:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: MONGODB_URL
+          value: "mongodb://admin:$(MONGODB_PASSWORD)@mongodb:27017/remotehive?authSource=admin"
+        - name: REDIS_URL
+          value: "redis://:$(REDIS_PASSWORD)@redis:6379"
+        - name: JWT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: jwt-secret
+        - name: MONGODB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mongodb-secret
+              key: password
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: redis-secret
+              key: password
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+
+---
+# Backend API Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-api
+  namespace: remotehive
+spec:
+  selector:
+    app: backend-api
+  ports:
+  - port: 8000
+    targetPort: 8000
+
+---
+# Autoscraper Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: autoscraper
+  namespace: remotehive
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: autoscraper
+  template:
+    metadata:
+      labels:
+        app: autoscraper
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: autoscraper
+        image: remotehive/autoscraper:latest
+        ports:
+        - containerPort: 8001
+        volumeMounts:
+        - name: autoscraper-storage
+          mountPath: /app/data
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "250m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: autoscraper-storage
+        persistentVolumeClaim:
+          claimName: autoscraper-pvc
+
+---
+# Autoscraper Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: autoscraper
+  namespace: remotehive
+spec:
+  selector:
+    app: autoscraper
+  ports:
+  - port: 8001
+    targetPort: 8001
+
+---
+# Admin Panel Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: admin-panel
+  namespace: remotehive
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: admin-panel
+  template:
+    metadata:
+      labels:
+        app: admin-panel
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+      containers:
+      - name: admin-panel
+        image: remotehive/admin-panel:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: NEXT_PUBLIC_API_URL
+          value: "http://backend-api:8000"
+        - name: NEXTAUTH_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: nextauth-secret
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "250m"
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+
+---
+# Admin Panel Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: admin-panel
+  namespace: remotehive
+spec:
+  selector:
+    app: admin-panel
+  ports:
+  - port: 3000
+    targetPort: 3000
+
+---
+# Public Website Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: public-website
+  namespace: remotehive
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: public-website
+  template:
+    metadata:
+      labels:
+        app: public-website
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+      containers:
+      - name: public-website
+        image: remotehive/public-website:latest
+        ports:
+        - containerPort: 5173
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "100m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 5173
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 5173
+          initialDelaySeconds: 5
+          periodSeconds: 5
+
+---
+# Public Website Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: public-website
+  namespace: remotehive
+spec:
+  selector:
+    app: public-website
+  ports:
+  - port: 5173
+    targetPort: 5173
+
+---
+# NGINX Ingress Controller
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-proxy
+  namespace: remotehive
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx-proxy
+  template:
+    metadata:
+      labels:
+        app: nginx-proxy
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.25-alpine
+        ports:
+        - containerPort: 80
+        - containerPort: 443
+        volumeMounts:
+        - name: nginx-config
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "100m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: nginx-config
+        configMap:
+          name: nginx-config
+
+---
+# NGINX Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-proxy
+  namespace: remotehive
+spec:
+  type: LoadBalancer
+  selector:
+    app: nginx-proxy
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+  - name: https
+    port: 443
+    targetPort: 443
+
+---
+# Persistent Volume Claims
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-pvc
+  namespace: remotehive
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: autoscraper-pvc
+  namespace: remotehive
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+
+---
+# Secrets
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mongodb-secret
+  namespace: remotehive
+type: Opaque
+data:
+  password: UmVtb3RlSGl2ZTIwMjQh  # RemoteHive2024! (base64 encoded)
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: redis-secret
+  namespace: remotehive
+type: Opaque
+data:
+  password: UmVtb3RlSGl2ZTIwMjQh  # RemoteHive2024! (base64 encoded)
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: app-secrets
+  namespace: remotehive
+type: Opaque
+data:
+  jwt-secret: Y2hhbmdlLW1lLXRvLWEtc2VjdXJlLXJhbmRvbS1zdHJpbmc=  # change-me-to-a-secure-random-string (base64)
+  nextauth-secret: Y2hhbmdlLW1lLXRvLWEtc2VjdXJlLXJhbmRvbS1zdHJpbmc=  # change-me-to-a-secure-random-string (base64)
+
+---
+# ConfigMap for NGINX
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: remotehive
+data:
+  nginx.conf: |
+    events {
+        worker_connections 1024;
+    }
+    
+    http {
+        upstream backend-api {
+            server backend-api:8000;
+        }
+        
+        upstream autoscraper {
+            server autoscraper:8001;
+        }
+        
+        upstream admin-panel {
+            server admin-panel:3000;
+        }
+        
+        upstream public-website {
+            server public-website:5173;
+        }
+        
+        server {
+            listen 80;
+            
+            location /health {
+                return 200 'OK';
+                add_header Content-Type text/plain;
+            }
+            
+            location /api/ {
+                proxy_pass http://backend-api/;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+            }
+            
+            location /autoscraper/ {
+                proxy_pass http://autoscraper/;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+            }
+            
+            location /admin/ {
+                proxy_pass http://admin-panel/;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+            }
+            
+            location / {
+                proxy_pass http://public-website/;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+            }
+        }
+    }
+
+---
+# Network Policies for Security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: remotehive-network-policy
+  namespace: remotehive
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: remotehive
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: remotehive
+  - to: []  # Allow external egress for API calls
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 443
+
+---
+# RBAC Configuration
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: remotehive
+  name: remotehive-role
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "statefulsets"]
+  verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: remotehive-rolebinding
+  namespace: remotehive
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: remotehive
+roleRef:
+  kind: Role
+  name: remotehive-role
+  apiGroup: rbac.authorization.k8s.io

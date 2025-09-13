@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase';
+import { API_CONFIG } from '@/utils/constants';
 
 /**
  * This API endpoint is called when a new user registers on the public website
@@ -43,16 +43,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabaseAdmin = createAdminClient();
-
     // Check if lead already exists for this user
-    const { data: existingLead } = await supabaseAdmin
-      .from('leads')
-      .select('id')
-      .eq('user_id', user_id)
-      .single();
-
-    if (existingLead) {
+    const checkResponse = await fetch(`${API_CONFIG.BASE_URL}/api/v1/leads/by-user/${user_id}`);
+    
+    if (checkResponse.ok) {
+      const existingLead = await checkResponse.json();
       return NextResponse.json(
         { message: 'Lead already exists for this user', lead_id: existingLead.id },
         { status: 200 }
@@ -85,28 +80,35 @@ export async function POST(request: NextRequest) {
       notes: `Auto-generated from ${leadType} registration`
     };
 
-    const { data: newLead, error: leadError } = await supabaseAdmin
-      .from('leads')
-      .insert(leadData)
-      .select()
-      .single();
+    const leadResponse = await fetch(`${API_CONFIG.BASE_URL}/api/v1/leads`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(leadData),
+    });
 
-    if (leadError) {
-      console.error('Error creating lead:', leadError);
+    if (!leadResponse.ok) {
+      console.error('Error creating lead:', await leadResponse.text());
       return NextResponse.json(
         { error: 'Failed to create lead' },
         { status: 500 }
       );
     }
 
+    const newLead = await leadResponse.json();
+
     // Create notification for new lead
     const notificationMessage = leadType === 'employer' 
       ? `New employer lead: ${full_name}${company_name ? ` from ${company_name}` : ''}`
       : `New jobseeker lead: ${full_name}`;
 
-    const { error: notificationError } = await supabaseAdmin
-      .from('notifications')
-      .insert({
+    const notificationResponse = await fetch(`${API_CONFIG.BASE_URL}/api/v1/notifications`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
         message: notificationMessage,
         type: 'new_lead',
         data: { 
@@ -117,25 +119,32 @@ export async function POST(request: NextRequest) {
         },
         created_at: new Date().toISOString(),
         read: false
-      });
+      }),
+    });
 
+    const notificationError = !notificationResponse.ok;
     if (notificationError) {
-      console.error('Error creating notification:', notificationError);
+      console.error('Error creating notification:', await notificationResponse.text());
       // Don't fail the request if notification creation fails
     }
 
     // Log the lead creation for analytics
-    const { error: analyticsError } = await supabaseAdmin
-      .from('lead_analytics')
-      .insert({
+    const analyticsResponse = await fetch(`${API_CONFIG.BASE_URL}/api/v1/analytics/leads`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
         date: new Date().toISOString().split('T')[0],
         lead_type: leadType,
         source: registration_source,
         created_at: new Date().toISOString()
-      });
+      }),
+    });
 
+    const analyticsError = !analyticsResponse.ok;
     if (analyticsError) {
-      console.error('Error logging analytics:', analyticsError);
+      console.error('Error logging analytics:', await analyticsResponse.text());
       // Don't fail the request if analytics logging fails
     }
 
@@ -165,8 +174,6 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const days = parseInt(searchParams.get('days') || '30');
-
-    const supabaseAdmin = createAdminClient();
     
     // Calculate date range
     const endDate = new Date();
@@ -174,20 +181,22 @@ export async function GET(request: NextRequest) {
     startDate.setDate(startDate.getDate() - days);
 
     // Get registration statistics
-    const { data: registrationStats, error } = await supabaseAdmin
-      .from('leads')
-      .select('type, created_at')
-      .eq('source', 'website_registration')
-      .gte('created_at', startDate.toISOString())
-      .lte('created_at', endDate.toISOString());
+    const statsUrl = new URL(`${API_CONFIG.BASE_URL}/api/v1/leads/registration-stats`);
+    statsUrl.searchParams.set('source', 'website_registration');
+    statsUrl.searchParams.set('start_date', startDate.toISOString());
+    statsUrl.searchParams.set('end_date', endDate.toISOString());
+    
+    const statsResponse = await fetch(statsUrl.toString());
 
-    if (error) {
-      console.error('Error fetching registration stats:', error);
+    if (!statsResponse.ok) {
+      console.error('Error fetching registration stats:', await statsResponse.text());
       return NextResponse.json(
         { error: 'Failed to fetch registration statistics' },
         { status: 500 }
       );
     }
+
+    const registrationStats = await statsResponse.json();
 
     // Process statistics
     const totalRegistrations = registrationStats?.length || 0;

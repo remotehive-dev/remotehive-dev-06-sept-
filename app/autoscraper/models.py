@@ -8,7 +8,9 @@ from enum import Enum as PyEnum
 import uuid
 
 # Import the base from the main models file
-from app.database.models import Base
+# TODO: MongoDB Migration - Update Base import to use MongoDB models
+# from app.database.models import Base
+from app.models.mongodb_models import Base
 
 
 class JobBoardType(PyEnum):

@@ -1,6 +1,6 @@
 from typing import List, Optional, Dict, Any
 from motor.motor_asyncio import AsyncIOMotorDatabase
-from bson import ObjectId
+# from bson import ObjectId  # Removed to fix Pydantic schema generation
 from app.schemas.scraper_config import ScraperConfigCreate, ScraperConfigUpdate
 from app.core.enums import ScraperSource
 from datetime import datetime
@@ -27,13 +27,13 @@ class ScraperConfigService:
     
     async def get_config_by_id(self, config_id: str) -> Optional[Dict[str, Any]]:
         """Get a specific scraper configuration by ID"""
-        return await self.db.scraper_configs.find_one({"_id": ObjectId(config_id)})
+        return await self.db.scraper_configs.find_one({"_id": config_id})
     
     async def create_config(self, config_data: ScraperConfigCreate, user_id: str) -> Dict[str, Any]:
         """Create a new scraper configuration"""
         try:
             # Verify user exists
-            user = await self.db.users.find_one({"_id": ObjectId(user_id)})
+            user = await self.db.users.find_one({"_id": user_id})
             if not user:
                 raise ValueError(f"User with ID {user_id} not found")
             
@@ -78,7 +78,7 @@ class ScraperConfigService:
             update_data["updated_at"] = datetime.utcnow()
             
             result = await self.db.scraper_configs.update_one(
-                {"_id": ObjectId(config_id)},
+                {"_id": config_id},
                 {"$set": update_data}
             )
             
@@ -101,7 +101,7 @@ class ScraperConfigService:
             if not existing_config:
                 return False
             
-            result = await self.db.scraper_configs.delete_one({"_id": ObjectId(config_id)})
+            result = await self.db.scraper_configs.delete_one({"_id": config_id})
             
             if result.deleted_count > 0:
                 logger.info(f"Deleted scraper config {config_id}")
@@ -147,7 +147,7 @@ class ScraperConfigService:
             }
             
             result = await self.db.scraper_configs.update_one(
-                {"_id": ObjectId(config_id)},
+                {"_id": config_id},
                 {"$set": update_data}
             )
             

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react'
-// Removed Supabase dependency - notifications will be handled via REST API
+// Using FastAPI backend for notification management
 import { useAuth } from './AuthContext'
 import { toast } from 'react-hot-toast'
 

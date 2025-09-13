@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -266,29 +267,29 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             {navigation.map((item) => {
               const isActive = pathname === item.href;
               return (
-                <motion.a
-                  key={item.name}
-                  href={item.href}
-                  whileHover={{ x: 4 }}
-                  whileTap={{ scale: 0.98 }}
-                  className={cn(
-                    "flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200",
-                    isActive
-                      ? "bg-primary text-primary-foreground shadow-md"
-                      : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                  )}
-                >
-                  <item.icon className="w-5 h-5 mr-3" />
-                  <div className="flex-1">
-                    <div className="font-medium">{item.name}</div>
-                    <div className={cn(
-                      "text-xs",
-                      isActive ? "text-primary-foreground/80" : "text-gray-500 dark:text-gray-400"
-                    )}>
-                      {item.description}
+                <Link key={item.name} href={item.href} passHref>
+                  <motion.div
+                    whileHover={{ x: 4 }}
+                    whileTap={{ scale: 0.98 }}
+                    className={cn(
+                      "flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 cursor-pointer",
+                      isActive
+                        ? "bg-primary text-primary-foreground shadow-md"
+                        : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    )}
+                  >
+                    <item.icon className="w-5 h-5 mr-3" />
+                    <div className="flex-1">
+                      <div className="font-medium">{item.name}</div>
+                      <div className={cn(
+                        "text-xs",
+                        isActive ? "text-primary-foreground/80" : "text-gray-500 dark:text-gray-400"
+                      )}>
+                        {item.description}
+                      </div>
                     </div>
-                  </div>
-                </motion.a>
+                  </motion.div>
+                </Link>
               );
             })}
           </nav>

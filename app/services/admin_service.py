@@ -1,6 +1,6 @@
 from typing import Dict, Any, List, Optional, Tuple
 from motor.motor_asyncio import AsyncIOMotorDatabase
-from bson import ObjectId
+# from bson import ObjectId  # Removed to fix Pydantic schema generation
 from datetime import datetime, timedelta
 from loguru import logger
 import json
@@ -33,8 +33,9 @@ class AdminService:
         """Log admin actions for audit trail"""
         try:
             # Create admin log entry
+            import uuid
             log_entry = {
-                "_id": str(ObjectId()),
+                "_id": str(uuid.uuid4()),
                 "admin_user_id": admin_user_id,
                 "action": log_data.action,
                 "target_table": log_data.target_table,
@@ -139,14 +140,14 @@ class AdminService:
         """Suspend a user account"""
         try:
             # Get user from MongoDB
-            user = await self.db.users.find_one({"_id": ObjectId(user_id)})
+            user = await self.db.users.find_one({"_id": user_id})
             if not user:
                 return False
             
             # Update user status
             old_values = {"is_active": user.get("is_active", True)}
             result = await self.db.users.update_one(
-                {"_id": ObjectId(user_id)},
+                {"_id": user_id},
                 {"$set": {"is_active": False}}
             )
             
@@ -176,14 +177,14 @@ class AdminService:
         """Unsuspend a user account"""
         try:
             # Get user from MongoDB
-            user = await self.db.users.find_one({"_id": ObjectId(user_id)})
+            user = await self.db.users.find_one({"_id": user_id})
             if not user:
                 return False
             
             # Update user status
             old_values = {"is_active": user.get("is_active", False)}
             result = await self.db.users.update_one(
-                {"_id": ObjectId(user_id)},
+                {"_id": user_id},
                 {"$set": {"is_active": True}}
             )
             
@@ -252,7 +253,7 @@ class AdminService:
         """Get user activity summary"""
         try:
             # Get user from MongoDB
-            user = await self.db.users.find_one({"_id": ObjectId(user_id)})
+            user = await self.db.users.find_one({"_id": user_id})
             if not user:
                 return None
             

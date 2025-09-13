@@ -1,4 +1,4 @@
-import React from 'react'
+// React import removed - not needed for functional components
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Check, X, Star, ArrowRight, Users, Briefcase, Building2, Crown } from 'lucide-react'

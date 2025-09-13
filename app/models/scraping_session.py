@@ -2,8 +2,8 @@ from beanie import Document
 from datetime import datetime
 from enum import Enum
 from typing import List, Dict, Any, Optional
-from pydantic import Field
-from bson import ObjectId
+from pydantic import Field, ConfigDict
+# from bson import ObjectId  # Removed to fix Pydantic schema generation
 
 class SessionStatus(Enum):
     CREATED = "created"
@@ -20,6 +20,7 @@ class WebsiteStatus(Enum):
     FAILED = "failed"
 
 class ScrapingSession(Document):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
     
     session_id: str = Field(..., index=True)
     name: str
@@ -125,6 +126,7 @@ class ScrapingSession(Document):
         }
 
 class ScrapingResult(Document):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
     
     session_id: str = Field(..., index=True)
     website_id: str
@@ -182,6 +184,7 @@ class ScrapingResult(Document):
         }
 
 class SessionWebsite(Document):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
     
     session_id: str = Field(..., index=True)
     website_id: str

@@ -7,7 +7,7 @@ from datetime import datetime
 import logging
 
 from motor.motor_asyncio import AsyncIOMotorDatabase
-from bson import ObjectId
+# from bson import ObjectId  # Removed to fix Pydantic schema generation
 
 class FieldType(Enum):
     """Supported field types for mapping"""
@@ -318,7 +318,7 @@ class FieldMappingService:
                 validators_data.append(validator_dict)
             
             mapping_data = {
-                'config_id': ObjectId(config_id),
+                'config_id': config_id,
                 'field_name': field_mapping.field_name,
                 'field_type': field_mapping.field_type.value,
                 'extractors': extractors_data,
@@ -348,7 +348,7 @@ class FieldMappingService:
         try:
             # Fetch from MongoDB
             if self.db:
-                config = await self.db.scraper_configs.find_one({"_id": ObjectId(config_id)})
+                config = await self.db.scraper_configs.find_one({"_id": config_id})
                 if config and config.get('source'):
                     source = config['source'].lower()
                     if source in self._templates:
@@ -391,7 +391,7 @@ class FieldMappingService:
             
             if self.db:
                 result = await self.db.field_mappings.update_one(
-                    {'config_id': ObjectId(config_id), 'field_name': field_name},
+                    {'config_id': config_id, 'field_name': field_name},
                     {'$set': mapping_data}
                 )
                 if result.matched_count == 0:
@@ -409,7 +409,7 @@ class FieldMappingService:
         try:
             if self.db:
                 result = await self.db.field_mappings.delete_one(
-                    {'config_id': ObjectId(config_id), 'field_name': field_name}
+                    {'config_id': config_id, 'field_name': field_name}
                 )
                 if result.deleted_count == 0:
                     return {'success': False, 'error': 'Field mapping not found'}

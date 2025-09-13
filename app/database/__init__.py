@@ -1,8 +1,9 @@
 from .database import DatabaseManager, get_db_session, init_database
-from .mongodb_models import (
+from ..models.mongodb_models import (
     User, UserRole, JobSeeker, Employer, JobPost, JobApplication, 
-    JobWorkflowLog, SeoSettings, Review, Ad, ScraperConfig, ScraperLog,
-    ContactSubmission, ContactInformation
+    SeoSettings, Review, Ad, ContactSubmission, ContactInformation,
+    PaymentGateway, Transaction, Refund, JobStatus, ApplicationStatus,
+    ContactStatus, Priority
 )
 from ..models.tasks import TaskResult
 from ..models.scraping_session import ScrapingSession, ScrapingResult, SessionWebsite
@@ -17,14 +18,18 @@ __all__ = [
     'Employer',
     'JobPost',
     'JobApplication',
-    'JobWorkflowLog',
     'SeoSettings',
     'Review',
     'Ad',
-    'ScraperConfig',
-    'ScraperLog',
     'ContactSubmission',
     'ContactInformation',
+    'PaymentGateway',
+    'Transaction',
+    'Refund',
+    'JobStatus',
+    'ApplicationStatus',
+    'ContactStatus',
+    'Priority',
     'TaskResult',
     'ScrapingSession',
     'ScrapingResult',

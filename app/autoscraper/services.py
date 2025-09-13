@@ -12,12 +12,18 @@ from urllib.parse import urljoin, urlparse
 from dataclasses import dataclass
 
 from app.database.database import get_database_manager
-from app.database.models import (
+# TODO: MongoDB Migration - Update imports to use MongoDB models
+# from app.database.models import (
+#     JobBoard, AutoScrapeScrapeJob as ScrapeJob, AutoScrapeScrapeRun as ScrapeRun, 
+#     AutoScrapeRawJob as RawJob, AutoScrapeNormalizedJob as NormalizedJob,
+#     JobBoardType, ScrapeJobStatus
+# )
+# from app.database.models import JobPost
+from app.models.mongodb_models import (
     JobBoard, AutoScrapeScrapeJob as ScrapeJob, AutoScrapeScrapeRun as ScrapeRun, 
     AutoScrapeRawJob as RawJob, AutoScrapeNormalizedJob as NormalizedJob,
-    JobBoardType, ScrapeJobStatus
+    JobBoardType, ScrapeJobStatus, JobPost
 )
-from app.database.models import JobPost
 from app.services.job_post_service import JobPostService
 
 

@@ -5,12 +5,12 @@ Replacement for SQLAlchemy models to work with MongoDB Atlas
 """
 
 from beanie import Document, Indexed, Link
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, ConfigDict
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
 import uuid
-from bson import ObjectId
+# from bson import ObjectId  # Removed to fix Pydantic schema generation
 
 # Import enums from core
 from app.core.enums import ScraperStatus, ScraperSource, CSVImportStatus
@@ -25,6 +25,8 @@ class UserRole(str, Enum):
 
 class User(Document):
     """User document model"""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     clerk_user_id: Optional[str] = Field(None, unique=True)
     email: Indexed(str, unique=True)
     password_hash: Optional[str] = None
@@ -48,7 +50,9 @@ class User(Document):
 
 
 class ContactSubmission(Document):
-    """Contact submission document model"""
+    """Contact form submission document model"""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     name: str
     email: str
     subject: str
@@ -79,6 +83,8 @@ class ContactSubmission(Document):
 
 class ContactInformation(Document):
     """Contact information document model"""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     category: str
     label: str
     email: Optional[str] = None
@@ -110,6 +116,8 @@ class ContactInformation(Document):
 
 class SeoSettings(Document):
     """SEO settings document model"""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     site_title: Optional[str] = None
     site_description: Optional[str] = None
     meta_keywords: Optional[str] = None
@@ -137,6 +145,8 @@ class SeoSettings(Document):
 
 class Review(Document):
     """Review document model"""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     author: str
     email: Optional[str] = None
     rating: int
@@ -163,6 +173,8 @@ class Review(Document):
 
 class Ad(Document):
     """Advertisement document model"""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     name: str
     type: str
     position: str
@@ -191,6 +203,8 @@ class Ad(Document):
 
 class JobSeeker(Document):
     """Job seeker profile document model"""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     user_id: str = Field(..., unique=True)  # Reference to User document
     current_title: Optional[str] = None
     experience_level: Optional[str] = None
@@ -224,6 +238,8 @@ class JobSeeker(Document):
 
 class Employer(Document):
     """Employer profile document model"""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     user_id: str  # Reference to User document
     employer_number: Optional[str] = Field(None, unique=True)  # RH00 series
     company_name: str
@@ -251,6 +267,8 @@ class Employer(Document):
 
 class JobPost(Document):
     """Job post document model"""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     employer_id: str  # Reference to Employer document
     title: str
     description: str
@@ -342,6 +360,8 @@ class JobPost(Document):
 
 class JobWorkflowLog(Document):
     """Job workflow log document model"""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     job_post_id: str  # Reference to JobPost document
     action: str
     from_status: Optional[str] = None
@@ -364,6 +384,8 @@ class JobWorkflowLog(Document):
 
 class JobApplication(Document):
     """Job application document model"""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     job_post_id: str  # Reference to JobPost document
     job_seeker_id: str  # Reference to JobSeeker document
     status: str = "pending"
@@ -391,6 +413,8 @@ class JobApplication(Document):
 # Scraper Models
 class ScraperConfig(Document):
     """Scraper configuration document model"""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     user_id: str  # Reference to User document
     name: str
     target_url: str
@@ -414,6 +438,8 @@ class ScraperConfig(Document):
 
 class ScraperLog(Document):
     """Scraper log document model"""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     scraper_config_id: str  # Reference to ScraperConfig document
     status: ScraperStatus
     message: Optional[str] = None
@@ -434,6 +460,8 @@ class ScraperLog(Document):
 
 class ScraperState(Document):
     """Scraper state document model for Redis backup and persistence"""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     scraper_config_id: str  # Reference to ScraperConfig document
     current_state: str = "idle"
     state_data: Dict[str, Any] = Field(default_factory=dict)
@@ -457,6 +485,8 @@ class ScraperState(Document):
 
 class EmailVerificationToken(Document):
     """Email verification token for user email verification"""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     user_id: str = Field(..., description="User ID this token belongs to")
     token: str = Field(..., description="Unique verification token")
     expires_at: datetime = Field(..., description="Token expiration timestamp")

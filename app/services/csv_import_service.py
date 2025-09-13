@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional
 import pandas as pd
 from motor.motor_asyncio import AsyncIOMotorDatabase
-from bson import ObjectId
+# from bson import ObjectId  # Removed to fix Pydantic schema generation
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from app.services.job_validation_service import JobDataValidator

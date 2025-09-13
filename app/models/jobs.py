@@ -9,8 +9,10 @@ from datetime import datetime
 from enum import Enum as PyEnum
 import uuid
 
-# Import from database models to avoid duplication
-from app.database.models import JobPost, Base
+# Import from MongoDB models to avoid duplication
+# from app.database.models import JobPost, Base  # Using MongoDB models instead
+from app.models.mongodb_models import JobPost
+# Base is not needed for MongoDB models
 from app.models.scraping_session import ScrapingSession
 
 # Re-export the models for easy importing

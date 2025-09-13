@@ -6,7 +6,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from app.core.database import get_db
 from app.core.auth import get_current_user
 from app.database.services import JobApplicationService as ApplicationService, JobPostService
-from app.database.models import User, JobApplication as Application, JobPost
+from app.models.mongodb_models import User, JobApplication as Application, JobPost
 from app.core.enums import UserRole, ApplicationStatus
 
 router = APIRouter()

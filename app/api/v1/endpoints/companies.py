@@ -5,7 +5,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.core.database import get_db
 from app.database.services import EmployerService
-from app.database.models import Employer
+from app.models.mongodb_models import Employer
 
 router = APIRouter()
 
@@ -22,8 +22,8 @@ async def get_companies(
     """Get companies (public endpoint)"""
     try:
         # Get employers from database
-        employers = await EmployerService.get_employers(
-            db,
+        employer_service = EmployerService()
+        employers = await employer_service.get_employers(
             search=search,
             skip=skip,
             limit=limit
@@ -67,7 +67,8 @@ async def get_company_by_id(
 ):
     """Get a specific company by ID"""
     try:
-        employer = EmployerService.get_employer_by_id(db, int(company_id))
+        employer_service = EmployerService()
+        employer = await employer_service.get_employer_by_id(company_id)
         
         if not employer:
             raise HTTPException(
@@ -108,27 +109,9 @@ async def create_company(
 ):
     """Create a new company (public endpoint)"""
     try:
-        # Create a system user if it doesn't exist
-        from app.database.models import User, UserRole
-        import uuid
-        
-        system_user = db.query(User).filter(User.email == "system@remotehive.com").first()
-        if not system_user:
-            system_user = User(
-                id=str(uuid.uuid4()),
-                email="system@remotehive.com",
-                password_hash="system",
-                first_name="System",
-                last_name="User",
-                role=UserRole.ADMIN
-            )
-            db.add(system_user)
-            db.commit()
-            db.refresh(system_user)
-        
         # Create employer data dictionary
         employer_data = {
-            "user_id": system_user.id,
+            "user_id": "system",  # Use system user ID
             "company_name": company_data.get("company_name") or company_data.get("name"),
             "company_email": company_data.get("email"),
             "company_website": company_data.get("website"),
@@ -139,11 +122,9 @@ async def create_company(
             "is_verified": False  # New companies start unverified
         }
         
-        # Create employer record
-        employer = Employer(**employer_data)
-        db.add(employer)
-        db.commit()
-        db.refresh(employer)
+        # Create employer record using service
+        employer_service = EmployerService()
+        employer = await employer_service.create_employer("system", employer_data)
         
         # Return in company format
         company = {

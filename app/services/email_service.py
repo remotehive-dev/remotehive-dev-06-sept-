@@ -9,10 +9,11 @@ import os
 from pathlib import Path
 from jinja2 import Template
 from motor.motor_asyncio import AsyncIOMotorDatabase
-from bson import ObjectId
+# from bson import ObjectId  # Removed to fix Pydantic schema generation
 from app.core.config import settings
 from app.database.services import UserService
-from app.models.email import EmailUser, EmailMessage
+# TODO: Migrate email models to MongoDB or handle differently
+# from app.models.email import EmailUser, EmailMessage
 import uuid
 from datetime import datetime
 import logging

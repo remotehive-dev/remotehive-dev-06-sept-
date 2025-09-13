@@ -2,12 +2,10 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional, List, Dict, Any
 from loguru import logger
-from sqlalchemy.orm import Session
 
 from .config import settings
-from app.database.database import get_db_session as get_db
 from app.database.services import UserService
-from app.database.models import User
+from app.models.mongodb_models import User
 from app.utils.jwt_auth import get_jwt_manager, JWTError, TokenExpiredError, TokenInvalidError
 
 security = HTTPBearer()
@@ -42,8 +40,7 @@ def verify_token(token: str) -> Optional[dict]:
         return None
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_db)
+    credentials: HTTPAuthorizationCredentials = Depends(security)
 ) -> Dict[str, Any]:
     """Get current authenticated user"""
     credentials_exception = HTTPException(
@@ -60,7 +57,7 @@ async def get_current_user(
     
     # Get user from database
     try:
-        user_service = UserService(db)
+        user_service = UserService()
         user = None
         
         # Try to get user by email (primary method for JWT tokens)
@@ -80,7 +77,7 @@ async def get_current_user(
                 detail="Inactive user"
             )
         
-        # Convert SQLAlchemy model to dict
+        # Convert MongoDB model to dict
         return {
             "id": user.id,
             "email": user.email,

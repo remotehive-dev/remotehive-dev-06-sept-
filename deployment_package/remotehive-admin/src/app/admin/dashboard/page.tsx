@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAdminStore } from '@/store/adminStore';
-// Import API-based services instead of Supabase services
+// Using FastAPI backend services for dashboard data
 import { AnalyticsApiService } from '@/services/api/analytics-api';
 import { EmployerApiService } from '@/services/api/employers-api';
 import { JobSeekerApiService } from '@/services/api/jobseekers-api';

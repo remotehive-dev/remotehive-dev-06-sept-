@@ -1,18 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, Depends, Query, UploadFile, File, Form
 from typing import Dict, Any, List, Optional
 from loguru import logger
-from sqlalchemy.orm import Session
 from datetime import datetime
 import os
 import uuid
 import shutil
 from pathlib import Path
+from beanie import PydanticObjectId
 
-from app.core.database import get_db
+from app.database.mongodb_models import CMSPage, SeoSettings, Review, Ad
 from app.core.auth import get_current_active_user, get_admin
 from app.schemas.cms import (
-    CMSPageCreate, CMSPageUpdate, CMSPage, CMSPageResponse,
-    SEOSettings, SEOSettingsUpdate,
+    CMSPageCreate, CMSPageUpdate, CMSPage as CMSPageSchema, CMSPageResponse,
+    SEOSettings as SEOSettingsSchema, SEOSettingsUpdate,
     ReviewResponse, ReviewUpdate,
     ThemeSettings, ThemeSettingsUpdate,
     PaginatedResponse,
@@ -20,306 +20,418 @@ from app.schemas.cms import (
     CarouselItemCreate, CarouselItemUpdate, CarouselItem,
     GalleryCreate, GalleryUpdate, Gallery, GalleryImageCreate, GalleryImageUpdate, GalleryImage
 )
+from app.schemas.cms import AdCampaignCreate as AdCreate, AdCampaignUpdate as AdUpdate, AdCampaign as AdSchema
 
 router = APIRouter()
 
 # Public CMS Endpoints (No Authentication Required)
-@router.get("/public/pages", response_model=List[CMSPage])
-def get_published_pages(
-    db: Session = Depends(get_db)
-):
-    """Get all published CMS pages for public website"""
+@router.get("/public/pages", response_model=List[CMSPageSchema])
+async def get_published_pages():
+    """Get all published CMS pages for public viewing"""
     try:
-        result = supabase.table("cms_pages").select("*").eq("status", "published").order("updated_at", desc=True).execute()
-        return result.data
+        pages = await CMSPage.find({"status": "published"}).sort("-updated_at").to_list()
+        return [{
+            "id": str(page.id),
+            "title": page.title,
+            "slug": page.slug,
+            "content": page.content,
+            "meta_title": page.meta_title,
+            "meta_description": page.meta_description,
+            "meta_keywords": page.meta_keywords,
+            "featured_image": page.featured_image,
+            "status": page.status,
+            "publish_date": page.publish_date,
+            "is_homepage": page.is_homepage,
+            "template": page.template,
+            "custom_css": page.custom_css,
+            "custom_js": page.custom_js,
+            "created_at": page.created_at,
+            "updated_at": page.updated_at,
+            "created_by": page.created_by,
+            "updated_by": page.updated_by,
+            "views": page.views
+        } for page in pages]
     except Exception as e:
         logger.error(f"Error fetching published pages: {e}")
-        # Return empty list if table doesn't exist
-        return []
+        raise HTTPException(status_code=500, detail="Failed to fetch published pages")
 
-@router.get("/public/pages/{slug}", response_model=CMSPage)
-def get_page_by_slug(
-    slug: str,
-    db: Session = Depends(get_db)
-):
-    """Get published CMS page by slug for public website"""
+@router.get("/public/pages/{slug}", response_model=CMSPageSchema)
+async def get_page_by_slug(slug: str):
+    """Get a specific published CMS page by slug for public website"""
     try:
-        result = supabase.table("cms_pages").select("*").eq("slug", slug).eq("status", "published").execute()
-        if not result.data:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Page not found"
-            )
-        return result.data[0]
+        page = await CMSPage.find_one({"slug": slug, "status": "published"})
+        
+        if not page:
+            raise HTTPException(status_code=404, detail="Page not found")
+        
+        # Increment views
+        await page.update({"$inc": {"views": 1}})
+        
+        return {
+            "id": str(page.id),
+            "title": page.title,
+            "slug": page.slug,
+            "content": page.content,
+            "meta_title": page.meta_title,
+            "meta_description": page.meta_description,
+            "meta_keywords": page.meta_keywords,
+            "featured_image": page.featured_image,
+            "status": page.status,
+            "publish_date": page.publish_date,
+            "is_homepage": page.is_homepage,
+            "template": page.template,
+            "custom_css": page.custom_css,
+            "custom_js": page.custom_js,
+            "created_at": page.created_at,
+            "updated_at": page.updated_at,
+            "created_by": page.created_by,
+            "updated_by": page.updated_by,
+            "views": page.views + 1
+        }
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error fetching page by slug {slug}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to fetch page"
-        )
+        raise HTTPException(status_code=500, detail="Failed to fetch page")
 
 @router.get("/public/reviews")
-def get_public_reviews(
-    featured: bool = Query(False),
-    limit: int = Query(10, ge=1, le=50),
-    db: Session = Depends(get_db)
+async def get_public_reviews(
+    limit: int = Query(10, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    featured_only: bool = Query(False)
 ):
-    """Get approved reviews for public website"""
+    """Get approved reviews for public display"""
     try:
-        query = supabase.table("reviews").select("*").eq("status", "approved")
+        filter_query = {"status": "approved"}
         
-        if featured:
-            query = query.eq("featured", True)
-            
-        result = query.order("created_at", desc=True).limit(limit).execute()
-        return {"data": result.data, "count": len(result.data)}
+        if featured_only:
+            filter_query["featured"] = True
+        
+        reviews = await Review.find(filter_query).sort("-created_at").skip(offset).limit(limit).to_list()
+        
+        return [{
+            "id": str(review.id),
+            "author": review.author,
+            "email": review.email,
+            "rating": review.rating,
+            "title": review.title,
+            "content": review.content,
+            "company": review.company,
+            "position": review.position,
+            "status": review.status,
+            "featured": review.featured,
+            "helpful_count": review.helpful_count,
+            "verified": review.verified,
+            "created_at": review.created_at,
+            "updated_at": review.updated_at
+        } for review in reviews]
     except Exception as e:
         logger.error(f"Error fetching public reviews: {e}")
-        # Return sample data if table doesn't exist
-        sample_reviews = [
-            {
-                "id": "1",
-                "author_name": "Sarah Johnson",
-                "rating": 5,
-                "content": "Amazing platform! Found my dream remote job within a week.",
-                "status": "approved",
-                "created_at": "2024-01-15T00:00:00Z",
-                "featured": True
-            },
-            {
-                "id": "2",
-                "author_name": "Mike Chen",
-                "rating": 4,
-                "content": "Great selection of remote opportunities. Highly recommended!",
-                "status": "approved",
-                "created_at": "2024-01-14T00:00:00Z",
-                "featured": False
-            }
-        ]
-        filtered_reviews = sample_reviews[:limit]
-        return {"data": filtered_reviews, "count": len(filtered_reviews)}
+        return []
 
-@router.get("/public/seo-settings", response_model=SEOSettings)
-def get_public_seo_settings(
-    db: Session = Depends(get_db)
-):
+@router.get("/public/seo-settings", response_model=SEOSettingsSchema)
+async def get_public_seo_settings():
     """Get SEO settings for public website"""
     try:
-        result = supabase.table("seo_settings").select("*").limit(1).execute()
-        if result.data:
-            return result.data[0]
+        seo_settings = await SeoSettings.find_one()
+        if seo_settings:
+            return {
+                "id": str(seo_settings.id),
+                "site_title": seo_settings.site_title,
+                "site_description": seo_settings.site_description,
+                "meta_keywords": seo_settings.meta_keywords,
+                "og_title": seo_settings.og_title,
+                "og_description": seo_settings.og_description,
+                "og_image": seo_settings.og_image,
+                "og_type": seo_settings.og_type,
+                "twitter_card": seo_settings.twitter_card,
+                "twitter_site": seo_settings.twitter_site,
+                "twitter_creator": seo_settings.twitter_creator,
+                "canonical_url": seo_settings.canonical_url,
+                "robots_txt": seo_settings.robots_txt,
+                "sitemap_url": seo_settings.sitemap_url,
+                "google_analytics_id": seo_settings.google_analytics_id,
+                "google_tag_manager_id": seo_settings.google_tag_manager_id,
+                "facebook_pixel_id": seo_settings.facebook_pixel_id,
+                "google_site_verification": seo_settings.google_site_verification,
+                "bing_site_verification": seo_settings.bing_site_verification,
+                "created_at": seo_settings.created_at,
+                "updated_at": seo_settings.updated_at
+            }
         else:
             # Return default SEO settings
-            default_settings = {
-                "site_title": "RemoteHive",
-                "site_description": "Your gateway to remote opportunities",
-                "meta_keywords": "remote jobs, work from home, remote work",
-                "og_title": "RemoteHive - Remote Job Platform",
+            return {
+                "site_title": "RemoteHive - Find Your Perfect Remote Job",
+                "site_description": "Discover thousands of remote job opportunities from top companies worldwide. Your next remote career starts here.",
+                "meta_keywords": "remote jobs, work from home, remote work, online jobs, telecommute",
+                "og_title": "RemoteHive - Remote Job Board",
                 "og_description": "Find your perfect remote job opportunity",
-                "og_image": "",
-                "twitter_card": "summary_large_image",
-                "twitter_site": "@remotehive",
-                "google_analytics_id": "",
-                "google_tag_manager_id": "",
-                "facebook_pixel_id": ""
+                "og_type": "website",
+                "twitter_card": "summary_large_image"
             }
-            return default_settings
     except Exception as e:
-        logger.error(f"Error fetching public SEO settings: {e}")
+        logger.error(f"Error fetching SEO settings: {e}")
         # Return default settings on error
         return {
-            "site_title": "RemoteHive",
-            "site_description": "Your gateway to remote opportunities",
-            "meta_keywords": "remote jobs, work from home, remote work",
-            "og_title": "RemoteHive - Remote Job Platform",
+            "site_title": "RemoteHive - Find Your Perfect Remote Job",
+            "site_description": "Discover thousands of remote job opportunities from top companies worldwide. Your next remote career starts here.",
+            "meta_keywords": "remote jobs, work from home, remote work, online jobs, telecommute",
+            "og_title": "RemoteHive - Remote Job Board",
             "og_description": "Find your perfect remote job opportunity",
-            "og_image": "",
-            "twitter_card": "summary_large_image",
-            "twitter_site": "@remotehive",
-            "google_analytics_id": "",
-            "google_tag_manager_id": "",
-            "facebook_pixel_id": ""
+            "og_type": "website",
+            "twitter_card": "summary_large_image"
         }
 
 @router.get("/public/ads", response_model=List[dict])
-def get_public_ads(
-    position: Optional[str] = Query(None),
-    db: Session = Depends(get_db)
+async def get_public_ads(
+    position: Optional[str] = Query(None, description="Ad position (header, sidebar, footer)")
 ):
     """Get active ads for public website"""
     try:
-        query = supabase.table("ads").select("*").eq("is_active", True)
-        
+        query_filter = {"is_active": True}
         if position:
-            query = query.eq("position", position)
+            query_filter["position"] = position
             
-        # Filter by date range
-        now = datetime.utcnow().isoformat()
-        query = query.lte("start_date", now).gte("end_date", now)
-            
-        result = query.order("created_at", desc=True).execute()
-        return result.data
+        ads = await Ad.find(query_filter).to_list()
+        return [
+            {
+                "id": str(ad.id),
+                "title": ad.title,
+                "content": ad.content,
+                "image_url": ad.image_url,
+                "link_url": ad.link_url,
+                "position": ad.position,
+                "is_active": ad.is_active,
+                "start_date": ad.start_date,
+                "end_date": ad.end_date,
+                "click_count": ad.click_count,
+                "impression_count": ad.impression_count,
+                "created_at": ad.created_at,
+                "updated_at": ad.updated_at
+            }
+            for ad in ads
+        ]
     except Exception as e:
         logger.error(f"Error fetching public ads: {e}")
-        # Return empty list if table doesn't exist
         return []
 
 # CMS Pages Management
-@router.get("/pages", response_model=PaginatedResponse)
-def get_pages(
-    page: int = Query(1, ge=1),
+@router.get("/pages", response_model=List[CMSPageResponse])
+async def get_pages(
+    skip: int = Query(0, ge=0),
     limit: int = Query(10, ge=1, le=100),
-    search: Optional[str] = Query(None),
-    status: Optional[str] = Query(None),
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    status: Optional[str] = Query(None, description="Filter by status (draft, published, archived)"),
+    search: Optional[str] = Query(None, description="Search in title and content")
 ):
-    """Get paginated list of CMS pages"""
+    """Get all pages with pagination and filtering"""
     try:
-        offset = (page - 1) * limit
+        query_filter = {}
         
-        # Build query
-        query = supabase.table("cms_pages").select("*", count="exact")
-        
-        if search:
-            query = query.or_(f"title.ilike.%{search}%,slug.ilike.%{search}%,content.ilike.%{search}%")
         if status:
-            query = query.eq("status", status)
+            query_filter["status"] = status
             
-        # Get total count
-        count_result = query.execute()
-        total = count_result.count
-        
-        # Get paginated data
-        result = query.range(offset, offset + limit - 1).order("updated_at", desc=True).execute()
-        
-        return {
-            "data": result.data,
-            "count": total,
-            "page": page,
-            "limit": limit,
-            "pages": (total + limit - 1) // limit
-        }
+        if search:
+            # MongoDB text search or regex search
+            query_filter["$or"] = [
+                {"title": {"$regex": search, "$options": "i"}},
+                {"content": {"$regex": search, "$options": "i"}}
+            ]
+            
+        pages = await CMSPage.find(query_filter).sort("-created_at").skip(skip).limit(limit).to_list()
+        return [
+            {
+                "id": str(page.id),
+                "title": page.title,
+                "slug": page.slug,
+                "content": page.content,
+                "excerpt": page.excerpt,
+                "status": page.status,
+                "is_homepage": page.is_homepage,
+                "meta_title": page.meta_title,
+                "meta_description": page.meta_description,
+                "featured_image": page.featured_image,
+                "author_id": str(page.author_id) if page.author_id else None,
+                "view_count": page.view_count,
+                "created_at": page.created_at,
+                "updated_at": page.updated_at
+            }
+            for page in pages
+        ]
     except Exception as e:
-        logger.error(f"Error fetching CMS pages: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to fetch CMS pages"
-        )
+        logger.error(f"Error fetching pages: {e}")
+        return []
 
-@router.get("/pages/{page_id}", response_model=CMSPage)
-def get_page_by_id(
-    page_id: str,
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+@router.get("/pages/{page_id}", response_model=CMSPageSchema)
+async def get_page_by_id(
+    page_id: PydanticObjectId
 ):
-    """Get CMS page by ID"""
+    """Get a specific CMS page by ID"""
     try:
-        result = supabase.table("cms_pages").select("*").eq("id", page_id).execute()
-        if not result.data:
+        page = await CMSPage.get(page_id)
+        
+        if not page:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
+                status_code=404,
                 detail="Page not found"
             )
-        return {"data": result.data[0]}
-    except HTTPException:
-        raise
+            
+        return {
+            "id": str(page.id),
+            "title": page.title,
+            "slug": page.slug,
+            "content": page.content,
+            "excerpt": page.excerpt,
+            "status": page.status,
+            "is_homepage": page.is_homepage,
+            "meta_title": page.meta_title,
+            "meta_description": page.meta_description,
+            "featured_image": page.featured_image,
+            "author_id": str(page.author_id) if page.author_id else None,
+            "view_count": page.view_count,
+            "created_at": page.created_at,
+            "updated_at": page.updated_at
+        }
     except Exception as e:
         logger.error(f"Error fetching page {page_id}: {e}")
+        if "not found" in str(e).lower():
+            raise HTTPException(
+                status_code=404,
+                detail="Page not found"
+            )
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=500,
             detail="Failed to fetch page"
         )
 
-@router.post("/pages", response_model=CMSPage)
-def create_page(
-    page_data: CMSPageCreate,
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+@router.post("/pages", response_model=CMSPageSchema)
+async def create_page(
+    page_data: CMSPageCreate
 ):
     """Create a new CMS page"""
     try:
         # Check if slug already exists
-        existing = supabase.table("cms_pages").select("id").eq("slug", page_data.slug).execute()
-        if existing.data:
+        existing = await CMSPage.find_one({"slug": page_data.slug})
+        if existing:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
+                status_code=400,
                 detail="Page with this slug already exists"
             )
         
+        # If this is set as homepage, unset other homepages
+        if page_data.is_homepage:
+            await CMSPage.find({"is_homepage": True}).update({"$set": {"is_homepage": False}})
+        
         # Create page
         page_dict = page_data.dict()
-        page_dict["created_by"] = current_admin["id"]
-        page_dict["updated_by"] = current_admin["id"]
-        page_dict["created_at"] = datetime.utcnow().isoformat()
-        page_dict["updated_at"] = datetime.utcnow().isoformat()
+        page_dict["created_at"] = datetime.utcnow()
+        page_dict["updated_at"] = datetime.utcnow()
         
-        result = supabase.table("cms_pages").insert(page_dict).execute()
+        new_page = CMSPage(**page_dict)
+        await new_page.insert()
         
-        return {"data": result.data[0]}
+        return {
+            "id": str(new_page.id),
+            "title": new_page.title,
+            "slug": new_page.slug,
+            "content": new_page.content,
+            "excerpt": new_page.excerpt,
+            "status": new_page.status,
+            "is_homepage": new_page.is_homepage,
+            "meta_title": new_page.meta_title,
+            "meta_description": new_page.meta_description,
+            "featured_image": new_page.featured_image,
+            "author_id": str(new_page.author_id) if new_page.author_id else None,
+            "view_count": new_page.view_count,
+            "created_at": new_page.created_at,
+            "updated_at": new_page.updated_at
+        }
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error creating page: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=500,
             detail="Failed to create page"
         )
 
-@router.put("/pages/{page_id}", response_model=CMSPage)
-def update_page(
-    page_id: str,
-    page_data: CMSPageUpdate,
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+@router.put("/pages/{page_id}", response_model=CMSPageSchema)
+async def update_page(
+    page_id: PydanticObjectId,
+    page_data: CMSPageUpdate
 ):
     """Update a CMS page"""
     try:
         # Check if page exists
-        existing = supabase.table("cms_pages").select("*").eq("id", page_id).execute()
-        if not existing.data:
+        existing_page = await CMSPage.get(page_id)
+        if not existing_page:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
+                status_code=404,
                 detail="Page not found"
             )
         
+        # If slug is being updated, check for conflicts
+        if page_data.slug and page_data.slug != existing_page.slug:
+            slug_conflict = await CMSPage.find_one({"slug": page_data.slug, "_id": {"$ne": page_id}})
+            if slug_conflict:
+                raise HTTPException(
+                    status_code=400,
+                    detail="A page with this slug already exists"
+                )
+        
+        # If this is set as homepage, unset other homepages
+        if page_data.is_homepage:
+            await CMSPage.find({"is_homepage": True, "_id": {"$ne": page_id}}).update({"$set": {"is_homepage": False}})
+        
         # Update page
         update_dict = page_data.dict(exclude_unset=True)
-        update_dict["updated_by"] = current_admin["id"]
-        update_dict["updated_at"] = datetime.utcnow().isoformat()
+        update_dict["updated_at"] = datetime.utcnow()
         
-        result = supabase.table("cms_pages").update(update_dict).eq("id", page_id).execute()
+        await existing_page.update({"$set": update_dict})
         
-        return {"data": result.data[0]}
+        # Fetch updated page
+        updated_page = await CMSPage.get(page_id)
+        
+        return {
+            "id": str(updated_page.id),
+            "title": updated_page.title,
+            "slug": updated_page.slug,
+            "content": updated_page.content,
+            "excerpt": updated_page.excerpt,
+            "status": updated_page.status,
+            "is_homepage": updated_page.is_homepage,
+            "meta_title": updated_page.meta_title,
+            "meta_description": updated_page.meta_description,
+            "featured_image": updated_page.featured_image,
+            "author_id": str(updated_page.author_id) if updated_page.author_id else None,
+            "view_count": updated_page.view_count,
+            "created_at": updated_page.created_at,
+            "updated_at": updated_page.updated_at
+        }
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error updating page {page_id}: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=500,
             detail="Failed to update page"
         )
 
 @router.delete("/pages/{page_id}")
-def delete_page(
-    page_id: str,
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+async def delete_page(
+    page_id: PydanticObjectId
 ):
     """Delete a CMS page"""
     try:
         # Check if page exists
-        existing = supabase.table("cms_pages").select("id").eq("id", page_id).execute()
-        if not existing.data:
+        existing_page = await CMSPage.get(page_id)
+        if not existing_page:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
+                status_code=404,
                 detail="Page not found"
             )
         
         # Delete page
-        supabase.table("cms_pages").delete().eq("id", page_id).execute()
+        await existing_page.delete()
         
         return {"message": "Page deleted successfully"}
     except HTTPException:
@@ -327,102 +439,133 @@ def delete_page(
     except Exception as e:
         logger.error(f"Error deleting page {page_id}: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=500,
             detail="Failed to delete page"
         )
 
 # SEO Settings Management
-@router.get("/seo-settings", response_model=SEOSettings)
-def get_seo_settings(
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
-):
+@router.get("/seo-settings", response_model=SEOSettingsSchema)
+async def get_seo_settings():
     """Get SEO settings"""
     try:
-        result = supabase.table("seo_settings").select("*").limit(1).execute()
-        if result.data:
-            return {"data": result.data[0]}
-        else:
-            # Return default SEO settings
-            default_settings = {
-                "site_title": "RemoteHive",
-                "site_description": "Your gateway to remote opportunities",
-                "meta_keywords": "remote jobs, work from home, remote work",
-                "og_title": "RemoteHive - Remote Job Platform",
-                "og_description": "Find your perfect remote job opportunity",
-                "og_image": "",
-                "twitter_card": "summary_large_image",
-                "twitter_site": "@remotehive",
-                "google_analytics_id": "",
-                "google_tag_manager_id": "",
-                "facebook_pixel_id": ""
+        seo_settings = await SeoSettings.find_one()
+        
+        if seo_settings:
+            return {
+                "id": str(seo_settings.id),
+                "site_title": seo_settings.site_title,
+                "site_description": seo_settings.site_description,
+                "site_keywords": seo_settings.site_keywords,
+                "og_image": seo_settings.og_image,
+                "twitter_handle": seo_settings.twitter_handle,
+                "google_analytics_id": seo_settings.google_analytics_id,
+                "google_tag_manager_id": seo_settings.google_tag_manager_id,
+                "facebook_pixel_id": seo_settings.facebook_pixel_id,
+                "created_at": seo_settings.created_at,
+                "updated_at": seo_settings.updated_at
             }
-            return {"data": default_settings}
+        else:
+            # Return default settings if none exist
+            return {
+                "id": None,
+                "site_title": "RemoteHive",
+                "site_description": "Find your next remote job opportunity",
+                "site_keywords": "remote jobs, work from home, remote work",
+                "og_image": None,
+                "twitter_handle": None,
+                "google_analytics_id": None,
+                "google_tag_manager_id": None,
+                "facebook_pixel_id": None,
+                "created_at": None,
+                "updated_at": None
+            }
     except Exception as e:
         logger.error(f"Error fetching SEO settings: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=500,
             detail="Failed to fetch SEO settings"
         )
 
-@router.put("/seo-settings", response_model=SEOSettings)
-def update_seo_settings(
-    settings_data: SEOSettingsUpdate,
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+@router.put("/seo-settings", response_model=SEOSettingsSchema)
+async def update_seo_settings(
+    settings_data: SEOSettingsUpdate
 ):
     """Update SEO settings"""
     try:
         # Check if settings exist
-        existing = supabase.table("seo_settings").select("*").limit(1).execute()
+        existing_settings = await SeoSettings.find_one()
         
         settings_dict = settings_data.dict(exclude_unset=True)
-        settings_dict["updated_at"] = datetime.utcnow().isoformat()
+        settings_dict["updated_at"] = datetime.utcnow()
         
-        if existing.data:
+        if existing_settings:
             # Update existing settings
-            result = supabase.table("seo_settings").update(settings_dict).eq("id", existing.data[0]["id"]).execute()
+            await existing_settings.update({"$set": settings_dict})
+            updated_settings = await SeoSettings.find_one()
         else:
             # Create new settings
-            settings_dict["created_at"] = datetime.utcnow().isoformat()
-            result = supabase.table("seo_settings").insert(settings_dict).execute()
+            settings_dict["created_at"] = datetime.utcnow()
+            new_settings = SeoSettings(**settings_dict)
+            updated_settings = await new_settings.insert()
         
-        return {"data": result.data[0]}
+        return {
+            "id": str(updated_settings.id),
+            "site_title": updated_settings.site_title,
+            "site_description": updated_settings.site_description,
+            "site_keywords": updated_settings.site_keywords,
+            "og_image": updated_settings.og_image,
+            "twitter_handle": updated_settings.twitter_handle,
+            "google_analytics_id": updated_settings.google_analytics_id,
+            "google_tag_manager_id": updated_settings.google_tag_manager_id,
+            "facebook_pixel_id": updated_settings.facebook_pixel_id,
+            "created_at": updated_settings.created_at,
+            "updated_at": updated_settings.updated_at
+        }
     except Exception as e:
         logger.error(f"Error updating SEO settings: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=500,
             detail="Failed to update SEO settings"
         )
 
 # Reviews Management
 @router.get("/reviews", response_model=PaginatedResponse)
-def get_reviews(
+async def get_reviews(
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100),
-    status: Optional[str] = Query(None),
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    status: Optional[str] = Query(None)
 ):
     """Get paginated list of reviews"""
     try:
-        offset = (page - 1) * limit
+        skip = (page - 1) * limit
         
-        # Build query
-        query = supabase.table("reviews").select("*", count="exact")
-        
+        # Build filter
+        filter_dict = {}
         if status and status != "all":
-            query = query.eq("status", status)
+            filter_dict["status"] = status
             
         # Get total count
-        count_result = query.execute()
-        total = count_result.count
+        total = await Review.find(filter_dict).count()
         
         # Get paginated data
-        result = query.range(offset, offset + limit - 1).order("created_at", desc=True).execute()
+        reviews = await Review.find(filter_dict).sort("-created_at").skip(skip).limit(limit).to_list()
+        
+        # Convert to response format
+        reviews_data = []
+        for review in reviews:
+            reviews_data.append({
+                "id": str(review.id),
+                "author": review.author,
+                "rating": review.rating,
+                "content": review.content,
+                "status": review.status,
+                "featured": review.featured,
+                "created_at": review.created_at,
+                "updated_at": review.updated_at
+            })
         
         return {
-            "data": result.data,
+            "data": reviews_data,
             "count": total,
             "page": page,
             "limit": limit,
@@ -430,68 +573,66 @@ def get_reviews(
         }
     except Exception as e:
         logger.error(f"Error fetching reviews: {e}")
-        # Return sample data if table doesn't exist
-        sample_reviews = [
-            {
-                "id": "1",
-                "author": "Sarah Johnson",
-                "rating": 5,
-                "content": "Amazing platform! Found my dream remote job within a week.",
-                "status": "approved",
-                "date": "2024-01-15",
-                "featured": True
-            },
-            {
-                "id": "2",
-                "author": "Mike Chen",
-                "rating": 4,
-                "content": "Great selection of remote opportunities. Highly recommended!",
-                "status": "pending",
-                "date": "2024-01-14",
-                "featured": False
-            }
-        ]
-        return {
-            "data": sample_reviews,
-            "count": len(sample_reviews),
-            "page": page,
-            "limit": limit,
-            "pages": 1
-        }
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to fetch reviews"
+        )
 
 @router.put("/reviews/{review_id}/status")
-def update_review_status(
-    review_id: str,
-    status_data: dict,
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+async def update_review_status(
+    review_id: PydanticObjectId,
+    status_data: dict
 ):
     """Update review status"""
     try:
-        # For now, return success since reviews table might not exist
-        return {"data": {"id": review_id, "status": status_data.get("status"), "message": "Review status updated successfully"}}
+        # Check if review exists
+        review = await Review.get(review_id)
+        if not review:
+            raise HTTPException(
+                status_code=404,
+                detail="Review not found"
+            )
+        
+        # Update status
+        new_status = status_data.get("status")
+        await review.update({"$set": {"status": new_status, "updated_at": datetime.utcnow()}})
+        
+        return {"data": {"id": str(review_id), "status": new_status, "message": "Review status updated successfully"}}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error updating review status: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=500,
             detail="Failed to update review status"
         )
 
 @router.put("/reviews/{review_id}/featured")
-def toggle_review_featured(
-    review_id: str,
-    featured_data: dict,
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+async def toggle_review_featured(
+    review_id: PydanticObjectId,
+    featured_data: dict
 ):
     """Toggle review featured status"""
     try:
-        # For now, return success since reviews table might not exist
-        return {"data": {"id": review_id, "featured": featured_data.get("featured"), "message": "Review featured status updated successfully"}}
+        # Check if review exists
+        review = await Review.get(review_id)
+        if not review:
+            raise HTTPException(
+                status_code=404,
+                detail="Review not found"
+            )
+        
+        # Update featured status
+        featured_status = featured_data.get("featured")
+        await review.update({"$set": {"featured": featured_status, "updated_at": datetime.utcnow()}})
+        
+        return {"data": {"id": str(review_id), "featured": featured_status, "message": "Review featured status updated successfully"}}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error updating review featured status: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=500,
             detail="Failed to update review featured status"
         )
 
@@ -500,8 +641,7 @@ def toggle_review_featured(
 def get_website_analytics(
     start_date: str = Query(...),
     end_date: str = Query(...),
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
 ):
     """Get website analytics"""
     try:
@@ -534,8 +674,7 @@ def get_website_analytics(
 # Theme Settings
 @router.get("/theme-settings")
 def get_theme_settings(
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
 ):
     """Get theme settings"""
     try:
@@ -562,8 +701,7 @@ def get_theme_settings(
 @router.put("/theme-settings")
 def update_theme_settings(
     settings_data: dict,
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
 ):
     """Update theme settings"""
     try:
@@ -582,8 +720,7 @@ def get_ads(
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100),
     status: Optional[str] = Query(None),
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
 ):
     """Get ads campaigns"""
     try:
@@ -618,8 +755,7 @@ def get_ads(
 def update_ad(
     ad_id: str,
     ad_data: dict,
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
 ):
     """Update ad campaign"""
     try:
@@ -643,8 +779,7 @@ async def upload_media_file(
     caption: Optional[str] = Form(None),
     folder: Optional[str] = Form(None),
     tags: Optional[str] = Form(None),  # Comma-separated tags
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
 ):
     """Upload a media file to the library"""
     try:
@@ -713,8 +848,7 @@ def get_media_files(
     search: Optional[str] = Query(None),
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
 ):
     """Get media files with filtering"""
     try:
@@ -784,8 +918,7 @@ def get_media_files(
 def update_media_file(
     media_id: str,
     media_data: MediaFileUpdate,
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
 ):
     """Update media file metadata"""
     try:
@@ -821,8 +954,7 @@ def update_media_file(
 @router.delete("/admin/media/{media_id}")
 def delete_media_file(
     media_id: str,
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
 ):
     """Delete media file"""
     try:
@@ -843,8 +975,7 @@ def delete_media_file(
 @router.get("/admin/carousel", response_model=List[CarouselItem])
 def get_carousel_items(
     carousel_type: Optional[str] = Query(None),
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
 ):
     """Get carousel items"""
     try:
@@ -898,8 +1029,7 @@ def get_carousel_items(
 @router.post("/admin/carousel", response_model=CarouselItem)
 def create_carousel_item(
     carousel_data: CarouselItemCreate,
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
 ):
     """Create new carousel item"""
     try:
@@ -931,8 +1061,7 @@ def create_carousel_item(
 def update_carousel_item(
     item_id: str,
     carousel_data: CarouselItemUpdate,
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
 ):
     """Update carousel item"""
     try:
@@ -963,8 +1092,7 @@ def update_carousel_item(
 @router.delete("/admin/carousel/{item_id}")
 def delete_carousel_item(
     item_id: str,
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
 ):
     """Delete carousel item"""
     try:
@@ -983,8 +1111,7 @@ def delete_carousel_item(
 
 @router.get("/admin/galleries", response_model=List[Gallery])
 def get_galleries(
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
 ):
     """Get all image galleries"""
     try:
@@ -1026,8 +1153,7 @@ def get_galleries(
 @router.post("/admin/galleries", response_model=Gallery)
 def create_gallery(
     gallery_data: GalleryCreate,
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
 ):
     """Create new image gallery"""
     try:
@@ -1055,8 +1181,7 @@ def create_gallery(
 @router.get("/admin/galleries/{gallery_id}/images", response_model=List[GalleryImage])
 def get_gallery_images(
     gallery_id: str,
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
 ):
     """Get images in a gallery"""
     try:
@@ -1103,8 +1228,7 @@ def get_gallery_images(
 def add_image_to_gallery(
     gallery_id: str,
     image_data: GalleryImageCreate,
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
 ):
     """Add image to gallery"""
     try:
@@ -1133,8 +1257,7 @@ def add_image_to_gallery(
 
 @router.get("/public/carousel/{carousel_type}", response_model=List[CarouselItem])
 def get_public_carousel(
-    carousel_type: str,
-    db: Session = Depends(get_db)
+    carousel_type: str
 ):
     """Get public carousel items by type"""
     try:
@@ -1167,8 +1290,7 @@ def get_public_carousel(
 
 @router.get("/public/galleries/{gallery_slug}", response_model=Dict[str, Any])
 def get_public_gallery(
-    gallery_slug: str,
-    db: Session = Depends(get_db)
+    gallery_slug: str
 ):
     """Get public gallery by slug"""
     try:

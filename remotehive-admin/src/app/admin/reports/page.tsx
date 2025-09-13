@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { getDashboardStats } from '@/lib/supabase';
+import { apiService } from '@/lib/api';
 import {
   Download,
   TrendingUp,
@@ -131,13 +131,14 @@ export default function ReportsPage() {
   const fetchStats = async () => {
     try {
       setLoading(true);
-      const { data, error } = await getDashboardStats();
+      const response = await apiService.get('/admin/dashboard/stats');
       
-      if (error) {
-        console.error('Error fetching stats:', error);
+      if (!response.ok) {
+        console.error('Error fetching stats:', response.statusText);
         return;
       }
       
+      const data = await response.json();
       setStats(data);
     } catch (error) {
       console.error('Error fetching stats:', error);

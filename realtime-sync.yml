@@ -1,0 +1,277 @@
+# Real-time IDE to Production Sync Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sync-config
+  namespace: remotehive
+data:
+  sync-config.yaml: |
+    sync:
+      enabled: true
+      mode: "webhook" # webhook, polling, or hybrid
+      interval: 30s
+      
+    watchers:
+      - name: "backend-api"
+        path: "/app"
+        patterns:
+          - "*.py"
+          - "*.yaml"
+          - "*.json"
+        exclude:
+          - "__pycache__"
+          - "*.pyc"
+          - ".git"
+        actions:
+          - type: "build"
+            dockerfile: "Dockerfile.backend"
+          - type: "deploy"
+            service: "backend-api"
+            
+      - name: "autoscraper"
+        path: "/autoscraper-service"
+        patterns:
+          - "*.py"
+          - "*.yaml"
+        exclude:
+          - "__pycache__"
+          - "*.pyc"
+        actions:
+          - type: "build"
+            dockerfile: "Dockerfile"
+          - type: "deploy"
+            service: "autoscraper"
+            
+      - name: "admin-panel"
+        path: "/remotehive-admin"
+        patterns:
+          - "*.tsx"
+          - "*.ts"
+          - "*.jsx"
+          - "*.js"
+          - "*.css"
+          - "*.json"
+        exclude:
+          - "node_modules"
+          - ".next"
+          - "dist"
+        actions:
+          - type: "build"
+            dockerfile: "Dockerfile.admin"
+          - type: "deploy"
+            service: "admin-panel"
+            
+      - name: "public-website"
+        path: "/remotehive-public"
+        patterns:
+          - "*.tsx"
+          - "*.ts"
+          - "*.jsx"
+          - "*.js"
+          - "*.css"
+          - "*.json"
+        exclude:
+          - "node_modules"
+          - "dist"
+        actions:
+          - type: "build"
+            dockerfile: "Dockerfile.public"
+          - type: "deploy"
+            service: "public-website"
+    
+    deployment:
+      strategy: "rolling"
+      timeout: "300s"
+      health_check:
+        enabled: true
+        endpoint: "/health"
+        timeout: "30s"
+        retries: 3
+      
+    notifications:
+      slack:
+        enabled: true
+        webhook_url: "${SLACK_WEBHOOK_URL}"
+        channel: "#dev-sync"
+      email:
+        enabled: false
+        recipients: []
+        
+    security:
+      allowed_branches:
+        - "main"
+        - "develop"
+        - "feature/*"
+      require_approval: false
+      max_deployments_per_hour: 10
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sync-service
+  namespace: remotehive
+  labels:
+    app: sync-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sync-service
+  template:
+    metadata:
+      labels:
+        app: sync-service
+    spec:
+      serviceAccountName: sync-service-sa
+      containers:
+      - name: sync-service
+        image: remotehive/sync-service:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: GITHUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: github-secrets
+              key: token
+        - name: DOCKER_REGISTRY
+          value: "ghcr.io"
+        - name: KUBERNETES_NAMESPACE
+          value: "remotehive"
+        - name: SLACK_WEBHOOK_URL
+          valueFrom:
+            secretKeyRef:
+              name: notification-secrets
+              key: slack-webhook
+        volumeMounts:
+        - name: sync-config
+          mountPath: /etc/sync
+        - name: docker-socket
+          mountPath: /var/run/docker.sock
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: sync-config
+        configMap:
+          name: sync-config
+      - name: docker-socket
+        hostPath:
+          path: /var/run/docker.sock
+          type: Socket
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sync-service
+  namespace: remotehive
+spec:
+  selector:
+    app: sync-service
+  ports:
+  - port: 8080
+    targetPort: 8080
+    name: http
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sync-service-sa
+  namespace: remotehive
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: sync-service-role
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "configmaps", "secrets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+- apiGroups: ["extensions", "networking.k8s.io"]
+  resources: ["ingresses"]
+  verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: sync-service-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: sync-service-role
+subjects:
+- kind: ServiceAccount
+  name: sync-service-sa
+  namespace: remotehive
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: github-secrets
+  namespace: remotehive
+type: Opaque
+data:
+  token: "" # Base64 encoded GitHub token
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: notification-secrets
+  namespace: remotehive
+type: Opaque
+data:
+  slack-webhook: "" # Base64 encoded Slack webhook URL
+
+---
+# Webhook receiver for GitHub/GitLab integration
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sync-webhook
+  namespace: remotehive
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /webhook
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  tls:
+  - hosts:
+    - sync.remotehive.com
+    secretName: sync-tls-secret
+  rules:
+  - host: sync.remotehive.com
+    http:
+      paths:
+      - path: /webhook
+        pathType: Prefix
+        backend:
+          service:
+            name: sync-service
+            port:
+              number: 8080

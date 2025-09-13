@@ -286,7 +286,8 @@ async def public_register(
                     "location": "Not specified"
                 }
                 logging.info(f"Creating employer profile with data: {employer_data}")
-                employer = EmployerService.create_employer(db, user.id, employer_data)
+                employer_service = EmployerService()
+                employer = await employer_service.create_employer(user.id, employer_data)
                 logging.info(f"Employer profile created successfully: {employer.id}")
                 
             elif registration_data.role == "job_seeker":
@@ -300,7 +301,8 @@ async def public_register(
                     "is_actively_looking": True
                 }
                 logging.info(f"Creating job seeker profile with data: {job_seeker_data}")
-                job_seeker = JobSeekerService.create_job_seeker(db, user.id, job_seeker_data)
+                job_seeker_service = JobSeekerService()
+                job_seeker = await job_seeker_service.create_job_seeker(user.id, job_seeker_data)
                 logging.info(f"Job seeker profile created successfully: {job_seeker.id}")
                 
         except Exception as profile_error:

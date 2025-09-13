@@ -1,4 +1,5 @@
-import { SupabaseService, TABLES, STATUS_TYPES } from './supabase';
+import { apiClient, ApiResponse, PaginatedResponse } from './base-api';
+import { API_ENDPOINTS, STATUS_TYPES, PAGINATION } from './constants';
 
 export interface JobSeeker {
   id: string;
@@ -57,8 +58,8 @@ export class JobSeekerService {
     sortOrder?: 'asc' | 'desc';
   } = {}): Promise<{ jobSeekers: JobSeeker[]; total: number }> {
     const {
-      page = 1,
-      limit = 10,
+      page = PAGINATION.DEFAULT_PAGE,
+      limit = PAGINATION.DEFAULT_LIMIT,
       status,
       experience_level,
       location,
@@ -67,104 +68,70 @@ export class JobSeekerService {
       sortOrder = 'desc'
     } = options;
 
-    const offset = (page - 1) * limit;
-    const filters: Record<string, any> = {};
+    const params: Record<string, any> = {
+      page,
+      limit,
+      sort_by: sortBy,
+      sort_order: sortOrder
+    };
 
-    if (status) filters.status = status;
-    if (experience_level) filters.experience_level = experience_level;
-    if (location) filters.location = location;
+    if (status) params.status = status;
+    if (experience_level) params.experience_level = experience_level;
+    if (location) params.location = location;
+    if (search) params.search = search;
 
-    let jobSeekers: JobSeeker[];
-
-    if (search) {
-      jobSeekers = await SupabaseService.search<JobSeeker>(
-        TABLES.JOB_SEEKERS,
-        search,
-        ['first_name', 'last_name', 'email', 'location', 'skills'],
-        {
-          select: `
-            *,
-            total_applications:applications(count),
-            successful_applications:applications(count).eq(status,hired)
-          `,
-          filters,
-          limit
-        }
+    try {
+      const response = await apiClient.get<ApiResponse<PaginatedResponse<JobSeeker>>>(
+        API_ENDPOINTS.JOB_SEEKERS.BASE,
+        { params }
       );
-    } else {
-      jobSeekers = await SupabaseService.read<JobSeeker>(
-        TABLES.JOB_SEEKERS,
-        {
-          select: `
-            *,
-            total_applications:applications(count),
-            successful_applications:applications(count).eq(status,hired)
-          `,
-          filters,
-          orderBy: { column: sortBy, ascending: sortOrder === 'asc' },
-          limit,
-          offset
-        }
-      );
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Failed to fetch job seekers');
+      }
+
+      const { data: jobSeekers, total } = response.data.data!;
+      return { jobSeekers, total };
+    } catch (error: any) {
+      console.error('Error fetching job seekers:', error);
+      throw new Error(error.message || 'Failed to fetch job seekers');
     }
-
-    const total = await SupabaseService.count(TABLES.JOB_SEEKERS, filters);
-
-    return { jobSeekers, total };
   }
 
   // Get job seeker by ID
   static async getJobSeekerById(id: string): Promise<JobSeeker> {
-    const jobSeekers = await SupabaseService.read<JobSeeker>(
-      TABLES.JOB_SEEKERS,
-      {
-        select: `
-          *,
-          total_applications:applications(count),
-          successful_applications:applications(count).eq(status,hired),
-          user:users(*)
-        `,
-        filters: { id }
+    try {
+      const response = await apiClient.get<ApiResponse<JobSeeker>>(
+        API_ENDPOINTS.JOB_SEEKERS.BY_ID(id)
+      );
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Job seeker not found');
       }
-    );
 
-    if (!jobSeekers.length) {
-      throw new Error('Job seeker not found');
+      return response.data.data!;
+    } catch (error: any) {
+      console.error('Error fetching job seeker:', error);
+      throw new Error(error.message || 'Job seeker not found');
     }
-
-    return jobSeekers[0];
   }
 
   // Get job seeker statistics
   static async getJobSeekerStats(): Promise<JobSeekerStats> {
-    const [total, active, inactive, premium] = await Promise.all([
-      SupabaseService.count(TABLES.JOB_SEEKERS),
-      SupabaseService.count(TABLES.JOB_SEEKERS, { status: STATUS_TYPES.ACTIVE }),
-      SupabaseService.count(TABLES.JOB_SEEKERS, { status: STATUS_TYPES.INACTIVE }),
-      SupabaseService.count(TABLES.JOB_SEEKERS, { is_premium: true })
-    ]);
+    try {
+      const response = await apiClient.get<ApiResponse<JobSeekerStats>>(
+        API_ENDPOINTS.JOB_SEEKERS.STATS
+      );
 
-    // Get new job seekers this month
-    const thisMonth = new Date();
-    thisMonth.setDate(1);
-    const new_this_month = await SupabaseService.count(TABLES.JOB_SEEKERS, {
-      created_at: `gte.${thisMonth.toISOString()}`
-    });
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Failed to fetch job seeker statistics');
+      }
 
-    // Get high performers (profile completion > 80% and active)
-    const high_performers = await SupabaseService.count(TABLES.JOB_SEEKERS, {
-      status: STATUS_TYPES.ACTIVE,
-      profile_completion: 'gte.80'
-    });
-
-    return {
-      total,
-      active,
-      inactive,
-      premium,
-      new_this_month,
-      high_performers
-    };
+      return response.data.data!;
+    } catch (error: any) {
+      console.error('Error fetching job seeker stats:', error);
+      throw new Error(error.message || 'Failed to fetch job seeker statistics');
+    }
   }
 
   // Update job seeker
@@ -172,153 +139,196 @@ export class JobSeekerService {
     id: string,
     data: Partial<JobSeeker>
   ): Promise<JobSeeker> {
-    return await SupabaseService.update<JobSeeker>(
-      TABLES.JOB_SEEKERS,
-      id,
-      {
-        ...data,
-        updated_at: new Date().toISOString()
+    try {
+      const response = await apiClient.put<ApiResponse<JobSeeker>>(
+        API_ENDPOINTS.JOB_SEEKERS.BY_ID(id),
+        {
+          ...data,
+          updated_at: new Date().toISOString()
+        }
+      );
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Failed to update job seeker');
       }
-    );
+
+      return response.data.data!;
+    } catch (error: any) {
+      console.error('Error updating job seeker:', error);
+      throw new Error(error.message || 'Failed to update job seeker');
+    }
   }
 
   // Toggle premium status
   static async togglePremium(id: string, isPremium: boolean): Promise<JobSeeker> {
-    return await SupabaseService.update<JobSeeker>(
-      TABLES.JOB_SEEKERS,
-      id,
-      {
-        is_premium: isPremium,
-        updated_at: new Date().toISOString()
+    try {
+      const response = await apiClient.patch<ApiResponse<JobSeeker>>(
+        `${API_ENDPOINTS.JOB_SEEKERS.BY_ID(id)}/premium`,
+        {
+          is_premium: isPremium,
+          updated_at: new Date().toISOString()
+        }
+      );
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Failed to toggle premium status');
       }
-    );
+
+      return response.data.data!;
+    } catch (error: any) {
+      console.error('Error toggling premium status:', error);
+      throw new Error(error.message || 'Failed to toggle premium status');
+    }
   }
 
   // Suspend job seeker
   static async suspendJobSeeker(id: string): Promise<JobSeeker> {
-    return await SupabaseService.update<JobSeeker>(
-      TABLES.JOB_SEEKERS,
-      id,
-      {
-        status: 'suspended',
-        updated_at: new Date().toISOString()
+    try {
+      const response = await apiClient.patch<ApiResponse<JobSeeker>>(
+        `${API_ENDPOINTS.JOB_SEEKERS.BY_ID(id)}/suspend`,
+        {
+          status: 'suspended',
+          updated_at: new Date().toISOString()
+        }
+      );
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Failed to suspend job seeker');
       }
-    );
+
+      return response.data.data!;
+    } catch (error: any) {
+      console.error('Error suspending job seeker:', error);
+      throw new Error(error.message || 'Failed to suspend job seeker');
+    }
   }
 
   // Activate job seeker
   static async activateJobSeeker(id: string): Promise<JobSeeker> {
-    return await SupabaseService.update<JobSeeker>(
-      TABLES.JOB_SEEKERS,
-      id,
-      {
-        status: STATUS_TYPES.ACTIVE,
-        updated_at: new Date().toISOString()
+    try {
+      const response = await apiClient.patch<ApiResponse<JobSeeker>>(
+        `${API_ENDPOINTS.JOB_SEEKERS.BY_ID(id)}/activate`,
+        {
+          status: STATUS_TYPES.ACTIVE,
+          updated_at: new Date().toISOString()
+        }
+      );
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Failed to activate job seeker');
       }
-    );
+
+      return response.data.data!;
+    } catch (error: any) {
+      console.error('Error activating job seeker:', error);
+      throw new Error(error.message || 'Failed to activate job seeker');
+    }
   }
 
   // Delete job seeker
   static async deleteJobSeeker(id: string): Promise<void> {
-    await SupabaseService.delete(TABLES.JOB_SEEKERS, id);
+    try {
+      const response = await apiClient.delete<ApiResponse<void>>(
+        API_ENDPOINTS.JOB_SEEKERS.BY_ID(id)
+      );
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Failed to delete job seeker');
+      }
+    } catch (error: any) {
+      console.error('Error deleting job seeker:', error);
+      throw new Error(error.message || 'Failed to delete job seeker');
+    }
   }
 
   // Get top performing job seekers
   static async getTopPerformers(limit: number = 10): Promise<JobSeeker[]> {
-    return await SupabaseService.read<JobSeeker>(
-      TABLES.JOB_SEEKERS,
-      {
-        select: `
-          *,
-          total_applications:applications(count),
-          successful_applications:applications(count).eq(status,hired)
-        `,
-        filters: { status: STATUS_TYPES.ACTIVE },
-        orderBy: { column: 'profile_completion', ascending: false },
-        limit
+    try {
+      const response = await apiClient.get<ApiResponse<JobSeeker[]>>(
+        `${API_ENDPOINTS.JOB_SEEKERS.BASE}/top-performers?limit=${limit}`
+      );
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Failed to fetch top performers');
       }
-    );
+
+      return response.data.data!;
+    } catch (error: any) {
+      console.error('Error fetching top performers:', error);
+      throw new Error(error.message || 'Failed to fetch top performers');
+    }
   }
 
   // Get job seekers by experience level
   static async getJobSeekersByExperience(): Promise<Record<string, number>> {
-    const experienceLevels = ['entry', 'mid', 'senior', 'lead', 'executive'];
-    const counts: Record<string, number> = {};
+    try {
+      const response = await apiClient.get<ApiResponse<Record<string, number>>>(
+        `${API_ENDPOINTS.JOB_SEEKERS.BASE}/by-experience`
+      );
 
-    for (const level of experienceLevels) {
-      counts[level] = await SupabaseService.count(TABLES.JOB_SEEKERS, {
-        experience_level: level,
-        status: STATUS_TYPES.ACTIVE
-      });
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Failed to fetch job seekers by experience');
+      }
+
+      return response.data.data!;
+    } catch (error: any) {
+      console.error('Error fetching job seekers by experience:', error);
+      throw new Error(error.message || 'Failed to fetch job seekers by experience');
     }
-
-    return counts;
   }
 
   // Get job seekers by location
   static async getJobSeekersByLocation(limit: number = 10): Promise<Record<string, number>> {
-    const { data, error } = await SupabaseService.read<{ location: string }>(
-      TABLES.JOB_SEEKERS,
-      {
-        select: 'location',
-        filters: { status: STATUS_TYPES.ACTIVE }
+    try {
+      const response = await apiClient.get<ApiResponse<Record<string, number>>>(
+        `${API_ENDPOINTS.JOB_SEEKERS.BASE}/by-location?limit=${limit}`
+      );
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Failed to fetch job seekers by location');
       }
-    );
 
-    if (error) throw error;
-
-    const locationCounts: Record<string, number> = {};
-    data.forEach(item => {
-      if (item.location) {
-        locationCounts[item.location] = (locationCounts[item.location] || 0) + 1;
-      }
-    });
-
-    // Sort by count and return top locations
-    const sortedLocations = Object.entries(locationCounts)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, limit)
-      .reduce((obj, [location, count]) => {
-        obj[location] = count;
-        return obj;
-      }, {} as Record<string, number>);
-
-    return sortedLocations;
+      return response.data.data!;
+    } catch (error: any) {
+      console.error('Error fetching job seekers by location:', error);
+      throw new Error(error.message || 'Failed to fetch job seekers by location');
+    }
   }
 
   // Get recent job seeker activity
   static async getRecentActivity(limit: number = 10): Promise<JobSeeker[]> {
-    return await SupabaseService.read<JobSeeker>(
-      TABLES.JOB_SEEKERS,
-      {
-        select: 'id, first_name, last_name, last_active, created_at',
-        orderBy: { column: 'last_active', ascending: false },
-        limit
+    try {
+      const response = await apiClient.get<ApiResponse<JobSeeker[]>>(
+        `${API_ENDPOINTS.JOB_SEEKERS.BASE}/recent-activity?limit=${limit}`
+      );
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Failed to fetch recent activity');
       }
-    );
+
+      return response.data.data!;
+    } catch (error: any) {
+      console.error('Error fetching recent activity:', error);
+      throw new Error(error.message || 'Failed to fetch recent activity');
+    }
   }
 
   // Search job seekers by skills
   static async searchBySkills(skills: string[]): Promise<JobSeeker[]> {
-    const { data, error } = await SupabaseService.read<JobSeeker>(
-      TABLES.JOB_SEEKERS,
-      {
-        select: '*',
-        filters: { status: STATUS_TYPES.ACTIVE }
-      }
-    );
-
-    if (error) throw error;
-
-    // Filter by skills (this would be better done with a proper full-text search)
-    const filteredJobSeekers = data.filter(jobSeeker => {
-      return skills.some(skill => 
-        jobSeeker.skills.some(js => 
-          js.toLowerCase().includes(skill.toLowerCase())
-        )
+    try {
+      const response = await apiClient.post<ApiResponse<JobSeeker[]>>(
+        `${API_ENDPOINTS.JOB_SEEKERS.BASE}/search-by-skills`,
+        { skills }
       );
-    });
 
-    return filteredJobSeekers;
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Failed to search job seekers by skills');
+      }
+
+      return response.data.data!;
+    } catch (error: any) {
+      console.error('Error searching job seekers by skills:', error);
+      throw new Error(error.message || 'Failed to search job seekers by skills');
+    }
   }
 }

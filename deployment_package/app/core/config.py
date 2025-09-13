@@ -20,12 +20,11 @@ class Settings(BaseSettings):
         "http://localhost:5173", "http://127.0.0.1:5173",
         "http://localhost:5174", "http://127.0.0.1:5174"
     ]
-    ALLOWED_HOSTS: List[str] = ["*"]
+    ALLOWED_HOSTS: str = os.getenv("ALLOWED_HOSTS", "*")
     
-    # Legacy Supabase Settings (TEMPORARILY ENABLED FOR MIGRATION)
-    SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
-    SUPABASE_ANON_KEY: str = os.getenv("SUPABASE_ANON_KEY", "")
-    SUPABASE_SERVICE_ROLE_KEY: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+    # MongoDB Settings
+    MONGODB_URL: str = os.getenv("MONGODB_URL", "mongodb://localhost:27017/remotehive")
+    MONGODB_DATABASE_NAME: str = os.getenv("MONGODB_DATABASE_NAME", "remotehive")
     
     # Database Settings
     DATABASE_URL: str = os.getenv("DATABASE_URL", "")

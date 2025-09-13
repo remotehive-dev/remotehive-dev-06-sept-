@@ -1,18 +1,16 @@
+from motor.motor_asyncio import AsyncIOMotorDatabase
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 from loguru import logger
-from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, or_
 import json
 
-from app.database.database import get_db_session as get_db
+from app.database.database import get_mongodb_session as get_db
 from app.core.auth import get_current_user, get_admin
-from app.database.services import JobSeekerService, UserService
-from app.database.models import (
-    User, JobSeeker, UserRole, JobPost, JobApplication, 
-    SavedJob as SavedJobModel, Interview as InterviewModel, 
-    AutoApplySettings as AutoApplySettingsModel
+from app.database.services import JobSeekerService, UserService, JobPostService
+from app.models.mongodb_models import (
+    User, JobSeeker, UserRole, JobPost, JobApplication
+    # SavedJob, Interview, AutoApplySettings models not available in MongoDB structure
 )
 from app.schemas.job_seeker import (
     JobSeeker as JobSeekerSchema,
@@ -37,8 +35,8 @@ router = APIRouter()
 
 @router.get("/profile", response_model=JobSeekerProfile)
 async def get_job_seeker_profile(
-    current_user: Dict[str, Any] = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Get current job seeker's profile"""
     # Check if user is a job seeker
@@ -48,8 +46,7 @@ async def get_job_seeker_profile(
             detail="Access denied. Job seeker role required."
         )
     
-    job_seeker_service = JobSeekerService(db)
-    job_seeker = job_seeker_service.get_job_seeker_by_user_id(current_user.get("id"))
+    job_seeker = await JobSeekerService.get_job_seeker_by_user_id(db, str(current_user.id))
     
     if not job_seeker:
         raise HTTPException(
@@ -88,8 +85,8 @@ async def get_job_seeker_profile(
 
 @router.get("/dashboard-stats", response_model=JobSeekerDashboardStats)
 async def get_dashboard_stats(
-    current_user: Dict[str, Any] = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Get dashboard statistics for job seeker"""
     if current_user.get("role") != "job_seeker":
@@ -100,7 +97,7 @@ async def get_dashboard_stats(
     
     try:
         # Get job seeker profile
-        job_seeker = db.query(JobSeeker).filter(JobSeeker.user_id == current_user.get("id")).first()
+        job_seeker = await JobSeekerService.get_job_seeker_by_user_id(db, str(current_user.id))
         if not job_seeker:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -108,45 +105,45 @@ async def get_dashboard_stats(
             )
         
         # Get real statistics from database
-        applications_sent = db.query(JobApplication).filter(
-            JobApplication.job_seeker_id == job_seeker.id
-        ).count()
+        applications_sent = await db.job_applications.count_documents(
+            {"job_seeker_id": job_seeker.id}
+        )
         
-        saved_jobs_count = db.query(SavedJobModel).filter(
-            SavedJobModel.job_seeker_id == job_seeker.id
-        ).count()
+        saved_jobs_count = await db.saved_jobs.count_documents(
+            {"job_seeker_id": job_seeker.id}
+        )
         
-        interview_requests = db.query(InterviewModel).filter(
-            InterviewModel.job_seeker_id == job_seeker.id
-        ).count()
+        interview_requests = await db.interviews.count_documents(
+            {"job_seeker_id": job_seeker.id}
+        )
         
         # Calculate response rate
         total_applications = applications_sent
-        responses = db.query(JobApplication).filter(
-            and_(
-                JobApplication.job_seeker_id == job_seeker.id,
-                JobApplication.status.in_(['interview_scheduled', 'offer_received', 'rejected'])
-            )
-        ).count()
+        responses = await db.job_applications.count_documents({
+            "job_seeker_id": job_seeker.id,
+            "status": {"$in": ["interview_scheduled", "offer_received", "rejected"]}
+        })
         
         response_rate = responses / total_applications if total_applications > 0 else 0.0
         
         # Get last activity (most recent application or saved job)
-        last_application = db.query(JobApplication).filter(
-            JobApplication.job_seeker_id == job_seeker.id
-        ).order_by(JobApplication.applied_at.desc()).first()
+        last_application = await db.job_applications.find_one(
+            {"job_seeker_id": job_seeker.id},
+            sort=[("applied_at", -1)]
+        )
         
-        last_saved = db.query(SavedJobModel).filter(
-            SavedJobModel.job_seeker_id == job_seeker.id
-        ).order_by(SavedJobModel.saved_at.desc()).first()
+        last_saved = await db.saved_jobs.find_one(
+            {"job_seeker_id": job_seeker.id},
+            sort=[("saved_at", -1)]
+        )
         
         last_activity = None
         if last_application and last_saved:
-            last_activity = max(last_application.applied_at, last_saved.saved_at)
+            last_activity = max(last_application["applied_at"], last_saved["saved_at"])
         elif last_application:
-            last_activity = last_application.applied_at
+            last_activity = last_application["applied_at"]
         elif last_saved:
-            last_activity = last_saved.saved_at
+            last_activity = last_saved["saved_at"]
         else:
             last_activity = datetime.now() - timedelta(days=30)
         
@@ -169,8 +166,8 @@ async def get_dashboard_stats(
 @router.get("/recommendations")
 async def get_job_recommendations(
     limit: int = Query(10, ge=1, le=50),
-    current_user: Dict[str, Any] = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Get job recommendations for job seeker"""
     if current_user.get("role") != "job_seeker":
@@ -181,7 +178,7 @@ async def get_job_recommendations(
     
     try:
         # Get job seeker profile
-        job_seeker = db.query(JobSeeker).filter(JobSeeker.user_id == current_user.get("id")).first()
+        job_seeker = await JobSeekerService.get_job_seeker_by_user_id(db, str(current_user.id))
         if not job_seeker:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -207,8 +204,8 @@ async def get_job_recommendations(
 async def get_saved_jobs(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
-    current_user: Dict[str, Any] = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Get saved jobs for the current user"""
     # Verify user is a job seeker
@@ -220,39 +217,52 @@ async def get_saved_jobs(
     
     try:
         # Get job seeker profile
-        job_seeker = db.query(JobSeeker).filter(JobSeeker.user_id == current_user.get("id")).first()
+        job_seeker = await JobSeekerService.get_job_seeker_by_user_id(db, str(current_user.id))
         if not job_seeker:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Job seeker profile not found"
             )
         
-        # Get saved jobs with job post details
-        saved_jobs_query = db.query(SavedJobModel).join(JobPost).filter(
-            SavedJobModel.job_seeker_id == job_seeker.id
-        ).order_by(SavedJobModel.saved_at.desc())
+        # Get saved jobs with job post details using aggregation
+        pipeline = [
+            {"$match": {"job_seeker_id": job_seeker.id}},
+            {"$lookup": {
+                "from": "job_posts",
+                "localField": "job_post_id",
+                "foreignField": "_id",
+                "as": "job_post"
+            }},
+            {"$unwind": "$job_post"},
+            {"$sort": {"saved_at": -1}},
+            {"$skip": skip},
+            {"$limit": limit}
+        ]
         
-        total = saved_jobs_query.count()
-        saved_jobs = saved_jobs_query.offset(skip).limit(limit).all()
+        saved_jobs_cursor = db.saved_jobs.aggregate(pipeline)
+        saved_jobs = await saved_jobs_cursor.to_list(length=limit)
+        
+        # Get total count
+        total = await db.saved_jobs.count_documents({"job_seeker_id": job_seeker.id})
         
         # Convert to response format
         saved_jobs_data = []
         for saved_job in saved_jobs:
-            job_post = saved_job.job_post
+            job_post = saved_job["job_post"]
             saved_jobs_data.append(SavedJobResponse(
-                id=saved_job.id,
-                job_post_id=saved_job.job_post_id,
-                saved_at=saved_job.saved_at,
-                notes=saved_job.notes,
+                id=str(saved_job["_id"]),
+                job_post_id=str(saved_job["job_post_id"]),
+                saved_at=saved_job["saved_at"],
+                notes=saved_job.get("notes"),
                 job_post={
-                    "id": job_post.id,
-                    "title": job_post.title,
-                    "company": job_post.company,
-                    "location": job_post.location,
-                    "salary_min": job_post.salary_min,
-                    "salary_max": job_post.salary_max,
-                    "job_type": job_post.job_type,
-                    "posted_at": job_post.posted_at
+                    "id": str(job_post["_id"]),
+                    "title": job_post["title"],
+                    "company": job_post["company"],
+                    "location": job_post["location"],
+                    "salary_min": job_post.get("salary_min"),
+                    "salary_max": job_post.get("salary_max"),
+                    "job_type": job_post["job_type"],
+                    "posted_at": job_post["posted_at"]
                 }
             ))
         
@@ -273,7 +283,7 @@ async def get_saved_jobs(
 async def save_job(
     saved_job_data: SavedJobCreate,
     current_user: Dict[str, Any] = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Save a job for the current user"""
     if current_user.get("role") != "job_seeker":
@@ -353,7 +363,7 @@ async def save_job(
 async def unsave_job(
     saved_job_id: int,
     current_user: Dict[str, Any] = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Remove a saved job"""
     if current_user.get("role") != "job_seeker":
@@ -400,7 +410,7 @@ async def unsave_job(
 @router.get("/auto-apply-settings", response_model=AutoApplySettingsResponse)
 async def get_auto_apply_settings(
     current_user: Dict[str, Any] = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Get auto-apply settings for job seeker"""
     if current_user.get("role") != "job_seeker":
@@ -464,7 +474,7 @@ async def get_auto_apply_settings(
 async def update_auto_apply_settings(
     settings_update: AutoApplySettingsUpdate,
     current_user: Dict[str, Any] = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Update auto-apply settings for job seeker"""
     if current_user.get("role") != "job_seeker":
@@ -525,7 +535,7 @@ async def update_auto_apply_settings(
 @router.get("/profile-strength")
 async def get_profile_strength(
     current_user: Dict[str, Any] = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Get profile strength analysis for job seeker"""
     if current_user.get("role") != "job_seeker":
@@ -563,7 +573,7 @@ async def get_interviews(
     limit: int = Query(20, ge=1, le=100),
     status_filter: Optional[str] = Query(None),
     current_user: Dict[str, Any] = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Get interviews for job seeker"""
     if current_user.get("role") != "job_seeker":
@@ -637,7 +647,7 @@ async def get_interviews(
 @router.get("/interviews/stats", response_model=InterviewStats)
 async def get_interview_stats(
     current_user: Dict[str, Any] = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Get interview statistics for job seeker"""
     if current_user.get("role") != "job_seeker":
@@ -700,7 +710,7 @@ async def get_interview_stats(
 async def get_career_advice(
     question: str,
     current_user: Dict[str, Any] = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Get personalized career advice using AI"""
     if current_user.get("role") != "job_seeker":
@@ -737,7 +747,7 @@ async def get_career_advice(
 async def create_job_seeker_profile(
     job_seeker_data: JobSeekerCreate,
     current_user: Dict[str, Any] = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Create job seeker profile"""
     # Check if user is a job seeker
@@ -795,7 +805,7 @@ async def create_job_seeker_profile(
 async def update_job_seeker_profile(
     job_seeker_data: JobSeekerUpdate,
     current_user: Dict[str, Any] = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Update job seeker profile"""
     # Check if user is a job seeker
@@ -856,7 +866,7 @@ async def get_job_seekers(
     skills: Optional[str] = Query(None),
     location: Optional[str] = Query(None),
     current_user: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Get list of job seekers (admin only)"""
     try:
@@ -920,7 +930,7 @@ async def get_job_seekers(
 @router.get("/stats", response_model=JobSeekerStats)
 async def get_job_seeker_stats(
     current_user: User = Depends(get_admin),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Get job seeker statistics (admin only)"""
     try:
@@ -965,7 +975,7 @@ async def get_job_seeker_stats(
 async def get_job_seeker_by_id(
     job_seeker_id: int,
     current_user: User = Depends(get_admin),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Get job seeker by ID (admin only)"""
     job_seeker_service = JobSeekerService(db)

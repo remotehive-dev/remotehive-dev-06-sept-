@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import List, Optional
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
-from sqlalchemy.orm import Session
+from beanie import PydanticObjectId
 
-from app.core.database import get_db
+from app.database.mongodb_models import ContactInformation
 from app.core.auth import get_admin
 
 router = APIRouter()
@@ -35,7 +35,7 @@ class ContactInfoUpdate(ContactInfoBase):
     pass
 
 class ContactInfoResponse(ContactInfoBase):
-    id: int
+    id: PydanticObjectId
     created_at: datetime
     updated_at: datetime
 
@@ -49,47 +49,37 @@ class ContactInfoListResponse(BaseModel):
 @router.get("/contact-info", response_model=ContactInfoListResponse)
 async def get_contact_infos(
     current_user = Depends(get_admin),
-    db: Session = Depends(get_db),
-    skip: int = 0,
-    limit: int = 100,
     category: Optional[str] = None,
-    is_active: Optional[bool] = None
+    is_active: Optional[bool] = None,
+    limit: int = Query(10, ge=1, le=100),
+    offset: int = Query(0, ge=0)
 ):
     """
     Get all contact information entries.
     Admin only endpoint.
     """
     try:
-        # Build query
-        query = supabase.table("contact_information").select("*")
-        
+        # Build query filters
+        query_filter = {}
         if category:
-            query = query.eq("category", category)
-            
+            query_filter["category"] = category
         if is_active is not None:
-            query = query.eq("is_active", is_active)
+            query_filter["is_active"] = is_active
             
-        # Get total count first
-        count_query = supabase.table("contact_information").select("id", count="exact")
-        if category:
-            count_query = count_query.eq("category", category)
-        if is_active is not None:
-            count_query = count_query.eq("is_active", is_active)
-            
-        count_result = count_query.execute()
-        total = count_result.count
+        # Get total count
+        total = await ContactInformation.find(query_filter).count()
         
         # Get paginated results
-        query = query.order("display_order", desc=False).order("created_at", desc=True)
-        query = query.range(skip, skip + limit - 1)
-        
-        result = query.execute()
-        contact_infos = result.data
+        contact_infos = await ContactInformation.find(query_filter).sort(
+            [("display_order", 1), ("-created_at", 1)]
+        ).skip(skip).limit(limit).to_list()
         
         # Convert to response format
         contact_info_list = []
-        for row in contact_infos:
-            contact_info_list.append(ContactInfoResponse(**row))
+        for contact_info in contact_infos:
+            contact_info_dict = contact_info.dict()
+            contact_info_dict["id"] = contact_info.id
+            contact_info_list.append(ContactInfoResponse(**contact_info_dict))
         
         return ContactInfoListResponse(
             contact_infos=contact_info_list,
@@ -105,7 +95,8 @@ async def get_contact_infos(
 
 @router.get("/contact-info/public", response_model=ContactInfoListResponse)
 async def get_public_contact_infos(
-    db: Session = Depends(get_db),
+    skip: int = 0,
+    limit: int = 100,
     category: Optional[str] = None
 ):
     """
@@ -113,24 +104,29 @@ async def get_public_contact_infos(
     No authentication required.
     """
     try:
-        query = supabase.table("contact_information").select("*").eq("is_active", True)
-        
+        # Build query filter for active contact info only
+        query_filter = {"is_active": True}
         if category:
-            query = query.eq("category", category)
+            query_filter["category"] = category
             
-        query = query.order("display_order", desc=False).order("created_at", desc=True)
+        # Get total count
+        total = await ContactInformation.find(query_filter).count()
         
-        result = query.execute()
-        contact_infos = result.data
+        # Get paginated results
+        contact_infos = await ContactInformation.find(query_filter).sort(
+            [("display_order", 1), ("-created_at", 1)]
+        ).skip(skip).limit(limit).to_list()
         
         # Convert to response format
         contact_info_list = []
-        for row in contact_infos:
-            contact_info_list.append(ContactInfoResponse(**row))
+        for contact_info in contact_infos:
+            contact_info_dict = contact_info.dict()
+            contact_info_dict["id"] = contact_info.id
+            contact_info_list.append(ContactInfoResponse(**contact_info_dict))
         
         return ContactInfoListResponse(
             contact_infos=contact_info_list,
-            total=len(contact_info_list)
+            total=total
         )
         
     except Exception as e:
@@ -142,24 +138,25 @@ async def get_public_contact_infos(
 
 @router.get("/contact-info/{contact_info_id}", response_model=ContactInfoResponse)
 async def get_contact_info(
-    contact_info_id: int,
-    current_user = Depends(get_admin),
-    db: Session = Depends(get_db)
+    contact_info_id: PydanticObjectId,
+    current_user = Depends(get_admin)
 ):
     """
     Get a specific contact information entry by ID.
     Admin only endpoint.
     """
     try:
-        result = supabase.table("contact_information").select("*").eq("id", contact_info_id).execute()
+        contact_info = await ContactInformation.get(contact_info_id)
         
-        if not result.data:
+        if not contact_info:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Contact information not found"
             )
         
-        return ContactInfoResponse(**result.data[0])
+        contact_info_dict = contact_info.dict()
+        contact_info_dict["id"] = contact_info.id
+        return ContactInfoResponse(**contact_info_dict)
         
     except HTTPException:
         raise
@@ -170,34 +167,31 @@ async def get_contact_info(
             detail="Failed to fetch contact information"
         )
 
-@router.post("/contact-info", response_model=ContactInfoResponse)
+@router.post("/contact-info", response_model=ContactInfoResponse, status_code=status.HTTP_201_CREATED)
 async def create_contact_info(
     contact_info: ContactInfoCreate,
-    current_user = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_user = Depends(get_admin)
 ):
     """
     Create a new contact information entry.
     Admin only endpoint.
     """
     try:
-        # If this is marked as primary, unset other primary entries in the same category
+        # Handle primary contact logic
         if contact_info.is_primary:
-            supabase.table("contact_information").update({
-                "is_primary": False
-            }).eq("category", contact_info.category).eq("is_primary", True).execute()
+            # Set all other contacts in the same category to non-primary
+            await ContactInformation.find(
+                ContactInformation.category == contact_info.category
+            ).update({"$set": {"is_primary": False}})
         
-        # Insert new contact info
-        data = contact_info.dict()
-        result = supabase.table("contact_information").insert(data).execute()
+        # Create new contact info
+        contact_data = contact_info.dict()
+        new_contact = ContactInformation(**contact_data)
+        await new_contact.insert()
         
-        if not result.data:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to create contact information"
-            )
-        
-        return ContactInfoResponse(**result.data[0])
+        contact_info_dict = new_contact.dict()
+        contact_info_dict["id"] = new_contact.id
+        return ContactInfoResponse(**contact_info_dict)
         
     except HTTPException:
         raise
@@ -210,10 +204,9 @@ async def create_contact_info(
 
 @router.put("/contact-info/{contact_info_id}", response_model=ContactInfoResponse)
 async def update_contact_info(
-    contact_info_id: int,
+    contact_info_id: PydanticObjectId,
     contact_info: ContactInfoUpdate,
-    current_user = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_user = Depends(get_admin)
 ):
     """
     Update a contact information entry.
@@ -221,30 +214,32 @@ async def update_contact_info(
     """
     try:
         # Check if contact info exists
-        check_result = supabase.table("contact_information").select("id").eq("id", contact_info_id).execute()
-        if not check_result.data:
+        existing_contact = await ContactInformation.get(contact_info_id)
+        
+        if not existing_contact:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Contact information not found"
             )
         
-        # If this is marked as primary, unset other primary entries in the same category
+        # Handle primary contact logic
         if contact_info.is_primary:
-            supabase.table("contact_information").update({
-                "is_primary": False
-            }).eq("category", contact_info.category).eq("is_primary", True).neq("id", contact_info_id).execute()
+            # Set all other contacts in the same category to non-primary (excluding current one)
+            await ContactInformation.find(
+                ContactInformation.category == contact_info.category,
+                ContactInformation.id != contact_info_id
+            ).update({"$set": {"is_primary": False}})
         
         # Update contact info
-        data = contact_info.dict()
-        result = supabase.table("contact_information").update(data).eq("id", contact_info_id).execute()
+        update_data = contact_info.dict(exclude_unset=True)
+        await existing_contact.update({"$set": update_data})
         
-        if not result.data:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to update contact information"
-            )
+        # Fetch updated contact
+        updated_contact = await ContactInformation.get(contact_info_id)
         
-        return ContactInfoResponse(**result.data[0])
+        contact_info_dict = updated_contact.dict()
+        contact_info_dict["id"] = updated_contact.id
+        return ContactInfoResponse(**contact_info_dict)
         
     except HTTPException:
         raise
@@ -257,9 +252,8 @@ async def update_contact_info(
 
 @router.delete("/contact-info/{contact_info_id}")
 async def delete_contact_info(
-    contact_info_id: int,
-    current_user = Depends(get_admin),
-    db: Session = Depends(get_db)
+    contact_info_id: PydanticObjectId,
+    current_user = Depends(get_admin)
 ):
     """
     Delete a contact information entry.
@@ -267,15 +261,16 @@ async def delete_contact_info(
     """
     try:
         # Check if contact info exists
-        check_result = supabase.table("contact_information").select("id").eq("id", contact_info_id).execute()
-        if not check_result.data:
+        existing_contact = await ContactInformation.get(contact_info_id)
+        
+        if not existing_contact:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Contact information not found"
             )
         
         # Delete contact info
-        result = supabase.table("contact_information").delete().eq("id", contact_info_id).execute()
+        await existing_contact.delete()
         
         return {"message": "Contact information deleted successfully"}
         

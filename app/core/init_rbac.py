@@ -4,7 +4,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from app.database.database import get_db_session, get_database_manager
-from app.database.models import User, UserRole, Base
+# TODO: MongoDB Migration - Update imports to use MongoDB models
+# from app.database.models import User, UserRole, Base
+from app.models.mongodb_models import User, UserRole, Base
 from app.core.local_auth import get_password_hash
 from app.core.rbac import RolePermission, UserSession, LoginAttempt, Permission
 

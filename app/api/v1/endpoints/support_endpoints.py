@@ -2,7 +2,8 @@ from fastapi import APIRouter, HTTPException, Depends, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel, EmailStr
 from app.core.database import get_db
-from app.database.models import User, EmailLog
+# from app.database.models import User, EmailLog  # Using MongoDB models instead
+from app.models.mongodb_models import User
 from app.core.local_auth import get_current_user
 from app.tasks.email import send_support_email_task
 from datetime import datetime

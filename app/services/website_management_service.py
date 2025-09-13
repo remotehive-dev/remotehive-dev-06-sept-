@@ -10,7 +10,7 @@ import re
 import asyncio
 from urllib.parse import urlparse
 
-from app.database.models import ManagedWebsite, MemoryUpload
+# from app.models.mongodb_models import ManagedWebsite, MemoryUpload  # Models not available in MongoDB structure
 from app.schemas.website_management import (
     WebsiteUploadResponse, WebsiteUploadStatus, WebsiteValidationResult, WebsiteConfig
 )

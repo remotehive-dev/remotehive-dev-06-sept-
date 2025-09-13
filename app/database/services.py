@@ -4,9 +4,9 @@ import json
 import logging
 import uuid
 from datetime import datetime
-from bson import ObjectId
+# from bson import ObjectId  # Removed to fix Pydantic schema generation
 
-from .models import User, JobSeeker, Employer, JobPost, JobApplication, JobCategory, SystemSettings, AdminLog, ScraperConfig, ScraperLog, ScraperMemory
+from .mongodb_models import User, JobSeeker, Employer, JobPost, JobApplication, ScraperConfig, ScraperLog
 from ..core.password_utils import get_password_hash, verify_password
 
 logger = logging.getLogger(__name__)
@@ -426,7 +426,7 @@ class SystemService:
     
     @staticmethod
     async def set_setting(db: AsyncIOMotorDatabase, key: str, value: str, description: str = None, 
-                   data_type: str = 'string', is_public: bool = False) -> SystemSettings:
+                   data_type: str = 'string', is_public: bool = False) -> Dict[str, Any]:
         """Set system setting."""
         setting_data = await db.system_settings.find_one({"key": key})
         
@@ -445,7 +445,7 @@ class SystemService:
                 {"$set": update_data}
             )
             updated_data = await db.system_settings.find_one({"key": key})
-            return SystemSettings(**updated_data)
+            return updated_data
         else:
             setting_dict = {
                 "key": key,
@@ -454,11 +454,9 @@ class SystemService:
                 "data_type": data_type,
                 "is_public": is_public
             }
-            setting = SystemSettings(**setting_dict)
-            setting_dict = setting.dict()
             result = await db.system_settings.insert_one(setting_dict)
             setting_dict["_id"] = result.inserted_id
-            return SystemSettings(**setting_dict)
+            return setting_dict
     
     @staticmethod
     async def log_admin_action(db: AsyncIOMotorDatabase, admin_user_id: str, action: str, 
@@ -476,8 +474,8 @@ class SystemService:
             "ip_address": ip_address,
             "user_agent": user_agent
         }
-        log_entry = AdminLog(**log_entry_dict)
-        log_entry_dict = log_entry.dict()
+        # log_entry = AdminLog(**log_entry_dict)
+        # log_entry_dict = log_entry.dict()
         await db.admin_logs.insert_one(log_entry_dict)
 
 class ScraperConfigService:
@@ -564,32 +562,30 @@ class ScraperMemoryService:
     def __init__(self, db: AsyncIOMotorDatabase):
         self.db = db
 
-    async def get_memory(self, memory_id: int) -> Optional[ScraperMemory]:
+    async def get_memory(self, memory_id: int) -> Optional[Dict[str, Any]]:
         memory_data = await self.db.scraper_memories.find_one({"id": memory_id})
-        return ScraperMemory(**memory_data) if memory_data else None
+        return memory_data if memory_data else None
 
-    async def get_memory_by_name(self, name: str) -> Optional[ScraperMemory]:
+    async def get_memory_by_name(self, name: str) -> Optional[Dict[str, Any]]:
         memory_data = await self.db.scraper_memories.find_one({"name": name})
-        return ScraperMemory(**memory_data) if memory_data else None
+        return memory_data if memory_data else None
 
-    async def get_all_memories(self) -> List[ScraperMemory]:
+    async def get_all_memories(self) -> List[Dict[str, Any]]:
         cursor = self.db.scraper_memories.find({})
         memories_data = await cursor.to_list(length=None)
-        return [ScraperMemory(**memory_data) for memory_data in memories_data]
+        return memories_data
 
-    async def get_active_memories(self) -> List[ScraperMemory]:
+    async def get_active_memories(self) -> List[Dict[str, Any]]:
         cursor = self.db.scraper_memories.find({"is_active": True})
         memories_data = await cursor.to_list(length=None)
-        return [ScraperMemory(**memory_data) for memory_data in memories_data]
+        return memories_data
 
-    async def create_memory(self, memory_data: dict) -> ScraperMemory:
-        memory = ScraperMemory(**memory_data)
-        memory_dict = memory.dict()
-        result = await self.db.scraper_memories.insert_one(memory_dict)
-        memory_dict["_id"] = result.inserted_id
-        return ScraperMemory(**memory_dict)
+    async def create_memory(self, memory_data: dict) -> Dict[str, Any]:
+        result = await self.db.scraper_memories.insert_one(memory_data)
+        memory_data["_id"] = result.inserted_id
+        return memory_data
 
-    async def update_memory(self, memory_id: int, memory_data: dict) -> Optional[ScraperMemory]:
+    async def update_memory(self, memory_id: int, memory_data: dict) -> Optional[Dict[str, Any]]:
         memory_data["updated_at"] = datetime.utcnow()
         result = await self.db.scraper_memories.update_one(
             {"id": memory_id},
@@ -597,14 +593,14 @@ class ScraperMemoryService:
         )
         if result.modified_count > 0:
             updated_data = await self.db.scraper_memories.find_one({"id": memory_id})
-            return ScraperMemory(**updated_data) if updated_data else None
+            return updated_data if updated_data else None
         return None
 
     async def delete_memory(self, memory_id: int) -> bool:
         result = await self.db.scraper_memories.delete_one({"id": memory_id})
         return result.deleted_count > 0
 
-    async def increment_usage(self, memory_id: int) -> Optional[ScraperMemory]:
+    async def increment_usage(self, memory_id: int) -> Optional[Dict[str, Any]]:
         result = await self.db.scraper_memories.update_one(
             {"id": memory_id},
             {
@@ -614,5 +610,5 @@ class ScraperMemoryService:
         )
         if result.modified_count > 0:
             updated_data = await self.db.scraper_memories.find_one({"id": memory_id})
-            return ScraperMemory(**updated_data) if updated_data else None
+            return updated_data if updated_data else None
         return None

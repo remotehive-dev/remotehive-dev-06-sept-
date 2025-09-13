@@ -10,7 +10,7 @@ from app.core.database import get_db
 from app.models.ml_parsing_config import MLParsingConfig
 from app.models.scraper_config import ScraperConfig
 from app.models.analytics_metrics import AnalyticsMetrics
-from bson import ObjectId
+# from bson import ObjectId  # Removed to fix Pydantic schema generation
 from core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -160,7 +160,7 @@ class MLConfigurationService:
         try:
             # Validate scraper config exists
             scraper_config = await db.scraper_configs.find_one(
-                {"_id": ObjectId(scraper_config_id)}
+                {"_id": scraper_config_id}
             )
             
             if not scraper_config:
@@ -225,7 +225,7 @@ class MLConfigurationService:
         """Update existing ML parsing configuration"""
         try:
             ml_config = await db.ml_parsing_configs.find_one(
-                {"_id": ObjectId(config_id)}
+                {"_id": config_id}
             )
             
             if not ml_config:
@@ -239,13 +239,13 @@ class MLConfigurationService:
             update_data["updated_at"] = datetime.utcnow()
             
             await db.ml_parsing_configs.update_one(
-                {"_id": ObjectId(config_id)},
+                {"_id": config_id},
                 {"$set": update_data}
             )
             
             # Get updated document
             updated_config = await db.ml_parsing_configs.find_one(
-                {"_id": ObjectId(config_id)}
+                {"_id": config_id}
             )
             
             # Log configuration update
@@ -420,7 +420,7 @@ class MLConfigurationService:
         """Test ML configuration with sample data"""
         try:
             ml_config = await db.ml_parsing_configs.find_one(
-                {"_id": ObjectId(config_id)}
+                {"_id": config_id}
             )
             
             if not ml_config:
@@ -511,7 +511,7 @@ class MLConfigurationService:
             
             # Get ML parsing config first
             ml_config = await db.ml_parsing_configs.find_one(
-                {"_id": ObjectId(config_id)}
+                {"_id": config_id}
             )
             
             if not ml_config:
@@ -567,7 +567,7 @@ class MLConfigurationService:
         """Clone ML configuration to another scraper"""
         try:
             source_config = await db.ml_parsing_configs.find_one(
-                {"_id": ObjectId(source_config_id)}
+                {"_id": source_config_id}
             )
             
             if not source_config:
@@ -627,7 +627,7 @@ class MLConfigurationService:
         try:
             # Get scraper config ID
             ml_config = await db.ml_parsing_configs.find_one(
-                {"_id": ObjectId(config_id)}
+                {"_id": config_id}
             )
             
             if ml_config:

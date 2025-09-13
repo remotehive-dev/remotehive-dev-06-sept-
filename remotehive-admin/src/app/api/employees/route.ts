@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase';
+import { apiClient } from '@/lib/api';
 
 export async function GET(request: NextRequest) {
   try {
@@ -7,36 +7,30 @@ export async function GET(request: NextRequest) {
     const includeRoles = searchParams.get('include_roles')?.split(',') || ['admin', 'super_admin'];
     const active_only = searchParams.get('active_only') !== 'false'; // default to true
 
-    const supabaseAdmin = createAdminClient();
-    
-    let query = supabaseAdmin
-      .from('users')
-      .select(`
-        id,
-        email,
-        full_name,
-        role,
-        is_active,
-        created_at,
-        last_login
-      `)
-      .in('role', includeRoles)
-      .order('full_name', { ascending: true });
+    // Build filters for FastAPI
+    const filters: any = {
+      role: { $in: includeRoles }
+    };
 
     // Filter by active status if requested
     if (active_only) {
-      query = query.eq('is_active', true);
+      filters.is_active = true;
     }
 
-    const { data, error } = await query;
+    const response = await apiClient.getItems('users', {
+      filters,
+      sort: { full_name: 1 }
+    });
 
-    if (error) {
-      console.error('Error fetching employees:', error);
+    if (response.error) {
+      console.error('Error fetching employees:', response.error);
       return NextResponse.json(
         { error: 'Failed to fetch employees' },
         { status: 500 }
       );
     }
+
+    const data = response.data || [];
 
     // Transform data to include display information
     const employees = data?.map(user => ({
@@ -87,72 +81,53 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabaseAdmin = createAdminClient();
-
     // Check if user already exists
-    const { data: existingUser } = await supabaseAdmin
-      .from('users')
-      .select('id')
-      .eq('email', email)
-      .single();
+    const existingResponse = await apiClient.getItems('users', {
+      filters: { email },
+      limit: 1
+    });
 
-    if (existingUser) {
+    if (existingResponse.error) {
+      console.error('Error checking existing user:', existingResponse.error);
+      return NextResponse.json(
+        { error: 'Failed to check existing user' },
+        { status: 500 }
+      );
+    }
+
+    if (existingResponse.data && existingResponse.data.length > 0) {
       return NextResponse.json(
         { error: 'User with this email already exists' },
         { status: 409 }
       );
     }
 
-    // Create user in auth system
-    const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
+    // Create user record in database
+    const userResponse = await apiClient.createItem('users', {
       email,
+      full_name,
+      role,
+      is_active: true,
       password: password || generateRandomPassword(),
-      email_confirm: true,
-      user_metadata: {
-        full_name,
-        role
-      }
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     });
 
-    if (authError) {
-      console.error('Error creating auth user:', authError);
-      return NextResponse.json(
-        { error: 'Failed to create user account' },
-        { status: 500 }
-      );
-    }
-
-    // Create user record in database
-    const { data: dbUser, error: dbError } = await supabaseAdmin
-      .from('users')
-      .insert({
-        id: authUser.user.id,
-        email,
-        full_name,
-        role,
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
-      .select()
-      .single();
-
-    if (dbError) {
-      console.error('Error creating database user:', dbError);
-      // Try to clean up auth user
-      await supabaseAdmin.auth.admin.deleteUser(authUser.user.id);
+    if (userResponse.error) {
+      console.error('Error creating user:', userResponse.error);
       return NextResponse.json(
         { error: 'Failed to create user record' },
         { status: 500 }
       );
     }
 
+    const dbUser = userResponse.data;
+
     // Send invitation email if requested
     if (send_invitation && !password) {
       try {
-        await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-          redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/login`
-        });
+        // Note: Email invitation functionality would need to be implemented in the backend
+        console.log(`Invitation email should be sent to: ${email}`);
       } catch (inviteError) {
         console.error('Error sending invitation:', inviteError);
         // Don't fail the request if invitation fails
@@ -160,15 +135,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Create notification for new employee
-    await supabaseAdmin
-      .from('notifications')
-      .insert({
-        message: `New ${role} user created: ${full_name}`,
-        type: 'system',
-        data: { user_id: dbUser.id, action: 'user_created' },
-        created_at: new Date().toISOString(),
-        read: false
-      });
+    await apiClient.createItem('notifications', {
+      message: `New ${role} user created: ${full_name}`,
+      type: 'system',
+      data: { user_id: dbUser.id, action: 'user_created' },
+      created_at: new Date().toISOString(),
+      read: false
+    });
 
     const responseData = {
       id: dbUser.id,

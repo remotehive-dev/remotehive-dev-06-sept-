@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase';
+import { apiService } from '@/lib/api';
 
 /**
  * This API endpoint is called when a new user registers on the public website
@@ -24,8 +24,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabaseAdmin = createAdminClient();
-
     // Create notification message based on role
     const notificationTitle = role === 'employer' 
       ? 'New Employer Registration'
@@ -35,41 +33,37 @@ export async function POST(request: NextRequest) {
       ? `New employer ${full_name} has registered and is now available in the system`
       : `New job seeker ${full_name} has registered and is now available in the system`;
 
-    // Create notification for admin users
-    const { data: notification, error: notificationError } = await supabaseAdmin
-      .from('notifications')
-      .insert({
-        title: notificationTitle,
-        message: notificationMessage,
-        type: 'new_user_registration',
-        priority: role === 'employer' ? 'high' : 'medium',
-        data: {
-          user_id,
-          email,
-          full_name,
-          role,
-          registration_source,
-          action_url: `/admin/users?search=${email}`
-        },
-        created_at: new Date().toISOString(),
-        read: false,
-        target_audience: 'admin' // This notification is for admin users
-      })
-      .select()
-      .single();
+    // Create notification for admin users via FastAPI backend
+    const notificationData = {
+      title: notificationTitle,
+      message: notificationMessage,
+      type: 'new_user_registration',
+      priority: role === 'employer' ? 'high' : 'medium',
+      data: {
+        user_id,
+        email,
+        full_name,
+        role,
+        registration_source,
+        action_url: `/admin/users?search=${email}`
+      },
+      read: false,
+      target_audience: 'admin'
+    };
 
-    if (notificationError) {
-      console.error('Error creating notification:', notificationError);
+    const notification = await apiService.post('/admin/notifications', notificationData);
+
+    if (!notification) {
+      console.error('Error creating notification');
       return NextResponse.json(
         { error: 'Failed to create notification' },
         { status: 500 }
       );
     }
 
-    // Log the notification creation for analytics
-    const { error: analyticsError } = await supabaseAdmin
-      .from('admin_activity_logs')
-      .insert({
+    // Log the notification creation for analytics via FastAPI backend
+    try {
+      await apiService.post('/admin/activity-logs', {
         action: 'notification_created',
         target_table: 'notifications',
         target_id: notification.id,
@@ -77,41 +71,11 @@ export async function POST(request: NextRequest) {
           type: 'new_user_registration',
           user_role: role,
           source: registration_source
-        },
-        created_at: new Date().toISOString()
-      });
-
-    if (analyticsError) {
-      console.error('Error logging analytics:', analyticsError);
-      // Don't fail the request if analytics logging fails
-    }
-
-    // Broadcast real-time notification to admin panel users
-    // This will be picked up by any admin users currently online
-    const { error: broadcastError } = await supabaseAdmin
-      .channel('admin-notifications')
-      .send({
-        type: 'broadcast',
-        event: 'new_user_registration',
-        payload: {
-          notification_id: notification.id,
-          title: notificationTitle,
-          message: notificationMessage,
-          type: 'new_user_registration',
-          priority: role === 'employer' ? 'high' : 'medium',
-          user_data: {
-            user_id,
-            email,
-            full_name,
-            role
-          },
-          timestamp: new Date().toISOString()
         }
       });
-
-    if (broadcastError) {
-      console.error('Error broadcasting notification:', broadcastError);
-      // Don't fail the request if broadcast fails
+    } catch (analyticsError) {
+      console.error('Error logging analytics:', analyticsError);
+      // Don't fail the request if analytics logging fails
     }
 
     return NextResponse.json({
@@ -119,8 +83,7 @@ export async function POST(request: NextRequest) {
       data: {
         notification_id: notification.id,
         type: 'new_user_registration',
-        role: role,
-        broadcast_sent: !broadcastError
+        role: role
       }
     }, { status: 201 });
 

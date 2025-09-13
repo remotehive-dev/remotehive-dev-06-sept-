@@ -9,7 +9,9 @@ from collections import defaultdict, Counter
 
 try:
     from app.database.database import get_db_session
-    from app.database.models import AnalyticsMetrics, ScraperConfig, ScraperLog
+    # TODO: MongoDB Migration - Update imports to use MongoDB models
+    # from app.database.models import AnalyticsMetrics, ScraperConfig, ScraperLog
+    from app.models.mongodb_models import AnalyticsMetrics, ScraperConfig, ScraperLog
 except ImportError:
     # Fallback for testing
     get_db_session = None

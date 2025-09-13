@@ -2,7 +2,10 @@ from celery import current_app as celery_app
 from app.core.database import get_db
 from app.database.services import JobPostService, JobApplicationService, UserService
 from app.database.database import get_database_manager
-from app.database.models import ScraperConfig, ScraperLog, ScraperMemory, JobPost, JobApplication
+# from app.database.models import ScraperConfig, ScraperLog, ScraperMemory, JobPost, JobApplication
+from app.models.mongodb_models import JobPost, JobApplication
+from app.database.mongodb_models import ScraperConfig, ScraperLog
+# Note: ScraperMemory needs to be implemented in MongoDB models if needed
 from datetime import datetime, timedelta
 import logging
 from typing import List, Dict, Any

@@ -161,6 +161,37 @@ class Review(Document):
         ]
 
 
+class CMSPage(Document):
+    """CMS Page document model"""
+    title: str
+    slug: Indexed(str, unique=True)
+    content: Optional[str] = None
+    meta_title: Optional[str] = None
+    meta_description: Optional[str] = None
+    meta_keywords: Optional[str] = None
+    featured_image: Optional[str] = None
+    status: str = "draft"
+    publish_date: Optional[datetime] = None
+    is_homepage: bool = False
+    template: str = "default"
+    custom_css: Optional[str] = None
+    custom_js: Optional[str] = None
+    created_by: Optional[str] = None
+    updated_by: Optional[str] = None
+    views: int = 0
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    class Settings:
+        name = "cms_pages"
+        indexes = [
+            "slug",
+            "status",
+            "is_homepage",
+            "created_at"
+        ]
+
+
 class Ad(Document):
     """Advertisement document model"""
     name: str
@@ -470,4 +501,127 @@ class EmailVerificationToken(Document):
             "user_id",
             "token",
             "expires_at"
+        ]
+
+
+class SystemSettings(Document):
+    """System settings document model"""
+    key: Indexed(str, unique=True)
+    value: Optional[str] = None
+    description: Optional[str] = None
+    category: str = "general"
+    is_public: bool = False
+    data_type: str = "string"  # string, number, boolean, json
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    class Settings:
+        name = "system_settings"
+        indexes = [
+            "key",
+            "category",
+            "is_public"
+        ]
+
+
+class Announcement(Document):
+    """Announcement document model"""
+    title: str
+    content: str
+    type: str = "info"  # info, warning, success, error
+    priority: str = "normal"  # low, normal, high, urgent
+    target_audience: str = "all"  # all, admins, users, employers, job_seekers
+    is_active: bool = True
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    created_by: str  # Reference to User document
+    updated_by: Optional[str] = None
+    views_count: int = 0
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    class Settings:
+        name = "announcements"
+        indexes = [
+            "is_active",
+            "target_audience",
+            "priority",
+            "created_at"
+        ]
+
+
+class AdminLog(Document):
+    """Admin log document model"""
+    admin_id: str  # Reference to User document
+    action: str
+    resource_type: Optional[str] = None
+    resource_id: Optional[str] = None
+    details: Optional[Dict[str, Any]] = None
+    ip_address: Optional[str] = None
+    user_agent: Optional[str] = None
+    status: str = "success"  # success, failed, warning
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    class Settings:
+        name = "admin_logs"
+        indexes = [
+            "admin_id",
+            "action",
+            "resource_type",
+            "status",
+            "created_at"
+        ]
+
+
+class Notification(Document):
+    """Notification document model"""
+    user_id: str  # Reference to User document
+    title: str
+    message: str
+    type: str = "info"  # info, warning, success, error
+    category: str = "general"  # general, job_alert, application, system
+    is_read: bool = False
+    is_archived: bool = False
+    action_url: Optional[str] = None
+    action_text: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+    expires_at: Optional[datetime] = None
+    read_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    class Settings:
+        name = "notifications"
+        indexes = [
+            "user_id",
+            "is_read",
+            "is_archived",
+            "type",
+            "category",
+            "created_at"
+        ]
+
+
+class NotificationPreference(Document):
+    """Notification preference document model"""
+    user_id: Indexed(str, unique=True)  # Reference to User document
+    email_notifications: bool = True
+    push_notifications: bool = True
+    sms_notifications: bool = False
+    job_alerts: bool = True
+    application_updates: bool = True
+    system_announcements: bool = True
+    marketing_emails: bool = False
+    weekly_digest: bool = True
+    frequency: str = "immediate"  # immediate, daily, weekly
+    quiet_hours_start: Optional[str] = None  # HH:MM format
+    quiet_hours_end: Optional[str] = None  # HH:MM format
+    timezone: str = "UTC"
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    class Settings:
+        name = "notification_preferences"
+        indexes = [
+            "user_id"
         ]

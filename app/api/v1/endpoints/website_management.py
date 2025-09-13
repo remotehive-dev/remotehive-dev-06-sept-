@@ -9,7 +9,7 @@ import io
 from datetime import datetime
 
 from app.core.deps import get_db, get_current_user
-from app.database.models import User
+from app.models.mongodb_models import User
 from app.services.website_management_service import WebsiteManagementService
 from app.services.website_template_service import WebsiteTemplateService
 from app.schemas.website_management import (

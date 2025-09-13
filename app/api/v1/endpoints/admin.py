@@ -1,15 +1,18 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import Dict, Any, List, Optional
 from loguru import logger
-from sqlalchemy.orm import Session
+from beanie import PydanticObjectId
+# from app.models.mongodb_models import SystemSetting, Announcement, AdminLog  # These models don't exist yet
 from datetime import datetime, timedelta
-
-from app.core.database import get_db
 from app.services.admin_service import AdminService
 from app.core.auth import get_current_active_user, get_admin, get_super_admin, require_roles
 from app.database.services import JobPostService, EmployerService
-from app.database.models import User, JobPost, JobApplication, AdminLog
+from app.models.mongodb_models import User, JobPost, JobApplication
+from app.database.database import get_mongodb_session as get_db
+from motor.motor_asyncio import AsyncIOMotorDatabase
+# AdminLog model not available in MongoDB structure
 import re
+# Supabase removed - using MongoDB only
 from app.schemas.admin import (
     DashboardStats, AdminLog, AdminLogCreate, SystemSetting, SystemSettingUpdate,
     UserSuspensionCreate, UserSuspension, AnnouncementCreate, Announcement,
@@ -33,7 +36,7 @@ router.include_router(autoscraper_endpoints.router, prefix="/autoscraper", tags=
 @router.get("/dashboard", response_model=DashboardStats)
 async def get_admin_dashboard(
     current_user: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Get admin dashboard statistics"""
     try:
@@ -58,7 +61,7 @@ async def get_admin_dashboard(
 @router.get("/system-health", response_model=SystemHealthCheck)
 async def get_system_health(
     current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Get system health status"""
     try:
@@ -81,35 +84,15 @@ async def get_users(
     role: Optional[str] = Query(None),
     user_status: Optional[str] = Query(None),
     current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Get paginated list of users with filtering"""
     try:
-        offset = (page - 1) * limit
-        
-        # Build query
-        query = supabase.table("users").select("*", count="exact")
-        
-        if search:
-            query = query.or_(f"email.ilike.%{search}%,full_name.ilike.%{search}%")
-        if role:
-            query = query.eq("role", role)
-        if user_status:
-            query = query.eq("is_active", user_status == "active")
-            
-        # Get total count
-        count_result = await query.execute()
-        total = count_result.count
-        
-        # Get paginated data
-        result = await query.range(offset, offset + limit - 1).execute()
-        
-        return PaginatedResponse(
-            items=result.data,
-            total=total,
-            page=page,
-            limit=limit,
-            pages=(total + limit - 1) // limit
+        # TODO: Implement MongoDB user query using User model
+        # Replace with: User.find() with appropriate filters
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="User management with MongoDB not yet implemented"
         )
     except Exception as e:
         logger.error(f"Error fetching users: {e}")
@@ -122,17 +105,15 @@ async def get_users(
 async def get_user_by_id(
     user_id: str,
     current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Get user details by ID"""
     try:
-        result = await supabase.table("users").select("*").eq("id", user_id).execute()
-        if not result.data:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found"
-            )
-        return result.data[0]
+        # TODO: Implement MongoDB user query using User.get(user_id)
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="User management with MongoDB not yet implemented"
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -142,42 +123,21 @@ async def get_user_by_id(
             detail="Failed to fetch user"
         )
 
-@router.put("/users/{user_id}", response_model=User)
+@router.put("/users/{user_id}")
 async def update_user(
     user_id: str,
     user_update: UserUpdate,
     current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
-    """Update user details"""
+    """Update user information"""
     try:
-        # Check if user exists
-        user_result = await supabase.table("users").select("*").eq("id", user_id).execute()
-        if not user_result.data:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found"
-            )
-        
-        # Update user
-        update_data = user_update.dict(exclude_unset=True)
-        update_data["updated_at"] = datetime.utcnow().isoformat()
-        
-        result = await supabase.table("users").update(update_data).eq("id", user_id).execute()
-        
-        # Log admin action
-        admin_service = AdminService(db)
-        await admin_service.log_admin_action(
-            admin_user_id=current_admin["id"],
-            log_data=AdminLogCreate(
-                action="user_update",
-                target_table="users",
-                target_id=user_id,
-                notes=f"Updated user {user_id}: {list(update_data.keys())}"
-            )
+        # TODO: Implement MongoDB user update using User.get(user_id) and save()
+        # TODO: Add admin action logging with MongoDB
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="User management with MongoDB not yet implemented"
         )
-        
-        return result.data[0]
     except HTTPException:
         raise
     except Exception as e:
@@ -192,7 +152,7 @@ async def suspend_user(
     user_id: str,
     suspension_data: UserSuspensionCreate,
     current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Suspend a user account"""
     try:
@@ -212,7 +172,7 @@ async def suspend_user(
 async def unsuspend_user(
     user_id: str,
     current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Unsuspend a user account"""
     try:
@@ -230,7 +190,7 @@ async def unsuspend_user(
 async def bulk_user_action(
     bulk_request: BulkActionRequest,
     current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Perform bulk actions on users"""
     try:
@@ -247,15 +207,16 @@ async def bulk_user_action(
         )
 
 # System Settings Endpoints
-@router.get("/settings", response_model=List[SystemSetting])
+@router.get("/settings")
 async def get_system_settings(
     current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Get all system settings"""
     try:
-        result = await supabase.table("system_settings").select("*").execute()
-        return result.data
+        # TODO: Implement MongoDB query using SystemSetting.find_all()
+        settings = await SystemSetting.find_all().to_list()
+        return [setting.dict() for setting in settings]
     except Exception as e:
         logger.error(f"Error fetching system settings: {e}")
         raise HTTPException(
@@ -263,44 +224,21 @@ async def get_system_settings(
             detail="Failed to fetch system settings"
         )
 
-@router.put("/settings/{setting_key}", response_model=SystemSetting)
+@router.put("/settings/{setting_key}")
 async def update_system_setting(
     setting_key: str,
     setting_update: SystemSettingUpdate,
     current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Update a system setting"""
     try:
-        # Check if setting exists
-        setting_result = await supabase.table("system_settings").select("*").eq("key", setting_key).execute()
-        if not setting_result.data:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Setting not found"
-            )
-        
-        # Update setting
-        update_data = {
-            "value": setting_update.value,
-            "updated_at": datetime.utcnow().isoformat()
-        }
-        
-        result = await supabase.table("system_settings").update(update_data).eq("key", setting_key).execute()
-        
-        # Log admin action
-        admin_service = AdminService(db)
-        await admin_service.log_admin_action(
-            admin_user_id=current_admin["id"],
-            log_data=AdminLogCreate(
-                action="setting_update",
-                target_table="system_settings",
-                target_id=setting_key,
-                notes=f"Updated setting {setting_key} to {setting_update.value}"
-            )
+        # TODO: Implement MongoDB update using SystemSetting.find_one({"key": setting_key})
+        # TODO: Add admin action logging with MongoDB
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="System settings with MongoDB not yet implemented"
         )
-        
-        return result.data[0]
     except HTTPException:
         raise
     except Exception as e:
@@ -311,22 +249,26 @@ async def update_system_setting(
         )
 
 # Announcements Endpoints
-@router.get("/announcements", response_model=List[Announcement])
+@router.get("/announcements")
 async def get_announcements(
     active_only: bool = Query(False),
     current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Get announcements"""
     try:
-        query = supabase.table("announcements").select("*").order("created_at", desc=True)
-        
+        # TODO: Implement MongoDB query using Announcement.find().sort("-created_at")
         if active_only:
-            now = datetime.utcnow().isoformat()
-            query = query.eq("is_active", True).lte("start_date", now).gte("end_date", now)
-            
-        result = await query.execute()
-        return result.data
+            now = datetime.utcnow()
+            announcements = await Announcement.find(
+                Announcement.is_active == True,
+                Announcement.start_date <= now,
+                Announcement.end_date >= now
+            ).sort("-created_at").to_list()
+        else:
+            announcements = await Announcement.find_all().sort("-created_at").to_list()
+        
+        return [announcement.dict() for announcement in announcements]
     except Exception as e:
         logger.error(f"Error fetching announcements: {e}")
         raise HTTPException(
@@ -338,15 +280,16 @@ async def get_announcements(
 async def create_announcement(
     announcement_data: AnnouncementCreate,
     current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Create a new announcement"""
     try:
-        admin_service = AdminService(supabase)
-        announcement = await admin_service.create_announcement(
-            announcement_data, current_admin["id"]
+        # TODO: Implement MongoDB-based announcement creation
+        # TODO: Replace AdminService(supabase) with MongoDB operations
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="Announcement creation with MongoDB not yet implemented"
         )
-        return announcement
     except Exception as e:
         logger.error(f"Error creating announcement: {e}")
         raise HTTPException(
@@ -358,7 +301,7 @@ async def create_announcement(
 @router.get("/analytics/platform")
 async def get_platform_analytics(
     current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Get platform analytics overview"""
     try:
@@ -366,9 +309,11 @@ async def get_platform_analytics(
         stats = await admin_service.get_dashboard_stats()
         
         # Calculate real employer and job seeker counts
-        from app.database.models import User
-        total_employers = db.query(User).filter(User.role == 'employer').count()
-        total_job_seekers = db.query(User).filter(User.role == 'job_seeker').count()
+        # TODO: MongoDB Migration - Update imports to use MongoDB models
+        # from app.database.models import User
+        from app.models.mongodb_models import User
+        total_employers = await User.find(User.role == 'employer').count()
+        total_job_seekers = await User.find(User.role == 'job_seeker').count()
         
         # Calculate growth rates based on previous week
         from datetime import datetime, timedelta
@@ -439,7 +384,7 @@ async def get_admin_job_posts(
     search: str = Query(None),
     job_status: str = Query(None),
     current_user: User = Depends(get_admin),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Get all job posts for admin panel"""
     try:
@@ -451,8 +396,8 @@ async def get_admin_job_posts(
         # Get job posts with filters
         # If no status specified, show all statuses (pass None to bypass default 'active' filter)
         status_filter = job_status if job_status is not None else None
-        job_posts = JobPostService.get_job_posts(
-            db,
+        job_post_service = JobPostService()
+        job_posts = await job_post_service.get_job_posts(
             search=search,
             status=status_filter,
             skip=offset,
@@ -480,7 +425,7 @@ async def get_admin_job_posts(
 async def create_admin_job_post(
     job_data: JobPostCreate,
     current_user: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Create a new job post (admin only)"""
     try:
@@ -492,7 +437,8 @@ async def create_admin_job_post(
             )
         
         # Verify employer exists
-        employer = EmployerService.get_employer_by_id(db, job_data.employer_id)
+        employer_service = EmployerService()
+        employer = await employer_service.get_employer_by_id(job_data.employer_id)
         if not employer:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -513,7 +459,7 @@ async def create_admin_job_post(
         
         # Create job post
         job_post_service = JobPostService()
-        job_post = job_post_service.create_job_post(db, employer.id, job_post_data)
+        job_post = await job_post_service.create_job_post(employer.id, job_post_data)
         
         logger.info(f"Job post created and approved by admin: {job_post.id} for employer {employer.id}")
         return JobPostSchema.from_orm(job_post)
@@ -531,11 +477,12 @@ async def create_admin_job_post(
 async def get_admin_job_post(
     job_id: str,
     current_user: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Get a specific job post by ID (admin only)"""
     try:
-        job_post = JobPostService.get_job_post_by_id(db, job_id)
+        job_post_service = JobPostService()
+        job_post = await job_post_service.get_job_post_by_id(job_id)
         if not job_post:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -556,12 +503,13 @@ async def update_admin_job_post(
     job_id: str,
     job_data: JobPostCreate,
     current_user: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Update a job post (admin only)"""
     try:
         # Check if job post exists
-        existing_job = JobPostService.get_job_post_by_id(db, job_id)
+        job_post_service = JobPostService()
+        existing_job = await job_post_service.get_job_post_by_id(job_id)
         if not existing_job:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -575,7 +523,7 @@ async def update_admin_job_post(
         
         # Update job post
         job_post_service = JobPostService()
-        updated_job = job_post_service.update_job_post(db, job_id, update_data)
+        updated_job = await job_post_service.update_job_post(job_id, update_data)
         
         logger.info(f"Job post updated by admin: {job_id}")
         return JobPostSchema.from_orm(updated_job)
@@ -593,12 +541,13 @@ async def update_admin_job_post(
 async def delete_admin_job_post(
     job_id: str,
     current_user: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Delete a job post (admin only)"""
     try:
         # Check if job post exists
-        existing_job = JobPostService.get_job_post_by_id(db, job_id)
+        job_post_service = JobPostService()
+        existing_job = await job_post_service.get_job_post_by_id(job_id)
         if not existing_job:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -606,8 +555,7 @@ async def delete_admin_job_post(
             )
         
         # Delete job post
-        job_post_service = JobPostService()
-        job_post_service.delete_job_post(db, job_id)
+        await job_post_service.delete_job_post(job_id)
         
         logger.info(f"Job post deleted by admin: {job_id}")
         return {"message": "Job post deleted successfully"}
@@ -626,12 +574,13 @@ async def update_job_post_status(
     job_id: str,
     status_data: dict,
     current_user: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Update job post status (admin only)"""
     try:
         # Check if job post exists
-        existing_job = JobPostService.get_job_post_by_id(db, job_id)
+        job_post_service = JobPostService()
+        existing_job = await job_post_service.get_job_post_by_id(job_id)
         if not existing_job:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -655,8 +604,7 @@ async def update_job_post_status(
             update_data["approved_at"] = datetime.utcnow()
             update_data["approved_by"] = current_user["id"]
         
-        job_post_service = JobPostService()
-        updated_job = job_post_service.update_job_post(db, job_id, update_data)
+        updated_job = await job_post_service.update_job_post(job_id, update_data)
         
         logger.info(f"Job post status updated by admin: {job_id} -> {new_status}")
         return JobPostSchema.from_orm(updated_job)
@@ -673,15 +621,16 @@ async def update_job_post_status(
 @router.get("/jobposts/stats")
 async def get_job_posts_stats(
     current_user: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Get job posts statistics (admin only)"""
     try:
         # Get basic stats
-        total_jobs = len(JobPostService.get_job_posts(db, status=None))
-        active_jobs = len(JobPostService.get_job_posts(db, status="active"))
-        approved_jobs = len(JobPostService.get_job_posts(db, status="approved"))
-        draft_jobs = len(JobPostService.get_job_posts(db, status="draft"))
+        job_post_service = JobPostService()
+        total_jobs = len(await job_post_service.get_job_posts(status=None))
+        active_jobs = len(await job_post_service.get_job_posts(status="active"))
+        approved_jobs = len(await job_post_service.get_job_posts(status="approved"))
+        draft_jobs = len(await job_post_service.get_job_posts(status="draft"))
         
         return {
             "total": total_jobs,
@@ -704,7 +653,7 @@ async def get_admin_employers(
     limit: int = Query(20, ge=1, le=100),
     search: str = Query(None),
     current_user: User = Depends(get_admin),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Get all employers for admin panel"""
     try:
@@ -714,8 +663,8 @@ async def get_admin_employers(
         offset = (page - 1) * limit
         
         # Get employers with filters
-        employers = EmployerService.get_employers(
-            db,
+        employer_service = EmployerService()
+        employers = await employer_service.get_employers(
             search=search,
             skip=offset,
             limit=limit
@@ -744,7 +693,7 @@ async def get_admin_job_seekers(
     limit: int = Query(20, ge=1, le=100),
     search: str = Query(None),
     current_user: User = Depends(get_admin),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Get all job seekers for admin panel"""
     try:
@@ -754,8 +703,8 @@ async def get_admin_job_seekers(
         offset = (page - 1) * limit
         
         # Get job seekers with filters
-        job_seekers = JobSeekerService.get_job_seekers(
-            db=db,
+        job_seeker_service = JobSeekerService()
+        job_seekers = await job_seeker_service.get_job_seekers(
             search=search,
             skip=offset,
             limit=limit
@@ -778,18 +727,27 @@ async def get_admin_job_seekers(
             detail="Failed to fetch job seekers"
         )
 
-@router.get("/analytics/daily", response_model=List[DailyStats])
+@router.get("/analytics/daily")
 async def get_daily_analytics(
-    start_date: Optional[datetime] = Query(None),
-    end_date: Optional[datetime] = Query(None),
+    date: str = Query(None, description="Date in YYYY-MM-DD format"),
     current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """Get daily analytics data"""
     try:
-        admin_service = AdminService(supabase)
-        analytics = await admin_service.get_daily_analytics(start_date, end_date)
-        return analytics
+        target_date = datetime.strptime(date, "%Y-%m-%d").date() if date else datetime.utcnow().date()
+        
+        # TODO: Implement MongoDB analytics using direct queries to User, JobPost, etc.
+        # TODO: Replace AdminService(supabase) with MongoDB-based analytics
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="Daily analytics with MongoDB not yet implemented"
+        )
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid date format. Use YYYY-MM-DD"
+        )
     except Exception as e:
         logger.error(f"Error fetching daily analytics: {e}")
         raise HTTPException(
@@ -798,47 +756,25 @@ async def get_daily_analytics(
         )
 
 # Admin Logs Endpoints
-@router.get("/logs", response_model=List[AdminLog])
+@router.get("/logs")
 async def get_admin_logs(
-    page: int = Query(1, ge=1),
-    per_page: int = Query(50, ge=1, le=100),
+    limit: int = Query(50, le=100),
+    offset: int = Query(0, ge=0),
     action: Optional[str] = Query(None),
-    admin_user_id: Optional[str] = Query(None),
-    start_date: Optional[datetime] = Query(None),
-    end_date: Optional[datetime] = Query(None),
-    current_admin: Dict[str, Any] = Depends(get_super_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin),
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
-    """Get admin activity logs"""
+    """Get admin action logs"""
     try:
-        offset = (page - 1) * limit
-        
-        # Build query
-        query = supabase.table("admin_logs").select("*", count="exact").order("created_at", desc=True)
+        # TODO: Implement MongoDB query using AdminLog.find().sort("-created_at").skip(offset).limit(limit)
+        # TODO: Add action filter if provided
+        query = AdminLog.find().sort("-created_at").skip(offset).limit(limit)
         
         if action:
-            query = query.eq("action", action)
-        if admin_id:
-            query = query.eq("admin_id", admin_id)
-        if start_date:
-            query = query.gte("created_at", start_date.isoformat())
-        if end_date:
-            query = query.lte("created_at", end_date.isoformat())
-            
-        # Get total count
-        count_result = await query.execute()
-        total = count_result.count
+            query = AdminLog.find(AdminLog.action == action).sort("-created_at").skip(offset).limit(limit)
         
-        # Get paginated data
-        result = await query.range(offset, offset + limit - 1).execute()
-        
-        return PaginatedResponse(
-            items=result.data,
-            total=total,
-            page=page,
-            limit=limit,
-            pages=(total + limit - 1) // limit
-        )
+        logs = await query.to_list()
+        return [log.dict() for log in logs]
     except Exception as e:
         logger.error(f"Error fetching admin logs: {e}")
         raise HTTPException(

@@ -14,10 +14,9 @@ import logging
 from contextlib import asynccontextmanager
 
 # Import all document models
-from app.database.mongodb_models import (
+from app.models.mongodb_models import (
     User, ContactSubmission, ContactInformation, SeoSettings, Review, Ad,
-    JobSeeker, Employer, JobPost, JobWorkflowLog, JobApplication,
-    ScraperConfig, ScraperLog, ScraperState, EmailVerificationToken
+    JobSeeker, Employer, JobPost, JobApplication, PaymentGateway, Transaction, Refund
 )
 from app.models.tasks import TaskResult
 from app.models.scraping_session import ScrapingSession, ScrapingResult, SessionWebsite
@@ -85,8 +84,7 @@ class MongoDBManager:
                 database=self.database,
                 document_models=[
                     User, ContactSubmission, ContactInformation, SeoSettings, Review, Ad,
-                    JobSeeker, Employer, JobPost, JobWorkflowLog, JobApplication,
-                    ScraperConfig, ScraperLog, ScraperState, EmailVerificationToken,
+                    JobSeeker, Employer, JobPost, JobApplication, PaymentGateway, Transaction, Refund,
                     TaskResult, ScrapingSession, ScrapingResult, SessionWebsite
                 ]
             )

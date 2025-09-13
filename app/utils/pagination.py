@@ -337,7 +337,9 @@ class AsyncPaginationHelper:
 # Utility functions for common pagination patterns
 def paginate_users(session: Session, params: PaginationParams, search: Optional[str] = None) -> Dict[str, Any]:
     """Paginate users with optional search"""
-    from app.database.models import User
+    # TODO: MongoDB Migration - Update imports to use MongoDB models
+    # from app.database.models import User
+    from app.models.mongodb_models import User
     
     query = PaginationHelper.create_search_query(
         session=session,
@@ -355,7 +357,9 @@ def paginate_job_posts(
     filters: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """Paginate job posts with search and filters"""
-    from app.database.models import JobPost
+    # TODO: MongoDB Migration - Update imports to use MongoDB models
+    # from app.database.models import JobPost
+    from app.models.mongodb_models import JobPost
     
     query = PaginationHelper.create_search_query(
         session=session,
@@ -373,7 +377,9 @@ def cursor_paginate_job_applications(
     job_seeker_id: Optional[str] = None
 ) -> Dict[str, Any]:
     """Cursor paginate job applications for better performance"""
-    from app.database.models import JobApplication
+    # TODO: MongoDB Migration - Update imports to use MongoDB models
+    # from app.database.models import JobApplication
+    from app.models.mongodb_models import JobApplication
     
     query = session.query(JobApplication)
     

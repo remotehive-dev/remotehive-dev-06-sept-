@@ -7,7 +7,7 @@ from loguru import logger
 from app.core.clerk_auth import clerk_auth
 from app.core.rbac import Permission, has_permission, get_role_permissions
 from app.database.database import get_db_session
-from app.database.models import User, UserRole
+from app.models.mongodb_models import User, UserRole
 from app.database.services import UserService, EmployerService, JobSeekerService
 
 security = HTTPBearer(auto_error=False)

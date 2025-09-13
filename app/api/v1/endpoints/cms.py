@@ -1,15 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Form
 from typing import Dict, Any, List, Optional
 from loguru import logger
-from sqlalchemy.orm import Session
 from datetime import datetime
 import os
 import uuid
 import shutil
 from pathlib import Path
+from beanie import PydanticObjectId
 
-from app.core.database import get_db
 from app.core.auth import get_current_active_user, get_admin
+from app.models.mongodb_models import SeoSettings, Review, Ad, ContactInformation
 from app.schemas.cms import (
     CMSPageCreate, CMSPageUpdate, CMSPage, CMSPageResponse,
     SEOSettings, SEOSettingsUpdate,
@@ -25,32 +25,26 @@ router = APIRouter()
 
 # Public CMS Endpoints (No Authentication Required)
 @router.get("/public/pages", response_model=List[CMSPage])
-def get_published_pages(
-    db: Session = Depends(get_db)
-):
+async def get_published_pages():
     """Get all published CMS pages for public website"""
     try:
-        result = supabase.table("cms_pages").select("*").eq("status", "published").order("updated_at", desc=True).execute()
-        return result.data
+        # For now, return empty list as CMS pages are not implemented in MongoDB yet
+        # TODO: Implement CMS page model and functionality
+        return []
     except Exception as e:
         logger.error(f"Error fetching published pages: {e}")
-        # Return empty list if table doesn't exist
         return []
 
 @router.get("/public/pages/{slug}", response_model=CMSPage)
-def get_page_by_slug(
-    slug: str,
-    db: Session = Depends(get_db)
-):
+async def get_page_by_slug(slug: str):
     """Get published CMS page by slug for public website"""
     try:
-        result = supabase.table("cms_pages").select("*").eq("slug", slug).eq("status", "published").execute()
-        if not result.data:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Page not found"
-            )
-        return result.data[0]
+        # For now, return 404 as CMS pages are not implemented in MongoDB yet
+        # TODO: Implement CMS page model and functionality
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Page not found"
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -61,23 +55,25 @@ def get_page_by_slug(
         )
 
 @router.get("/public/reviews")
-def get_public_reviews(
+async def get_public_reviews(
     featured: bool = Query(False),
-    limit: int = Query(10, ge=1, le=50),
-    db: Session = Depends(get_db)
+    limit: int = Query(10, ge=1, le=50)
 ):
     """Get approved reviews for public website"""
     try:
-        query = supabase.table("reviews").select("*").eq("status", "approved")
-        
+        # Build MongoDB query for approved reviews
+        query_filter = {"status": "approved"}
         if featured:
-            query = query.eq("featured", True)
+            query_filter["featured"] = True
             
-        result = query.order("created_at", desc=True).limit(limit).execute()
-        return {"data": result.data, "count": len(result.data)}
+        reviews = await Review.find(query_filter).sort(-Review.created_at).limit(limit).to_list()
+        
+        # Convert to dict format for response
+        reviews_data = [review.dict() for review in reviews]
+        return {"data": reviews_data, "count": len(reviews_data)}
     except Exception as e:
         logger.error(f"Error fetching public reviews: {e}")
-        # Return sample data if table doesn't exist
+        # Return sample data if no reviews exist
         sample_reviews = [
             {
                 "id": "1",
@@ -102,14 +98,13 @@ def get_public_reviews(
         return {"data": filtered_reviews, "count": len(filtered_reviews)}
 
 @router.get("/public/seo-settings", response_model=SEOSettings)
-def get_public_seo_settings(
-    db: Session = Depends(get_db)
-):
+async def get_public_seo_settings():
     """Get SEO settings for public website"""
     try:
-        result = supabase.table("seo_settings").select("*").limit(1).execute()
-        if result.data:
-            return result.data[0]
+        # Try to get SEO settings from MongoDB
+        seo_settings = await SeoSettings.find_one()
+        if seo_settings:
+            return seo_settings.dict()
         else:
             # Return default SEO settings
             default_settings = {
@@ -143,65 +138,47 @@ def get_public_seo_settings(
             "facebook_pixel_id": ""
         }
 
-@router.get("/public/ads", response_model=List[dict])
-def get_public_ads(
-    position: Optional[str] = Query(None),
-    db: Session = Depends(get_db)
+@router.get("/public/ads")
+async def get_public_ads(
+    placement: str = Query(None),
+    limit: int = Query(5, ge=1, le=20)
 ):
     """Get active ads for public website"""
     try:
-        query = supabase.table("ads").select("*").eq("is_active", True)
+        # Build MongoDB query for active ads
+        query_filter = {"status": "active"}
+        if placement:
+            query_filter["placement"] = placement
+            
+        ads = await Ad.find(query_filter).sort(-Ad.priority).limit(limit).to_list()
         
-        if position:
-            query = query.eq("position", position)
-            
-        # Filter by date range
-        now = datetime.utcnow().isoformat()
-        query = query.lte("start_date", now).gte("end_date", now)
-            
-        result = query.order("created_at", desc=True).execute()
-        return result.data
+        # Convert to dict format for response
+        ads_data = [ad.dict() for ad in ads]
+        return {"data": ads_data, "count": len(ads_data)}
     except Exception as e:
         logger.error(f"Error fetching public ads: {e}")
-        # Return empty list if table doesn't exist
-        return []
+        # Return empty ads list on error
+        return {"data": [], "count": 0}
 
 # CMS Pages Management
 @router.get("/pages", response_model=PaginatedResponse)
-def get_pages(
+async def get_pages(
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100),
     search: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
 ):
     """Get paginated list of CMS pages"""
     try:
-        offset = (page - 1) * limit
-        
-        # Build query
-        query = supabase.table("cms_pages").select("*", count="exact")
-        
-        if search:
-            query = query.or_(f"title.ilike.%{search}%,slug.ilike.%{search}%,content.ilike.%{search}%")
-        if status:
-            query = query.eq("status", status)
-            
-        # Get total count
-        count_result = query.execute()
-        total = count_result.count
-        
-        # Get paginated data
-        result = query.range(offset, offset + limit - 1).order("updated_at", desc=True).execute()
-        
-        return {
-            "data": result.data,
-            "count": total,
-            "page": page,
-            "limit": limit,
-            "pages": (total + limit - 1) // limit
-        }
+        # TODO: Implement CMS page listing with MongoDB
+        # This requires creating a CmsPage model in mongodb_models.py
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="CMS page listing not yet implemented with MongoDB"
+        )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error fetching CMS pages: {e}")
         raise HTTPException(
@@ -212,8 +189,8 @@ def get_pages(
 @router.get("/pages/{page_id}", response_model=CMSPage)
 def get_page_by_id(
     page_id: str,
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
+    # db: Session = Depends(get_db)  # Commented out - Session not available
 ):
     """Get CMS page by ID"""
     try:
@@ -234,31 +211,18 @@ def get_page_by_id(
         )
 
 @router.post("/pages", response_model=CMSPage)
-def create_page(
+async def create_page(
     page_data: CMSPageCreate,
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
 ):
     """Create a new CMS page"""
     try:
-        # Check if slug already exists
-        existing = supabase.table("cms_pages").select("id").eq("slug", page_data.slug).execute()
-        if existing.data:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Page with this slug already exists"
-            )
-        
-        # Create page
-        page_dict = page_data.dict()
-        page_dict["created_by"] = current_admin["id"]
-        page_dict["updated_by"] = current_admin["id"]
-        page_dict["created_at"] = datetime.utcnow().isoformat()
-        page_dict["updated_at"] = datetime.utcnow().isoformat()
-        
-        result = supabase.table("cms_pages").insert(page_dict).execute()
-        
-        return {"data": result.data[0]}
+        # TODO: Implement CMS page creation with MongoDB
+        # This requires creating a CmsPage model in mongodb_models.py
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="CMS page creation not yet implemented with MongoDB"
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -269,30 +233,19 @@ def create_page(
         )
 
 @router.put("/pages/{page_id}", response_model=CMSPage)
-def update_page(
+async def update_page(
     page_id: str,
     page_data: CMSPageUpdate,
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
 ):
     """Update a CMS page"""
     try:
-        # Check if page exists
-        existing = supabase.table("cms_pages").select("*").eq("id", page_id).execute()
-        if not existing.data:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Page not found"
-            )
-        
-        # Update page
-        update_dict = page_data.dict(exclude_unset=True)
-        update_dict["updated_by"] = current_admin["id"]
-        update_dict["updated_at"] = datetime.utcnow().isoformat()
-        
-        result = supabase.table("cms_pages").update(update_dict).eq("id", page_id).execute()
-        
-        return {"data": result.data[0]}
+        # TODO: Implement CMS page update with MongoDB
+        # This requires creating a CmsPage model in mongodb_models.py
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="CMS page update not yet implemented with MongoDB"
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -302,40 +255,27 @@ def update_page(
             detail="Failed to update page"
         )
 
-@router.delete("/pages/{page_id}")
-def delete_page(
+@router.delete("/admin/pages/{page_id}")
+async def delete_page(
     page_id: str,
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_user: dict = Depends(get_admin)  # Changed from get_current_admin_user
 ):
-    """Delete a CMS page"""
+    """Delete a CMS page (Admin only)"""
     try:
-        # Check if page exists
-        existing = supabase.table("cms_pages").select("id").eq("id", page_id).execute()
-        if not existing.data:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Page not found"
-            )
-        
-        # Delete page
-        supabase.table("cms_pages").delete().eq("id", page_id).execute()
-        
-        return {"message": "Page deleted successfully"}
+        # TODO: Implement CMS page deletion with MongoDB
+        # This requires creating a CmsPage model in mongodb_models.py
+        raise HTTPException(status_code=501, detail="CMS page deletion not yet implemented with MongoDB")
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error deleting page {page_id}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to delete page"
-        )
+        logger.error(f"Error deleting page: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete page")
 
 # SEO Settings Management
 @router.get("/seo-settings", response_model=SEOSettings)
 def get_seo_settings(
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
+    # db: Session = Depends(get_db)  # Commented out - Session not available
 ):
     """Get SEO settings"""
     try:
@@ -368,8 +308,8 @@ def get_seo_settings(
 @router.put("/seo-settings", response_model=SEOSettings)
 def update_seo_settings(
     settings_data: SEOSettingsUpdate,
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
+    # db: Session = Depends(get_db)  # Commented out - Session not available
 ):
     """Update SEO settings"""
     try:
@@ -401,8 +341,8 @@ def get_reviews(
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100),
     status: Optional[str] = Query(None),
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
+    # db: Session = Depends(get_db)  # Commented out - Session not available
 ):
     """Get paginated list of reviews"""
     try:
@@ -463,8 +403,8 @@ def get_reviews(
 def update_review_status(
     review_id: str,
     status_data: dict,
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
+    # db: Session = Depends(get_db)  # Commented out - Session not available
 ):
     """Update review status"""
     try:
@@ -481,8 +421,8 @@ def update_review_status(
 def toggle_review_featured(
     review_id: str,
     featured_data: dict,
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
+    # db: Session = Depends(get_db)  # Commented out - Session not available
 ):
     """Toggle review featured status"""
     try:
@@ -500,8 +440,8 @@ def toggle_review_featured(
 def get_website_analytics(
     start_date: str = Query(...),
     end_date: str = Query(...),
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
+    # db: Session = Depends(get_db)  # Commented out - Session not available
 ):
     """Get website analytics"""
     try:
@@ -534,8 +474,8 @@ def get_website_analytics(
 # Theme Settings
 @router.get("/theme-settings")
 def get_theme_settings(
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
+    # db: Session = Depends(get_db)  # Commented out - Session not available
 ):
     """Get theme settings"""
     try:
@@ -562,8 +502,8 @@ def get_theme_settings(
 @router.put("/theme-settings")
 def update_theme_settings(
     settings_data: dict,
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
+    # db: Session = Depends(get_db)  # Commented out - Session not available
 ):
     """Update theme settings"""
     try:
@@ -582,8 +522,8 @@ def get_ads(
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100),
     status: Optional[str] = Query(None),
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
+    # db: Session = Depends(get_db)  # Commented out - Session not available
 ):
     """Get ads campaigns"""
     try:
@@ -618,8 +558,8 @@ def get_ads(
 def update_ad(
     ad_id: str,
     ad_data: dict,
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
+    # db: Session = Depends(get_db)  # Commented out - Session not available
 ):
     """Update ad campaign"""
     try:
@@ -643,8 +583,8 @@ async def upload_media_file(
     caption: Optional[str] = Form(None),
     folder: Optional[str] = Form(None),
     tags: Optional[str] = Form(None),  # Comma-separated tags
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
+    # db: Session = Depends(get_db)  # Commented out - Session not available
 ):
     """Upload a media file to the library"""
     try:
@@ -713,8 +653,8 @@ def get_media_files(
     search: Optional[str] = Query(None),
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
+    # db: Session = Depends(get_db)  # Commented out - Session not available
 ):
     """Get media files with filtering"""
     try:
@@ -784,8 +724,8 @@ def get_media_files(
 def update_media_file(
     media_id: str,
     media_data: MediaFileUpdate,
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
+    # db: Session = Depends(get_db)  # Commented out - Session not available
 ):
     """Update media file metadata"""
     try:
@@ -821,8 +761,8 @@ def update_media_file(
 @router.delete("/admin/media/{media_id}")
 def delete_media_file(
     media_id: str,
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
+    # db: Session = Depends(get_db)  # Commented out - Session not available
 ):
     """Delete media file"""
     try:
@@ -843,8 +783,8 @@ def delete_media_file(
 @router.get("/admin/carousel", response_model=List[CarouselItem])
 def get_carousel_items(
     carousel_type: Optional[str] = Query(None),
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
+    # db: Session = Depends(get_db)  # Commented out - Session not available
 ):
     """Get carousel items"""
     try:
@@ -898,8 +838,8 @@ def get_carousel_items(
 @router.post("/admin/carousel", response_model=CarouselItem)
 def create_carousel_item(
     carousel_data: CarouselItemCreate,
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
+    # db: Session = Depends(get_db)  # Commented out - Session not available
 ):
     """Create new carousel item"""
     try:
@@ -931,8 +871,8 @@ def create_carousel_item(
 def update_carousel_item(
     item_id: str,
     carousel_data: CarouselItemUpdate,
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
+    # db: Session = Depends(get_db)  # Commented out - Session not available
 ):
     """Update carousel item"""
     try:
@@ -963,8 +903,8 @@ def update_carousel_item(
 @router.delete("/admin/carousel/{item_id}")
 def delete_carousel_item(
     item_id: str,
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
+    # db: Session = Depends(get_db)  # Commented out - Session not available
 ):
     """Delete carousel item"""
     try:
@@ -983,8 +923,8 @@ def delete_carousel_item(
 
 @router.get("/admin/galleries", response_model=List[Gallery])
 def get_galleries(
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
+    # db: Session = Depends(get_db)  # Commented out - Session not available
 ):
     """Get all image galleries"""
     try:
@@ -1026,8 +966,8 @@ def get_galleries(
 @router.post("/admin/galleries", response_model=Gallery)
 def create_gallery(
     gallery_data: GalleryCreate,
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
+    # db: Session = Depends(get_db)  # Commented out - Session not available
 ):
     """Create new image gallery"""
     try:
@@ -1055,8 +995,8 @@ def create_gallery(
 @router.get("/admin/galleries/{gallery_id}/images", response_model=List[GalleryImage])
 def get_gallery_images(
     gallery_id: str,
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
+    # db: Session = Depends(get_db)  # Commented out - Session not available
 ):
     """Get images in a gallery"""
     try:
@@ -1103,8 +1043,8 @@ def get_gallery_images(
 def add_image_to_gallery(
     gallery_id: str,
     image_data: GalleryImageCreate,
-    current_admin: Dict[str, Any] = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_admin: Dict[str, Any] = Depends(get_admin)
+    # db: Session = Depends(get_db)  # Commented out - Session not available
 ):
     """Add image to gallery"""
     try:
@@ -1133,8 +1073,8 @@ def add_image_to_gallery(
 
 @router.get("/public/carousel/{carousel_type}", response_model=List[CarouselItem])
 def get_public_carousel(
-    carousel_type: str,
-    db: Session = Depends(get_db)
+    carousel_type: str
+    # db: Session = Depends(get_db)  # Commented out - Session not available
 ):
     """Get public carousel items by type"""
     try:
@@ -1167,8 +1107,8 @@ def get_public_carousel(
 
 @router.get("/public/galleries/{gallery_slug}", response_model=Dict[str, Any])
 def get_public_gallery(
-    gallery_slug: str,
-    db: Session = Depends(get_db)
+    gallery_slug: str
+    # db: Session = Depends(get_db)  # Commented out - Session not available
 ):
     """Get public gallery by slug"""
     try:

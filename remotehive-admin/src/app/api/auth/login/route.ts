@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase';
 import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || '8b0aceeaa899e15c513ea9b6f9de82edef07bd6ba6d36c30007856f7a3db5f77';

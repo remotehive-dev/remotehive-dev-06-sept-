@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase';
+import { API_CONFIG } from '@/utils/constants';
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,22 +10,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
     }
 
-    const supabaseAdmin = createAdminClient();
-    
-    const { data, error } = await supabaseAdmin
-      .from('users')
-      .select('*')
-      .eq('id', userId)
-      .single();
+    const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/users/${userId}`);
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!response.ok) {
+      if (response.status === 404) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      }
+      const errorText = await response.text();
+      console.error('Error fetching user profile:', errorText);
+      return NextResponse.json({ error: 'Failed to fetch user profile' }, { status: 500 });
     }
 
-    if (!data) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
-
+    const data = await response.json();
     return NextResponse.json({ data });
   } catch (error) {
     console.error('Error fetching user profile:', error);

@@ -13,7 +13,9 @@ from app.schemas.scraper_config import (
     BulkScraperConfigResponse
 )
 from app.core.auth import get_current_user
-from app.database.models import User
+# TODO: MongoDB Migration - Update User import to use MongoDB models
+# from app.database.models import User
+from app.models.mongodb_models import User
 
 router = APIRouter()
 

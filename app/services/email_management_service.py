@@ -1,5 +1,5 @@
 from motor.motor_asyncio import AsyncIOMotorDatabase
-from bson import ObjectId
+# from bson import ObjectId  # Removed to fix Pydantic schema generation
 from typing import List, Optional, Dict, Any
 # MongoDB models are handled as dictionaries
 from app.services.email_service import EmailService
@@ -32,7 +32,7 @@ class EmailManagementService:
             
             # Create email user document
             email_user = {
-                "_id": ObjectId(),
+                "_id": str(uuid.uuid4()),
                 "email_address": email_address,
                 "full_name": full_name,
                 "personal_email": personal_email,
@@ -79,7 +79,7 @@ class EmailManagementService:
         """Soft delete email user"""
         try:
             email_user = await self.db.email_users.find_one({
-                "_id": ObjectId(user_id),
+                "_id": user_id,
                 "is_active": True
             })
             
@@ -91,7 +91,7 @@ class EmailManagementService:
             
             # Soft delete
             await self.db.email_users.update_one(
-                {"_id": ObjectId(user_id)},
+                {"_id": user_id},
                 {
                     "$set": {
                         "deleted_by": deleted_by,
@@ -119,7 +119,7 @@ class EmailManagementService:
         """Reset user password and send notification"""
         try:
             email_user = await self.db.email_users.find_one({
-                "_id": ObjectId(user_id),
+                "_id": user_id,
                 "is_active": True
             })
             
@@ -134,7 +134,7 @@ class EmailManagementService:
             
             # Update password
             await self.db.email_users.update_one(
-                {"_id": ObjectId(user_id)},
+                {"_id": user_id},
                 {
                     "$set": {
                         "password_hash": get_password_hash(new_temp_password),
@@ -199,7 +199,7 @@ class EmailManagementService:
         """Send email from user"""
         try:
             from_user = await self.db.email_users.find_one({
-                "_id": ObjectId(from_user_id),
+                "_id": from_user_id,
                 "is_active": True
             })
             
@@ -267,7 +267,7 @@ class EmailManagementService:
     ) -> List[Dict[str, Any]]:
         """Get user messages from specific folder"""
         folder = await self.db.email_folders.find_one({
-            "user_id": ObjectId(user_id),
+            "user_id": user_id,
             "name": folder_name
         })
         
@@ -376,7 +376,7 @@ class EmailManagementService:
         """Add message to specific folder"""
         try:
             folder = await self.db.email_folders.find_one({
-                "user_id": ObjectId(user_id),
+                "user_id": user_id,
                 "name": folder_name
             })
             
@@ -388,14 +388,14 @@ class EmailManagementService:
             
             # Check if already exists
             existing = await self.db.email_message_folders.find_one({
-                "message_id": ObjectId(message_id),
+                "message_id": message_id,
                 "folder_id": folder["_id"]
             })
             
             if not existing:
                 message_folder = {
                     "_id": ObjectId(),
-                    "message_id": ObjectId(message_id),
+                    "message_id": message_id,
                     "folder_id": folder["_id"],
                     "added_at": datetime.utcnow()
                 }

@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # MongoDB Database
   mongodb:
@@ -312,9 +310,9 @@ services:
     networks:
       - remotehive-network
     depends_on:
-      - backend
+      - backend-api
       - admin
-      - public
+      - public-website
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/health"]
       interval: 30s

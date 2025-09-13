@@ -1,4 +1,14 @@
-import { SupabaseService, TABLES, STATUS_TYPES } from './supabase';
+import { apiClient } from '../../lib/api';
+
+// Status types for employers
+const STATUS_TYPES = {
+  PENDING: 'pending',
+  APPROVED: 'approved',
+  REJECTED: 'rejected',
+  ACTIVE: 'active',
+  INACTIVE: 'inactive',
+  SUSPENDED: 'suspended'
+} as const;
 
 export interface Employer {
   id: string;
@@ -55,113 +65,87 @@ export class EmployerService {
       sortOrder = 'desc'
     } = options;
 
-    const offset = (page - 1) * limit;
     const filters: Record<string, any> = {};
 
     if (status) filters.status = status;
     if (industry) filters.industry = industry;
 
-    let employers: Employer[];
+    const response = await apiClient.getItems('employers', {
+      filters,
+      search,
+      sortBy,
+      sortOrder,
+      page,
+      limit
+    });
 
-    if (search) {
-      employers = await SupabaseService.search<Employer>(
-        TABLES.EMPLOYERS,
-        search,
-        ['company_name', 'contact_email', 'location'],
-        {
-          select: `
-            *,
-            total_job_posts:job_posts(count),
-            active_job_posts:job_posts(count).eq(status,active)
-          `,
-          filters,
-          limit
-        }
-      );
-    } else {
-      employers = await SupabaseService.read<Employer>(
-        TABLES.EMPLOYERS,
-        {
-          select: `
-            *,
-            total_job_posts:job_posts(count),
-            active_job_posts:job_posts(count).eq(status,active)
-          `,
-          filters,
-          orderBy: { column: sortBy, ascending: sortOrder === 'asc' },
-          limit,
-          offset
-        }
-      );
+    if (response.error) {
+      throw new Error(response.error);
     }
 
-    const total = await SupabaseService.count(TABLES.EMPLOYERS, filters);
-
-    return { employers, total };
+    return { 
+      employers: response.data || [], 
+      total: response.total || 0 
+    };
   }
 
   // Get employer by ID
   static async getEmployerById(id: string): Promise<Employer> {
-    const employers = await SupabaseService.read<Employer>(
-      TABLES.EMPLOYERS,
-      {
-        select: `
-          *,
-          total_job_posts:job_posts(count),
-          active_job_posts:job_posts(count).eq(status,active),
-          user:users(*)
-        `,
-        filters: { id }
-      }
-    );
+    const response = await apiClient.getItem('employers', id);
 
-    if (!employers.length) {
+    if (response.error) {
+      throw new Error(response.error);
+    }
+
+    if (!response.data) {
       throw new Error('Employer not found');
     }
 
-    return employers[0];
+    return response.data;
   }
 
   // Get employer statistics
   static async getEmployerStats(): Promise<EmployerStats> {
-    const [total, pending, approved, rejected, premium] = await Promise.all([
-      SupabaseService.count(TABLES.EMPLOYERS),
-      SupabaseService.count(TABLES.EMPLOYERS, { status: STATUS_TYPES.PENDING }),
-      SupabaseService.count(TABLES.EMPLOYERS, { status: STATUS_TYPES.APPROVED }),
-      SupabaseService.count(TABLES.EMPLOYERS, { status: STATUS_TYPES.REJECTED }),
-      SupabaseService.count(TABLES.EMPLOYERS, { is_premium: true })
+    const [totalResponse, pendingResponse, approvedResponse, rejectedResponse, premiumResponse] = await Promise.all([
+      apiClient.getCount('employers'),
+      apiClient.getCount('employers', { status: STATUS_TYPES.PENDING }),
+      apiClient.getCount('employers', { status: STATUS_TYPES.APPROVED }),
+      apiClient.getCount('employers', { status: STATUS_TYPES.REJECTED }),
+      apiClient.getCount('employers', { is_premium: true })
     ]);
 
     // Get active employers this month
     const thisMonth = new Date();
     thisMonth.setDate(1);
-    const active_this_month = await SupabaseService.count(TABLES.EMPLOYERS, {
+    const activeThisMonthResponse = await apiClient.getCount('employers', {
       status: STATUS_TYPES.APPROVED,
-      created_at: `gte.${thisMonth.toISOString()}`
+      created_at: { $gte: thisMonth.toISOString() }
     });
 
     return {
-      total,
-      pending,
-      approved,
-      rejected,
-      premium,
-      active_this_month
+      total: totalResponse.data?.count || 0,
+      pending: pendingResponse.data?.count || 0,
+      approved: approvedResponse.data?.count || 0,
+      rejected: rejectedResponse.data?.count || 0,
+      premium: premiumResponse.data?.count || 0,
+      active_this_month: activeThisMonthResponse.data?.count || 0
     };
   }
 
   // Approve employer
   static async approveEmployer(id: string, adminId: string): Promise<Employer> {
-    return await SupabaseService.update<Employer>(
-      TABLES.EMPLOYERS,
-      id,
-      {
-        status: STATUS_TYPES.APPROVED,
-        approved_at: new Date().toISOString(),
-        approved_by: adminId,
-        rejection_reason: null
-      }
-    );
+    const response = await apiClient.updateItem('employers', id, {
+      status: STATUS_TYPES.APPROVED,
+      approved_at: new Date().toISOString(),
+      approved_by: adminId,
+      rejection_reason: null
+    });
+
+    if (response.error) {
+      throw new Error(response.error);
+    }
+
+    return response.data;
   }
 
   // Reject employer
@@ -170,16 +154,18 @@ export class EmployerService {
     adminId: string,
     reason: string
   ): Promise<Employer> {
-    return await SupabaseService.update<Employer>(
-      TABLES.EMPLOYERS,
-      id,
-      {
-        status: STATUS_TYPES.REJECTED,
-        approved_by: adminId,
-        rejection_reason: reason,
-        approved_at: null
-      }
-    );
+    const response = await apiClient.updateItem('employers', id, {
+      status: STATUS_TYPES.REJECTED,
+      approved_by: adminId,
+      rejection_reason: reason,
+      approved_at: null
+    });
+
+    if (response.error) {
+      throw new Error(response.error);
+    }
+
+    return response.data;
   }
 
   // Update employer
@@ -187,14 +173,16 @@ export class EmployerService {
     id: string,
     data: Partial<Employer>
   ): Promise<Employer> {
-    return await SupabaseService.update<Employer>(
-      TABLES.EMPLOYERS,
-      id,
-      {
-        ...data,
-        updated_at: new Date().toISOString()
-      }
-    );
+    const response = await apiClient.updateItem('employers', id, {
+      ...data,
+      updated_at: new Date().toISOString()
+    });
+
+    if (response.error) {
+      throw new Error(response.error);
+    }
+
+    return response.data;
   }
 
   // Toggle premium status
@@ -215,57 +203,76 @@ export class EmployerService {
       updateData.subscription_plan = null;
     }
 
-    return await SupabaseService.update<Employer>(
-      TABLES.EMPLOYERS,
-      id,
-      updateData
-    );
+    const response = await apiClient.updateItem('employers', id, updateData);
+
+    if (response.error) {
+      throw new Error(response.error);
+    }
+
+    return response.data;
   }
 
   // Suspend employer
-  static async suspendEmployer(id: string, reason: string): Promise<Employer> {
-    return await SupabaseService.update<Employer>(
-      TABLES.EMPLOYERS,
-      id,
-      {
-        status: 'suspended',
-        rejection_reason: reason,
-        updated_at: new Date().toISOString()
-      }
-    );
+  static async suspendEmployer(id: string, adminId: string): Promise<Employer> {
+    const response = await apiClient.updateItem('employers', id, {
+      status: STATUS_TYPES.SUSPENDED,
+      updated_at: new Date().toISOString(),
+      updated_by: adminId
+    });
+
+    if (response.error) {
+      throw new Error(response.error);
+    }
+
+    return response.data;
   }
 
   // Delete employer
   static async deleteEmployer(id: string): Promise<void> {
-    await SupabaseService.delete(TABLES.EMPLOYERS, id);
+    const response = await apiClient.deleteItem('employers', id);
+
+    if (response.error) {
+      throw new Error(response.error);
+    }
   }
 
-  // Get pending employers for approval queue
+  // Get pending employers
   static async getPendingEmployers(): Promise<Employer[]> {
-    return await SupabaseService.read<Employer>(
-      TABLES.EMPLOYERS,
-      {
-        filters: { status: STATUS_TYPES.PENDING },
-        orderBy: { column: 'created_at', ascending: true }
-      }
-    );
+    const response = await apiClient.getItems('employers', {
+      filters: { status: STATUS_TYPES.PENDING },
+      sort: { created_at: -1 }
+    });
+
+    if (response.error) {
+      throw new Error(response.error);
+    }
+
+    return response.data || [];
   }
 
-  // Get employer industries for filters
-  static async getIndustries(): Promise<string[]> {
-    const { data, error } = await SupabaseService.read<{ industry: string }>(
-      TABLES.EMPLOYERS,
-      {
-        select: 'industry',
+  // Get industries
+  static async getIndustries(): Promise<{ industry: string; count: number }[]> {
+    const response = await apiClient.getItems('employers', {
+      filters: { status: STATUS_TYPES.APPROVED },
+      select: ['industry']
+    });
+
+    if (response.error) {
+      throw new Error(response.error);
+    }
+
+    const employers = response.data || [];
+
+    // Count industries
+    const industryCount: { [key: string]: number } = {};
+    employers.forEach(employer => {
+      if (employer.industry) {
+        industryCount[employer.industry] = (industryCount[employer.industry] || 0) + 1;
       }
-    );
+    });
 
-    if (error) throw error;
-
-    const industries = [...new Set(data.map(item => item.industry))]
-      .filter(Boolean)
-      .sort();
-
-    return industries;
+    return Object.entries(industryCount)
+      .map(([industry, count]) => ({ industry, count }))
+      .sort((a, b) => b.count - a.count);
   }
 }

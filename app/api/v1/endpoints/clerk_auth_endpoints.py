@@ -11,8 +11,9 @@ from app.core.clerk_middleware import (
     ClerkAuthContext
 )
 from app.core.database import get_db
-from app.database.models import User, UserRole
-from app.database.services import EmployerService, JobSeekerService, UserService
+# from app.database.models import User, UserRole  # Using MongoDB models instead
+from app.models.mongodb_models import User, Employer, JobSeeker
+from app.database.services import EmployerService, JobSeekerService  # MongoDB services
 
 router = APIRouter()
 
@@ -113,7 +114,8 @@ async def employer_signup(
             "company_email": signup_data.email,
             "company_description": "New employer profile"
         }
-        employer_profile = EmployerService.create_employer(db, local_user.id, employer_data)
+        employer_service = EmployerService()
+        employer_profile = await employer_service.create_employer(local_user.id, employer_data)
         
         logger.info(f"Employer signup successful for: {signup_data.email}")
         
@@ -174,7 +176,8 @@ async def job_seeker_signup(
             "current_title": "Job Seeker",
             "is_actively_looking": True
         }
-        job_seeker_profile = JobSeekerService.create_job_seeker(db, local_user.id, job_seeker_data)
+        job_seeker_service = JobSeekerService()
+        job_seeker_profile = await job_seeker_service.create_job_seeker(local_user.id, job_seeker_data)
         
         logger.info(f"Job seeker signup successful for: {signup_data.email}")
         
@@ -340,7 +343,8 @@ async def sync_user_with_backend(
                     "industry": "Not specified",
                     "company_size": "startup"
                 }
-                EmployerService.create_employer(db, local_user.id, employer_data)
+                employer_service = EmployerService()
+                await employer_service.create_employer(local_user.id, employer_data)
                 
                 # Create lead for employer
                 try:
@@ -369,7 +373,8 @@ async def sync_user_with_backend(
                     "skills": [],
                     "is_actively_looking": True
                 }
-                JobSeekerService.create_job_seeker(db, local_user.id, job_seeker_data)
+                job_seeker_service = JobSeekerService()
+                await job_seeker_service.create_job_seeker(local_user.id, job_seeker_data)
         
         return ClerkAuthResponse(
             success=True,

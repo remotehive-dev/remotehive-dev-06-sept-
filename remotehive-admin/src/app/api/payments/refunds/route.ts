@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { apiClient } from '@/lib/api';
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,39 +8,31 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50');
     const status = searchParams.get('status');
     
-    const offset = (page - 1) * limit;
-    
-    let query = supabase
-      .from('refunds')
-      .select(`
-        *,
-        transaction:transactions(
-          id,
-          gateway_transaction_id,
-          customer_email,
-          customer_name,
-          amount,
-          currency
-        )
-      `, { count: 'exact' })
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
-    
+    const filters: any = {};
     if (status && status !== 'all') {
-      query = query.eq('status', status);
+      filters.status = status;
     }
     
-    const { data, error, count } = await query;
+    const response = await apiClient.getItems('refunds', {
+      page,
+      limit,
+      filters,
+      sort: '-created_at',
+      populate: ['transaction']
+    });
     
-    if (error) {
-      console.error('Error fetching refunds:', error);
+    if (response.error) {
+      console.error('Error fetching refunds:', response.error);
       return NextResponse.json(
         { error: 'Failed to fetch refunds' },
         { status: 500 }
       );
     }
     
-    return NextResponse.json({ data, count });
+    return NextResponse.json({ 
+      data: response.data || [], 
+      count: response.total || 0 
+    });
   } catch (error) {
     console.error('Error in refunds API:', error);
     return NextResponse.json(
@@ -61,18 +48,19 @@ export async function POST(request: NextRequest) {
     const { transaction_id, amount, reason } = body;
     
     // First, get the transaction details
-    const { data: transaction, error: transError } = await supabase
-      .from('transactions')
-      .select('*')
-      .eq('id', transaction_id)
-      .single();
+    const transactionResponse = await apiClient.getItems('transactions', {
+      filters: { id: transaction_id },
+      limit: 1
+    });
     
-    if (transError || !transaction) {
+    if (transactionResponse.error || !transactionResponse.data || transactionResponse.data.length === 0) {
       return NextResponse.json(
         { error: 'Transaction not found' },
         { status: 404 }
       );
     }
+    
+    const transaction = transactionResponse.data[0];
     
     // Check if transaction is eligible for refund
     if (transaction.status !== 'completed' && transaction.status !== 'success') {
@@ -96,19 +84,13 @@ export async function POST(request: NextRequest) {
       amount,
       currency: transaction.currency,
       reason,
-      status: 'pending',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      status: 'pending'
     };
     
-    const { data: refund, error: refundError } = await supabase
-      .from('refunds')
-      .insert([refundData])
-      .select()
-      .single();
+    const refundResponse = await apiClient.createItem('refunds', refundData);
     
-    if (refundError) {
-      console.error('Error creating refund:', refundError);
+    if (refundResponse.error) {
+      console.error('Error creating refund:', refundResponse.error);
       return NextResponse.json(
         { error: 'Failed to create refund' },
         { status: 500 }
@@ -118,7 +100,7 @@ export async function POST(request: NextRequest) {
     // Here you would typically integrate with the payment gateway to process the actual refund
     // For now, we'll just mark it as pending
     
-    return NextResponse.json({ data: refund });
+    return NextResponse.json({ data: refundResponse.data });
   } catch (error) {
     console.error('Error in refund creation:', error);
     return NextResponse.json(

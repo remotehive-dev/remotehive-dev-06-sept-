@@ -1,10 +1,10 @@
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status, Request
-from sqlalchemy.orm import Session
+# from sqlalchemy.orm import Session  # Commented out - using MongoDB
 
-from app.core.database import get_db
+# from app.core.database import get_db  # Commented out - using MongoDB
 from app.core.auth import get_current_user, get_admin, get_employer
-from app.database.models import User, JobPost, JobWorkflowLog
+from app.models.mongodb_models import User, JobPost  # JobWorkflowLog commented out - doesn't exist
 from app.schemas.job_post import (
     JobPost as JobPostSchema,
     JobWorkflowAction,
@@ -24,7 +24,7 @@ router = APIRouter(prefix="/job-workflow", tags=["Job Workflow"])
 async def submit_job_for_approval(
     job_post_id: str,
     notes: Optional[str] = None,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Commented out - using MongoDB
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -53,7 +53,7 @@ async def submit_job_for_approval(
 async def pause_job(
     job_post_id: str,
     reason: Optional[str] = None,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Commented out - using MongoDB
     current_user: User = Depends(get_employer)
 ):
     """
@@ -80,7 +80,7 @@ async def pause_job(
 async def resume_job(
     job_post_id: str,
     reason: Optional[str] = None,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Commented out - using MongoDB
     current_user: User = Depends(get_employer)
 ):
     """
@@ -107,7 +107,7 @@ async def resume_job(
 async def close_job(
     job_post_id: str,
     reason: Optional[str] = None,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Commented out - using MongoDB
     current_user: Dict[str, Any] = Depends(get_employer)
 ):
     """
@@ -134,7 +134,7 @@ async def close_job(
 async def cancel_job(
     job_post_id: str,
     reason: Optional[str] = None,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Commented out - using MongoDB
     current_user: User = Depends(get_employer)
 ):
     """
@@ -162,7 +162,7 @@ async def cancel_job(
 async def approve_job(
     job_post_id: str,
     approval_data: JobApprovalAction,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Commented out - using MongoDB
     current_user: User = Depends(get_admin)
 ):
     """
@@ -180,7 +180,7 @@ async def approve_job(
 async def reject_job(
     job_post_id: str,
     rejection_data: JobRejectionAction,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Commented out - using MongoDB
     current_user: User = Depends(get_admin)
 ):
     """
@@ -198,7 +198,7 @@ async def reject_job(
 async def publish_job(
     job_post_id: str,
     publish_data: JobPublishAction,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Commented out - using MongoDB
     current_user: User = Depends(get_admin)
 ):
     """
@@ -216,7 +216,7 @@ async def publish_job(
 async def unpublish_job(
     job_post_id: str,
     reason: Optional[str] = None,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Commented out - using MongoDB
     current_user: User = Depends(get_admin)
 ):
     """
@@ -234,7 +234,7 @@ async def unpublish_job(
 async def flag_job(
     job_post_id: str,
     flag_data: JobFlagAction,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Commented out - using MongoDB
     current_user: User = Depends(get_admin)
 ):
     """
@@ -252,7 +252,7 @@ async def flag_job(
 async def unflag_job(
     job_post_id: str,
     notes: Optional[str] = None,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Commented out - using MongoDB
     current_user: User = Depends(get_admin)
 ):
     """
@@ -270,7 +270,7 @@ async def unflag_job(
 async def get_pending_approvals(
     limit: int = 50,
     offset: int = 0,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Commented out - using MongoDB
     current_user: User = Depends(get_admin)
 ):
     """
@@ -287,7 +287,7 @@ async def get_pending_approvals(
 async def get_flagged_jobs(
     limit: int = 50,
     offset: int = 0,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Commented out - using MongoDB
     current_user: User = Depends(get_admin)
 ):
     """
@@ -304,7 +304,7 @@ async def get_flagged_jobs(
 @router.get("/history/{job_post_id}", response_model=List[JobWorkflowLogSchema])
 async def get_workflow_history(
     job_post_id: str,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Commented out - using MongoDB
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """
@@ -332,7 +332,7 @@ async def get_workflow_history(
 async def bulk_approve_jobs(
     job_post_ids: List[str],
     approval_data: JobApprovalAction,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Commented out - using MongoDB
     current_user: User = Depends(get_admin)
 ):
     """
@@ -359,7 +359,7 @@ async def bulk_approve_jobs(
 async def bulk_reject_jobs(
     job_post_ids: List[str],
     rejection_data: JobRejectionAction,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Commented out - using MongoDB
     current_user: User = Depends(get_admin)
 ):
     """
@@ -386,7 +386,7 @@ async def bulk_reject_jobs(
 async def bulk_publish_jobs(
     job_post_ids: List[str],
     publish_data: JobPublishAction,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Commented out - using MongoDB
     current_user: User = Depends(get_admin)
 ):
     """
@@ -412,7 +412,7 @@ async def bulk_publish_jobs(
 # Statistics endpoints
 @router.get("/admin/workflow-stats")
 async def get_workflow_stats(
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Commented out - using MongoDB
     current_user: User = Depends(get_admin)
 ):
     """

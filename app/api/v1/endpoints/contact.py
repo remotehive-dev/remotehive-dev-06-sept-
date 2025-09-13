@@ -7,9 +7,9 @@ import os
 from app.core.database import get_db_session
 from app.core.auth import get_admin
 from app.services.slack_service import SlackService
-from app.database.models import ContactSubmission
-from sqlalchemy.orm import Session
-from sqlalchemy import func, or_
+# from app.database.models import ContactSubmission  # Commented out - model doesn't exist yet
+# from sqlalchemy.orm import Session  # Commented out - using MongoDB
+# from sqlalchemy import func, or_  # Commented out - using MongoDB
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -83,7 +83,7 @@ class EmailReplyResponse(BaseModel):
 def submit_contact_form(
     submission: ContactSubmissionCreate,
     request: Request,
-    db: Session = Depends(get_db_session)
+    # db: Session = Depends(get_db_session)  # Commented out - using MongoDB
 ):
     """
     Submit a contact form from the public website
@@ -161,7 +161,7 @@ def get_contact_submissions(
     inquiry_type_filter: Optional[str] = None,
     priority_filter: Optional[str] = None,
     search: Optional[str] = None,
-    db: Session = Depends(get_db_session),
+    # db: Session = Depends(get_db_session),  # Commented out - using MongoDB
     current_user = Depends(get_admin)
 ):
     """
@@ -237,7 +237,7 @@ def get_contact_submissions(
 @router.get("/admin/submissions/{submission_id}", response_model=ContactSubmissionResponse)
 def get_contact_submission(
     submission_id: str,
-    db: Session = Depends(get_db_session),
+    # db: Session = Depends(get_db_session),  # Commented out - using MongoDB
     current_user = Depends(get_admin)
 ):
     """
@@ -310,7 +310,7 @@ def test_slack_integration(
 def update_contact_submission(
     submission_id: str,
     update_data: ContactSubmissionUpdate,
-    db: Session = Depends(get_db_session),
+    # db: Session = Depends(get_db_session),  # Commented out - using MongoDB
     current_user = Depends(get_admin)
 ):
     """
@@ -373,7 +373,7 @@ def update_contact_submission(
 @router.delete("/admin/submissions/{submission_id}")
 def delete_contact_submission(
     submission_id: str,
-    db: Session = Depends(get_db_session),
+    # db: Session = Depends(get_db_session),  # Commented out - using MongoDB
     current_user = Depends(get_admin)
 ):
     """
@@ -401,7 +401,7 @@ def delete_contact_submission(
 def send_email_reply(
     submission_id: str,
     reply_data: EmailReplyRequest,
-    db: Session = Depends(get_db_session),
+    # db: Session = Depends(get_db_session),  # Commented out - using MongoDB
     current_user = Depends(get_admin)
 ):
     """
@@ -493,7 +493,7 @@ Submission ID: {submission_id}
 
 @router.get("/admin/stats", response_model=ContactStats)
 def get_contact_stats(
-    db: Session = Depends(get_db_session),
+    # db: Session = Depends(get_db_session),  # Commented out - using MongoDB
     current_user = Depends(get_admin)
 ):
     """

@@ -600,7 +600,7 @@ class EnhancedMiddleware(BaseHTTPMiddleware):
         # CORS headers (if needed)
         if hasattr(self.settings, 'CORS_ORIGINS'):
             origin = request.headers.get('origin')
-            if origin in self.settings.CORS_ORIGINS:
+            if origin and origin in self.settings.CORS_ORIGINS:
                 response.headers['Access-Control-Allow-Origin'] = origin
                 response.headers['Access-Control-Allow-Credentials'] = 'true'
     

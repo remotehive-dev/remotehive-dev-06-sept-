@@ -8,7 +8,9 @@ from datetime import datetime
 
 from app.core.database import get_db
 from app.core.auth import get_current_admin_user
-from app.database.models import User
+# TODO: MongoDB Migration - Update User import to use MongoDB models
+# from app.database.models import User
+from app.models.mongodb_models import User
 from app.services.slack_service import SlackService
 from app.core.config import settings
 

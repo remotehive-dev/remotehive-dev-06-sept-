@@ -1,29 +1,29 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase';
+import { apiService } from '@/lib/api';
 
 export async function GET() {
   try {
     const startTime = Date.now();
-    const supabaseAdmin = createAdminClient();
     
     // Test database connectivity
-    const dbTest = await supabaseAdmin.from('users').select('id').limit(1);
+    const dbTest = await apiService.get('/admin/users?limit=1');
     const dbResponseTime = Date.now() - startTime;
     
-    // Check scraper queue status
-    const scraperStatus = await supabaseAdmin
-      .from('scraper_queue')
-      .select('status')
-      .eq('status', 'running')
-      .limit(1);
+    // Check scraper queue status (using autoscraper service)
+    let scraperStatus;
+    try {
+      scraperStatus = await fetch('http://localhost:8001/api/v1/scraper/status');
+    } catch (error) {
+      scraperStatus = { ok: false };
+    }
     
     const result = {
       database: {
-        status: dbTest.error ? 'error' : 'healthy',
+        status: dbTest ? 'healthy' : 'error',
         responseTime: dbResponseTime
       },
       scraperQueue: {
-        status: scraperStatus.data && scraperStatus.data.length > 0 ? 'processing' : 'idle'
+        status: scraperStatus.ok ? 'operational' : 'error'
       },
       api: {
         status: 'operational'

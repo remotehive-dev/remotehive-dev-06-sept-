@@ -4,13 +4,13 @@
 
 // API Configuration
 export const API_CONFIG = {
-  BASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  BASE_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
   TIMEOUT: 30000, // 30 seconds
   RETRY_ATTEMPTS: 3,
   RETRY_DELAY: 1000, // 1 second
 } as const;
 
-// Supabase Tables
+// MongoDB Collections
 export const TABLES = {
   USERS: 'users',
   EMPLOYERS: 'employers',
@@ -500,70 +500,48 @@ export const API_ENDPOINTS = {
     PROFILE: '/api/v1/auth/profile',
   },
   USERS: {
-    LIST: '/users',
-    CREATE: '/users',
-    UPDATE: '/users/:id',
-    DELETE: '/users/:id',
-    BULK: '/users/bulk',
+    BASE: '/api/v1/users',
+    BY_ID: (id: string) => `/api/v1/users/${id}`,
+    BULK: '/api/v1/users/bulk',
   },
   EMPLOYERS: {
-    LIST: '/employers',
-    CREATE: '/employers',
-    UPDATE: '/employers/:id',
-    DELETE: '/employers/:id',
-    APPROVE: '/employers/:id/approve',
-    REJECT: '/employers/:id/reject',
-    SUSPEND: '/employers/:id/suspend',
-    STATS: '/employers/stats',
+    BASE: '/api/v1/employers',
+    BY_ID: (id: string) => `/api/v1/employers/${id}`,
+    STATS: '/api/v1/employers/stats',
   },
   JOB_SEEKERS: {
-    LIST: '/job-seekers',
-    CREATE: '/job-seekers',
-    UPDATE: '/job-seekers/:id',
-    DELETE: '/job-seekers/:id',
-    STATS: '/job-seekers/stats',
+    BASE: '/api/v1/job-seekers',
+    BY_ID: (id: string) => `/api/v1/job-seekers/${id}`,
+    STATS: '/api/v1/job-seekers/stats',
   },
   JOB_POSTS: {
-    LIST: '/job-posts',
-    CREATE: '/job-posts',
-    UPDATE: '/job-posts/:id',
-    DELETE: '/job-posts/:id',
-    APPROVE: '/job-posts/:id/approve',
-    REJECT: '/job-posts/:id/reject',
-    FLAG: '/job-posts/:id/flag',
-    STATS: '/job-posts/stats',
+    BASE: '/api/v1/job-posts',
+    BY_ID: (id: string) => `/api/v1/job-posts/${id}`,
+    STATS: '/api/v1/job-posts/stats',
   },
   ANALYTICS: {
-    DASHBOARD: '/analytics/dashboard',
-    USERS: '/analytics/users',
-    JOBS: '/analytics/jobs',
-    REVENUE: '/analytics/revenue',
-    EXPORT: '/analytics/export',
+    DASHBOARD: '/api/v1/analytics/dashboard',
+    USERS: '/api/v1/analytics/users',
+    JOBS: '/api/v1/analytics/jobs',
+    REVENUE: '/api/v1/analytics/revenue',
+    EXPORT: '/api/v1/analytics/export',
   },
   CONTENT: {
-    LIST: '/content',
-    CREATE: '/content',
-    UPDATE: '/content/:id',
-    DELETE: '/content/:id',
-    PUBLISH: '/content/:id/publish',
+    BASE: '/api/v1/content',
+    BY_ID: (id: string) => `/api/v1/content/${id}`,
   },
   NOTIFICATIONS: {
-    LIST: '/notifications',
-    CREATE: '/notifications',
-    UPDATE: '/notifications/:id',
-    DELETE: '/notifications/:id',
-    MARK_READ: '/notifications/:id/read',
-    BULK_READ: '/notifications/bulk-read',
+    BASE: '/api/v1/notifications',
+    BY_ID: (id: string) => `/api/v1/notifications/${id}`,
+    BULK_READ: '/api/v1/notifications/bulk-read',
   },
   SETTINGS: {
-    GET: '/settings',
-    UPDATE: '/settings',
-    RESET: '/settings/reset',
+    BASE: '/api/v1/settings',
   },
   UPLOAD: {
-    FILE: '/upload/file',
-    IMAGE: '/upload/image',
-    DOCUMENT: '/upload/document',
+    FILE: '/api/v1/upload/file',
+    IMAGE: '/api/v1/upload/image',
+    DOCUMENT: '/api/v1/upload/document',
   },
 } as const;
 

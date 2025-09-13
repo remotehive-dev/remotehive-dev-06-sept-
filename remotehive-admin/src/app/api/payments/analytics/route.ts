@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { apiClient } from '@/lib/api';
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,19 +12,24 @@ export async function GET(request: NextRequest) {
     const start = startDate ? new Date(startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     
     // Get overall statistics
-    const { data: transactions, error: transError } = await supabase
-      .from('transactions')
-      .select('*')
-      .gte('created_at', start.toISOString())
-      .lte('created_at', end.toISOString());
+    const response = await apiClient.getItems('transactions', {
+      filters: {
+        created_at: {
+          $gte: start.toISOString(),
+          $lte: end.toISOString()
+        }
+      }
+    });
     
-    if (transError) {
-      console.error('Error fetching transactions for analytics:', transError);
+    if (response.error) {
+      console.error('Error fetching transactions for analytics:', response.error);
       return NextResponse.json(
         { error: 'Failed to fetch analytics data' },
         { status: 500 }
       );
     }
+
+    const transactions = response.data || [];
     
     // Calculate analytics
     const totalTransactions = transactions.length;

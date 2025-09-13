@@ -1,4 +1,4 @@
-import { SupabaseService, TABLES } from './supabase';
+import { apiClient } from '../../lib/api';
 
 export interface AnalyticsData {
   users: {
@@ -68,53 +68,75 @@ export class AnalyticsService {
     const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
 
+
+
     // Users analytics
-    const [totalUsers, newUsersThisMonth, newUsersLastMonth, activeUsers] = await Promise.all([
-      SupabaseService.count(TABLES.USERS),
-      SupabaseService.count(TABLES.USERS, {
-        created_at: `gte.${thisMonth.toISOString()}`
+    const [totalUsersResponse, newUsersThisMonthResponse, newUsersLastMonthResponse, activeUsersResponse] = await Promise.all([
+      apiClient.getCount('users'),
+      apiClient.getCount('users', {
+        created_at: { $gte: thisMonth.toISOString() }
       }),
-      SupabaseService.count(TABLES.USERS, {
-        created_at: `gte.${lastMonth.toISOString()}.lt.${thisMonth.toISOString()}`
+      apiClient.getCount('users', {
+        created_at: { $gte: lastMonth.toISOString(), $lt: thisMonth.toISOString() }
       }),
-      SupabaseService.count(TABLES.USERS, {
-        last_sign_in_at: `gte.${new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()}`
+      apiClient.getCount('users', {
+        last_sign_in_at: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString() }
       })
     ]);
+
+    const totalUsers = totalUsersResponse.data?.count || 0;
+    const newUsersThisMonth = newUsersThisMonthResponse.data?.count || 0;
+    const newUsersLastMonth = newUsersLastMonthResponse.data?.count || 0;
+    const activeUsers = activeUsersResponse.data?.count || 0;
 
     const userGrowthRate = newUsersLastMonth > 0 
       ? ((newUsersThisMonth - newUsersLastMonth) / newUsersLastMonth) * 100 
       : 0;
 
     // Job posts analytics
-    const [totalJobPosts, activeJobPosts, newJobPostsThisMonth, totalApplications] = await Promise.all([
-      SupabaseService.count(TABLES.JOB_POSTS),
-      SupabaseService.count(TABLES.JOB_POSTS, { status: 'active' }),
-      SupabaseService.count(TABLES.JOB_POSTS, {
-        created_at: `gte.${thisMonth.toISOString()}`
+    const [totalJobPostsResponse, activeJobPostsResponse, newJobPostsThisMonthResponse, totalApplicationsResponse] = await Promise.all([
+      apiClient.getCount('job_posts'),
+      apiClient.getCount('job_posts', { status: 'active' }),
+      apiClient.getCount('job_posts', {
+        created_at: { $gte: thisMonth.toISOString() }
       }),
-      SupabaseService.count(TABLES.APPLICATIONS)
+      apiClient.getCount('applications')
     ]);
+
+    const totalJobPosts = totalJobPostsResponse.data?.count || 0;
+    const activeJobPosts = activeJobPostsResponse.data?.count || 0;
+    const newJobPostsThisMonth = newJobPostsThisMonthResponse.data?.count || 0;
+    const totalApplications = totalApplicationsResponse.data?.count || 0;
 
     // Employers analytics
-    const [totalEmployers, activeEmployers, premiumEmployers, newEmployersThisMonth] = await Promise.all([
-      SupabaseService.count(TABLES.EMPLOYERS),
-      SupabaseService.count(TABLES.EMPLOYERS, { status: 'approved' }),
-      SupabaseService.count(TABLES.EMPLOYERS, { is_premium: true }),
-      SupabaseService.count(TABLES.EMPLOYERS, {
-        created_at: `gte.${thisMonth.toISOString()}`
+    const [totalEmployersResponse, activeEmployersResponse, premiumEmployersResponse, newEmployersThisMonthResponse] = await Promise.all([
+      apiClient.getCount('employers'),
+      apiClient.getCount('employers', { status: 'active' }),
+      apiClient.getCount('employers', { is_premium: true }),
+      apiClient.getCount('employers', {
+        created_at: { $gte: thisMonth.toISOString() }
       })
     ]);
 
+    const totalEmployers = totalEmployersResponse.data?.count || 0;
+    const activeEmployers = activeEmployersResponse.data?.count || 0;
+    const premiumEmployers = premiumEmployersResponse.data?.count || 0;
+    const newEmployersThisMonth = newEmployersThisMonthResponse.data?.count || 0;
+
     // Job seekers analytics
-    const [totalJobSeekers, activeJobSeekers, premiumJobSeekers, newJobSeekersThisMonth] = await Promise.all([
-      SupabaseService.count(TABLES.JOB_SEEKERS),
-      SupabaseService.count(TABLES.JOB_SEEKERS, { status: 'active' }),
-      SupabaseService.count(TABLES.JOB_SEEKERS, { is_premium: true }),
-      SupabaseService.count(TABLES.JOB_SEEKERS, {
-        created_at: `gte.${thisMonth.toISOString()}`
+    const [totalJobSeekersResponse, activeJobSeekersResponse, premiumJobSeekersResponse, newJobSeekersThisMonthResponse] = await Promise.all([
+      apiClient.getCount('job_seekers'),
+      apiClient.getCount('job_seekers', { status: 'active' }),
+      apiClient.getCount('job_seekers', { is_premium: true }),
+      apiClient.getCount('job_seekers', {
+        created_at: { $gte: thisMonth.toISOString() }
       })
     ]);
+
+    const totalJobSeekers = totalJobSeekersResponse.data?.count || 0;
+    const activeJobSeekers = activeJobSeekersResponse.data?.count || 0;
+    const premiumJobSeekers = premiumJobSeekersResponse.data?.count || 0;
+    const newJobSeekersThisMonth = newJobSeekersThisMonthResponse.data?.count || 0;
 
     // Revenue analytics (mock data - would integrate with payment provider)
     const totalRevenue = premiumEmployers * 99 + premiumJobSeekers * 29; // Mock calculation
@@ -193,9 +215,11 @@ export class AnalyticsService {
         label = startDate.getFullYear().toString();
       }
 
-      const count = await SupabaseService.count(TABLES.USERS, {
-        created_at: `gte.${startDate.toISOString()}.lt.${endDate.toISOString()}`
+      const countResponse = await apiClient.getCount('users', {
+        created_at: { $gte: startDate.toISOString(), $lt: endDate.toISOString() }
       });
+
+      const count = countResponse.data?.count || 0;
 
       labels.push(label);
       data.push(count);
@@ -215,15 +239,16 @@ export class AnalyticsService {
 
   // Get job categories distribution
   static async getJobCategoriesData(): Promise<ChartData> {
-    const { data, error } = await SupabaseService.read<{ industry: string }>(
-      TABLES.JOB_POSTS,
-      {
-        select: 'industry',
-        filters: { status: 'active' }
-      }
-    );
+    const jobPostsResponse = await apiClient.getItems('job_posts', {
+      select: ['industry'],
+      filters: { status: 'active' }
+    });
 
-    if (error) throw error;
+    if (jobPostsResponse.error) {
+      throw new Error(jobPostsResponse.error);
+    }
+
+    const data = jobPostsResponse.data || [];
 
     const categoryCounts: Record<string, number> = {};
     data.forEach(item => {
@@ -273,15 +298,18 @@ export class AnalyticsService {
         label = startDate.toLocaleDateString('en-US', { month: 'short' });
       }
 
-      const [applications, hires] = await Promise.all([
-        SupabaseService.count(TABLES.APPLICATIONS, {
-          created_at: `gte.${startDate.toISOString()}.lt.${endDate.toISOString()}`
+      const [applicationsResponse, hiresResponse] = await Promise.all([
+        apiClient.getCount('applications', {
+          created_at: { $gte: startDate.toISOString(), $lt: endDate.toISOString() }
         }),
-        SupabaseService.count(TABLES.APPLICATIONS, {
+        apiClient.getCount('applications', {
           status: 'hired',
-          updated_at: `gte.${startDate.toISOString()}.lt.${endDate.toISOString()}`
+          updated_at: { $gte: startDate.toISOString(), $lt: endDate.toISOString() }
         })
       ]);
+
+      const applications = applicationsResponse.data?.count || 0;
+      const hires = hiresResponse.data?.count || 0;
 
       labels.push(label);
       applicationData.push(applications);
@@ -311,19 +339,18 @@ export class AnalyticsService {
 
   // Get top performing employers
   static async getTopEmployers(limit: number = 10): Promise<TopPerformer[]> {
-    const employers = await SupabaseService.read<any>(
-      TABLES.EMPLOYERS,
-      {
-        select: `
-          id,
-          company_name,
-          job_posts:job_posts(count).eq(status,active)
-        `,
-        filters: { status: 'approved' },
-        orderBy: { column: 'created_at', ascending: false },
-        limit
-      }
-    );
+    const employersResponse = await apiClient.getItems('employers', {
+      select: ['id', 'company_name'],
+      filters: { status: 'approved' },
+      sort: { job_posts_count: -1 },
+      limit: 10
+    });
+
+    if (employersResponse.error) {
+      throw new Error(employersResponse.error);
+    }
+
+    const employers = employersResponse.data || [];
 
     return employers.map(employer => ({
       id: employer.id,
@@ -336,21 +363,18 @@ export class AnalyticsService {
 
   // Get top performing job seekers
   static async getTopJobSeekers(limit: number = 10): Promise<TopPerformer[]> {
-    const jobSeekers = await SupabaseService.read<any>(
-      TABLES.JOB_SEEKERS,
-      {
-        select: `
-          id,
-          first_name,
-          last_name,
-          profile_completion,
-          applications:applications(count)
-        `,
-        filters: { status: 'active' },
-        orderBy: { column: 'profile_completion', ascending: false },
-        limit
-      }
-    );
+    const jobSeekersResponse = await apiClient.getItems('job_seekers', {
+      select: ['id', 'first_name', 'last_name', 'profile_completion'],
+      filters: { status: 'active' },
+      sort: { profile_completion: -1 },
+      limit
+    });
+
+    if (jobSeekersResponse.error) {
+      throw new Error(jobSeekersResponse.error);
+    }
+
+    const jobSeekers = jobSeekersResponse.data || [];
 
     return jobSeekers.map(seeker => ({
       id: seeker.id,
@@ -368,9 +392,15 @@ export class AnalyticsService {
     const alerts: PlatformAlert[] = [];
 
     // Check for high pending approvals
-    const pendingEmployers = await SupabaseService.count(TABLES.EMPLOYERS, { status: 'pending' });
-    const pendingJobPosts = await SupabaseService.count(TABLES.JOB_POSTS, { status: 'pending' });
-    const flaggedPosts = await SupabaseService.count(TABLES.JOB_POSTS, { is_flagged: true });
+    const [pendingEmployersResponse, pendingJobPostsResponse, flaggedPostsResponse] = await Promise.all([
+      apiClient.getCount('employers', { status: 'pending' }),
+      apiClient.getCount('job_posts', { status: 'pending' }),
+      apiClient.getCount('job_posts', { is_flagged: true })
+    ]);
+
+    const pendingEmployers = pendingEmployersResponse.data?.count || 0;
+    const pendingJobPosts = pendingJobPostsResponse.data?.count || 0;
+    const flaggedPosts = flaggedPostsResponse.data?.count || 0;
 
     if (pendingEmployers > 10) {
       alerts.push({
@@ -421,22 +451,23 @@ export class AnalyticsService {
 
   // Get location-based statistics
   static async getLocationStats(limit: number = 10): Promise<Record<string, number>> {
-    const [employerLocations, jobSeekerLocations] = await Promise.all([
-      SupabaseService.read<{ location: string }>(
-        TABLES.EMPLOYERS,
-        {
-          select: 'location',
-          filters: { status: 'approved' }
-        }
-      ),
-      SupabaseService.read<{ location: string }>(
-        TABLES.JOB_SEEKERS,
-        {
-          select: 'location',
-          filters: { status: 'active' }
-        }
-      )
+    const [employerLocationsResponse, jobSeekerLocationsResponse] = await Promise.all([
+      apiClient.getItems('employers', {
+        select: ['location'],
+        filters: { status: 'approved' }
+      }),
+      apiClient.getItems('job_seekers', {
+        select: ['location'],
+        filters: { status: 'active' }
+      })
     ]);
+
+    if (employerLocationsResponse.error || jobSeekerLocationsResponse.error) {
+      throw new Error('Failed to fetch location data');
+    }
+
+    const employerLocations = employerLocationsResponse.data || [];
+    const jobSeekerLocations = jobSeekerLocationsResponse.data || [];
 
     const locationCounts: Record<string, number> = {};
     

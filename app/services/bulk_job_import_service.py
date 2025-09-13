@@ -1,7 +1,7 @@
 import asyncio
 from typing import List, Dict, Any, Optional, Tuple
 from motor.motor_asyncio import AsyncIOMotorDatabase
-from bson import ObjectId
+# from bson import ObjectId  # Removed to fix Pydantic schema generation
 from datetime import datetime
 import hashlib
 import json

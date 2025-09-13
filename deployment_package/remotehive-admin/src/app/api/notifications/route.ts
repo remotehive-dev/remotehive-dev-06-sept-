@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase';
+import { API_CONFIG } from '@/utils/constants';
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,34 +9,33 @@ export async function GET(request: NextRequest) {
     const unreadOnly = searchParams.get('unread_only') === 'true';
     const type = searchParams.get('type'); // 'new_lead', 'lead_assigned', 'lead_updated'
 
-    const supabaseAdmin = createAdminClient();
-    
-    let query = supabaseAdmin
-      .from('notifications')
-      .select('*', { count: 'exact' })
-      .order('created_at', { ascending: false })
-      .range((page - 1) * limit, page * limit - 1);
+    // Build query parameters for FastAPI backend
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+    });
 
-    // Apply filters
     if (unreadOnly) {
-      query = query.eq('read', false);
+      queryParams.append('unread_only', 'true');
     }
 
     if (type) {
-      query = query.eq('type', type);
+      queryParams.append('type', type);
     }
 
-    const { data, error, count } = await query;
+    const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/notifications?${queryParams}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
 
-    if (error) {
-      console.error('Error fetching notifications:', error);
-      return NextResponse.json(
-        { error: 'Failed to fetch notifications' },
-        { status: 500 }
-      );
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    return NextResponse.json({ data, count });
+    const result = await response.json();
+    return NextResponse.json(result);
   } catch (error) {
     console.error('Error in notifications API:', error);
     return NextResponse.json(
@@ -72,31 +71,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabaseAdmin = createAdminClient();
-
-    // Create notification
-    const { data, error } = await supabaseAdmin
-      .from('notifications')
-      .insert({
+    const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/notifications`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
         message,
         type,
         data: notificationData || {},
         recipient_id,
-        created_at: new Date().toISOString(),
-        read: false
-      })
-      .select()
-      .single();
+      }),
+    });
 
-    if (error) {
-      console.error('Error creating notification:', error);
-      return NextResponse.json(
-        { error: 'Failed to create notification' },
-        { status: 500 }
-      );
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    return NextResponse.json({ data }, { status: 201 });
+    const result = await response.json();
+    return NextResponse.json(result, { status: 201 });
   } catch (error) {
     console.error('Error in notifications POST API:', error);
     return NextResponse.json(
@@ -121,27 +114,23 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const supabaseAdmin = createAdminClient();
-
-    // Update notifications
-    const { data, error } = await supabaseAdmin
-      .from('notifications')
-      .update({
+    const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/notifications/bulk`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        ids,
         read,
-        updated_at: new Date().toISOString()
-      })
-      .in('id', ids)
-      .select();
+      }),
+    });
 
-    if (error) {
-      console.error('Error updating notifications:', error);
-      return NextResponse.json(
-        { error: 'Failed to update notifications' },
-        { status: 500 }
-      );
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    return NextResponse.json({ data });
+    const result = await response.json();
+    return NextResponse.json(result);
   } catch (error) {
     console.error('Error in notifications PUT API:', error);
     return NextResponse.json(
@@ -157,40 +146,36 @@ export async function DELETE(request: NextRequest) {
     const id = searchParams.get('id');
     const olderThan = searchParams.get('older_than'); // ISO date string
 
-    const supabaseAdmin = createAdminClient();
-
     if (id) {
       // Delete specific notification
-      const { error } = await supabaseAdmin
-        .from('notifications')
-        .delete()
-        .eq('id', id);
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/notifications/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
 
-      if (error) {
-        console.error('Error deleting notification:', error);
-        return NextResponse.json(
-          { error: 'Failed to delete notification' },
-          { status: 500 }
-        );
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      return NextResponse.json({ message: 'Notification deleted successfully' });
+      const result = await response.json();
+      return NextResponse.json(result);
     } else if (olderThan) {
       // Delete notifications older than specified date
-      const { error } = await supabaseAdmin
-        .from('notifications')
-        .delete()
-        .lt('created_at', olderThan);
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/notifications/cleanup?older_than=${olderThan}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
 
-      if (error) {
-        console.error('Error deleting old notifications:', error);
-        return NextResponse.json(
-          { error: 'Failed to delete old notifications' },
-          { status: 500 }
-        );
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      return NextResponse.json({ message: 'Old notifications deleted successfully' });
+      const result = await response.json();
+      return NextResponse.json(result);
     } else {
       return NextResponse.json(
         { error: 'Either id or older_than parameter is required' },

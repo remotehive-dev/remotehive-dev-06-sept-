@@ -4,7 +4,7 @@ from pydantic import BaseModel
 import requests
 from app.core.config import settings
 from app.core.auth import get_current_user
-from app.database.models import User
+# from app.database.models import User  # Commented out - not used in this file
 
 router = APIRouter()
 

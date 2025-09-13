@@ -310,4 +310,4 @@ class AnalyticsService {
 }
 
 export default AnalyticsService;
-export const analyticsService = new AnalyticsService();
+export const analyticsService = new AnalyticsService();export { AnalyticsService };

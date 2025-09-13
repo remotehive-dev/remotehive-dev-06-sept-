@@ -1,13 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import List, Optional, Dict, Any
-from app.database.models import User
 from loguru import logger
 from motor.motor_asyncio import AsyncIOMotorDatabase
 import re
 
 from app.core.database import get_db
 from app.database.services import JobPostService, EmployerService
-from app.database.models import JobPost, Employer
+from app.models.mongodb_models import User, JobPost, Employer
 from app.core.enums import JobStatus
 from app.core.auth_middleware import require_admin, require_employer, require_job_seeker
 from app.core.local_auth import get_current_user
@@ -56,7 +55,8 @@ async def create_job_post(
                 )
             
             # Verify the employer exists
-            employer = EmployerService.get_employer_by_id(db, job_data.employer_id)
+            employer_service = EmployerService()
+            employer = await employer_service.get_employer_by_id(job_data.employer_id)
             logger.info(f"Employer lookup result: {employer.company_name if employer else 'None'}")
             if not employer:
                 raise HTTPException(
@@ -65,7 +65,8 @@ async def create_job_post(
                 )
         else:
             # Employer users use their own profile
-            employer = EmployerService.get_employer_by_user_id(db, current_user.id)
+            employer_service = EmployerService()
+            employer = await employer_service.get_employer_by_user_id(current_user.id)
             
             if not employer:
                 raise HTTPException(
@@ -198,7 +199,8 @@ async def get_my_job_posts(
     """Get job posts for the current employer"""
     try:
         # Get employer profile
-        employer = EmployerService.get_employer_by_user_id(db, current_user.id)
+        employer_service = EmployerService()
+        employer = await employer_service.get_employer_by_user_id(current_user.id)
         
         if not employer:
             raise HTTPException(

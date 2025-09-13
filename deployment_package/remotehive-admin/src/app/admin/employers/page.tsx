@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/providers/ToastProvider';
-// Removed Supabase import - using FastAPI backend instead
+// Using FastAPI backend for data operations
 import {
   Search,
   Filter,

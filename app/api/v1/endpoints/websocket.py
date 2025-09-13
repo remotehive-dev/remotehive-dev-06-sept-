@@ -7,7 +7,9 @@ from app.services.websocket_service import websocket_manager, CSVImportWebSocket
 from app.services.csv_progress_tracker import CSVProgressTracker
 from app.core.auth import get_current_user
 from app.database.database import get_db_session
-from app.database.models import User
+# TODO: MongoDB Migration - Update User import to use MongoDB models
+# from app.database.models import User
+from app.models.mongodb_models import User
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)

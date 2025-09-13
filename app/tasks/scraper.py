@@ -1,7 +1,9 @@
 from celery import current_app as celery_app
 from app.database.database import get_database_manager
 from app.database.services import JobPostService
-from app.database.models import ScraperConfig, ScraperLog, JobPost
+# from app.database.models import ScraperConfig, ScraperLog, JobPost  # Using MongoDB models instead
+from app.models.mongodb_models import JobPost
+from app.database.mongodb_models import ScraperConfig, ScraperLog
 from app.performance import performance_tracker, PerformanceContext, MetricType
 from app.scraper.engine import WebScrapingEngine, ScrapingConfig
 from app.scraper.parsers import ParsedJobPost

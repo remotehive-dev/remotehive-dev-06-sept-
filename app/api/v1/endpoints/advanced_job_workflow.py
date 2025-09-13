@@ -6,14 +6,14 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
-from sqlalchemy.orm import Session, joinedload, noload
+# from sqlalchemy.orm import Session, joinedload, noload  # Commented out - using MongoDB
 from sqlalchemy import and_, or_, func, desc, asc, text
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 import uuid
 
-from app.core.database import get_db
-from app.database.models import Employer, User, JobWorkflowLog
+# from app.core.database import get_db  # Commented out - using MongoDB
+from app.models.mongodb_models import Employer, User  # JobWorkflowLog commented out - doesn't exist
 # Removed job_post schema imports to isolate serialization issue
 from app.schemas.employer import (
     Employer as EmployerSchema,
@@ -34,8 +34,8 @@ router = APIRouter(tags=["Advanced Job Workflow"])
 @router.get("/employers", response_model=Dict[str, Any])
 async def get_employers_with_stats(
     search_params: EmployerSearchParams = Depends(),
-    current_user: User = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_admin)
+    # db: Session = Depends(get_db)  # Commented out - using MongoDB
 ):
     """
     Get all employers with job statistics and RH00 numbers.
@@ -152,8 +152,8 @@ async def get_employers_with_stats(
 @router.get("/employers/{employer_number}", response_model=EmployerWithJobStats)
 async def get_employer_by_rh_number(
     employer_number: str,
-    current_user: User = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_admin)
+    # db: Session = Depends(get_db)  # Commented out - using MongoDB
 ):
     """
     Get employer details by RH00 series number with comprehensive job statistics.
@@ -292,8 +292,8 @@ async def perform_workflow_action(
     job_id: str,
     action: JobWorkflowAction,
     background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_admin)
+    # db: Session = Depends(get_db)  # Commented out - using MongoDB
 ):
     """
     Perform enhanced workflow actions on job posts.
@@ -424,8 +424,8 @@ async def bulk_workflow_action(
     job_ids: List[str],
     action: JobWorkflowAction,
     background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_admin)
+    # db: Session = Depends(get_db)  # Commented out - using MongoDB
 ):
     """
     Perform bulk workflow actions on multiple job posts.
@@ -510,8 +510,8 @@ async def bulk_workflow_action(
 
 @router.get("/statistics")
 async def get_workflow_statistics(
-    current_user: User = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_admin)
+    # db: Session = Depends(get_db)  # Commented out - using MongoDB
 ):
     """
     Get comprehensive workflow statistics.
@@ -581,8 +581,8 @@ async def get_workflow_statistics(
 
 @router.post("/automation/publish-scheduled")
 async def run_auto_publish(
-    current_user: User = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_admin)
+    # db: Session = Depends(get_db)  # Commented out - using MongoDB
 ):
     """
     Manually trigger auto-publishing of scheduled jobs.
@@ -599,8 +599,8 @@ async def run_auto_publish(
 
 @router.post("/automation/expire-jobs")
 async def run_auto_expire(
-    current_user: User = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_admin)
+    # db: Session = Depends(get_db)  # Commented out - using MongoDB
 ):
     """
     Manually trigger auto-expiration of jobs.
@@ -622,8 +622,8 @@ async def run_auto_expire(
 @router.get("/jobs/{job_id}/workflow-history")
 async def get_job_workflow_history(
     job_id: str,
-    current_user: User = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_admin)
+    # db: Session = Depends(get_db)  # Commented out - using MongoDB
 ):
     """
     Get complete workflow history for a specific job.
@@ -651,8 +651,8 @@ async def get_employer_workflow_history(
     employer_number: str,
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
-    current_user: User = Depends(get_admin),
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_admin)
+    # db: Session = Depends(get_db)  # Commented out - using MongoDB
 ):
     """
     Get workflow history for all jobs of a specific employer.

@@ -11,7 +11,7 @@ const nextConfig = {
   experimental: {
     ssr: false,
     outputFileTracingRoot: undefined,
-    serverComponentsExternalPackages: ['@supabase/supabase-js'],
+    serverComponentsExternalPackages: [],
   },
   serverRuntimeConfig: {
     // Will only be available on the server side

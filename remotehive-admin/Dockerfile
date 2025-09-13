@@ -14,9 +14,7 @@ WORKDIR /app
     COPY . .
     
     # Set dummy environment variables for build
-    ENV NEXT_PUBLIC_SUPABASE_URL=https://dummy.supabase.co
-    ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR1bW15IiwiYXVkIjoiYXV0aGVudGljYXRlZCIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNjAwMDAwMDAwLCJleHAiOjE5MDA0NDQ0NDR9.dummy
-    ENV SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR1bW15IiwiYXVkIjoiYXV0aGVudGljYXRlZCIsInJvbGUiOiJzZXJ2aWNlX3JvbGUiLCJpYXQiOjE2MDAwMDAwMDAsImV4cCI6MTkwMDQ0NDQ0NH0.dummy
+    # MongoDB Atlas configuration for database operations
     ENV NEXT_PUBLIC_API_URL=http://localhost:8001/api/v1
     ENV NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=dummy-key
     ENV JWT_SECRET=dummy-secret
@@ -44,9 +42,8 @@ RUN npm install
 COPY . .
 
 # Set development environment variables
-ENV NEXT_PUBLIC_SUPABASE_URL=https://dummy.supabase.co
-ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR1bW15IiwiYXVkIjoiYXV0aGVudGljYXRlZCIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNjAwMDAwMDAwLCJleHAiOjE5MDA0NDQ0NDR9.dummy
-ENV SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR1bW15IiwiYXVkIjoiYXV0aGVudGljYXRlZCIsInJvbGUiOiJzZXJ2aWNlX3JvbGUiLCJpYXQiOjE2MDAwMDAwMDAsImV4cCI6MTkwMDQ0NDQ0NH0.dummy
+# MongoDB Atlas configuration for database operations
+# ENV NEXT_PUBLIC_API_URL will be set for FastAPI backend connection
 ENV NEXT_PUBLIC_API_URL=http://localhost:8001/api/v1
 ENV NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=dummy-key
 ENV JWT_SECRET=dummy-secret
