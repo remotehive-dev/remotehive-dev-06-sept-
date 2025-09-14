@@ -1,7 +1,7 @@
 import logging
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta
-from sqlalchemy.orm import Session
+# from sqlalchemy.orm import Session  # Using MongoDB instead
 from app.core.database import get_db
 from app.services.email_service import EmailService
 

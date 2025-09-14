@@ -42,10 +42,6 @@ const ClerkLogin: React.FC = () => {
             routing="path"
             path="/clerk-login"
             signUpUrl="/clerk-register"
-            onError={(error) => {
-              console.error('Clerk signin error:', error)
-              setClerkError(error.message || 'An error occurred during sign in')
-            }}
             appearance={{
               elements: {
                 formButtonPrimary: 'bg-blue-600 hover:bg-blue-700 text-sm normal-case',

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+# from sqlalchemy.orm import Session  # Using MongoDB instead
 from typing import List, Optional
 from pydantic import BaseModel
 from datetime import datetime
@@ -104,7 +104,7 @@ async def get_jobs(
     status: str = Query("active", description="Filter by status"),
     limit: int = Query(12, ge=1, le=100, description="Number of jobs to return"),
     skip: int = Query(0, ge=0, description="Number of jobs to skip"),
-    db: Session = Depends(get_db_session)
+    db = Depends(get_db_session)  # TODO: MongoDB Migration - Remove Session type
 ):
     """Get list of job posts with filters and pagination."""
     try:
@@ -125,7 +125,7 @@ async def get_jobs(
         if status:
             total_query = total_query.filter(JobPost.status == status)
         if search:
-            from sqlalchemy import or_
+            # from sqlalchemy import or_  # TODO: MongoDB Migration - Remove SQLAlchemy dependency
             total_query = total_query.filter(
                 or_(
                     JobPost.title.ilike(f'%{search}%'),
@@ -136,7 +136,7 @@ async def get_jobs(
         if job_type:
             total_query = total_query.filter(JobPost.job_type == job_type)
         if location:
-            from sqlalchemy import or_
+            # from sqlalchemy import or_  # TODO: MongoDB Migration - Remove SQLAlchemy dependency
             total_query = total_query.filter(
                 or_(
                     JobPost.location_city.ilike(f'%{location}%'),
@@ -166,7 +166,7 @@ async def get_jobs(
 @router.post("/", response_model=JobPostResponse, status_code=201)
 async def create_job(
     job_data: JobPostCreate,
-    db: Session = Depends(get_db_session)
+    db = Depends(get_db_session)  # TODO: MongoDB Migration - Remove Session type
 ):
     """Create a new job post."""
     try:
@@ -194,7 +194,7 @@ async def create_job(
 async def get_job(
     job_id: int,
     increment_views: bool = Query(True, description="Whether to increment view count"),
-    db: Session = Depends(get_db_session)
+    db = Depends(get_db_session)  # TODO: MongoDB Migration - Remove Session type
 ):
     """Get job post by ID."""
     try:
@@ -221,7 +221,7 @@ async def get_job(
 async def update_job(
     job_id: int,
     job_data: JobPostUpdate,
-    db: Session = Depends(get_db_session)
+    db = Depends(get_db_session)  # TODO: MongoDB Migration - Remove Session type
 ):
     """Update job post."""
     try:
@@ -248,7 +248,7 @@ async def update_job(
 @router.delete("/{job_id}")
 async def delete_job(
     job_id: int,
-    db: Session = Depends(get_db_session)
+    db = Depends(get_db_session)  # TODO: MongoDB Migration - Remove Session type
 ):
     """Delete job post."""
     try:
@@ -286,7 +286,7 @@ async def get_jobs_by_employer(
     status: Optional[str] = Query(None, description="Filter by status"),
     limit: int = Query(50, ge=1, le=100, description="Number of jobs to return"),
     skip: int = Query(0, ge=0, description="Number of jobs to skip"),
-    db: Session = Depends(get_db_session)
+    db = Depends(get_db_session)  # TODO: MongoDB Migration - Remove Session type
 ):
     """Get job posts by employer."""
     try:

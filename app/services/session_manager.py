@@ -14,7 +14,7 @@ from app.services.scraper_orchestrator import ScraperOrchestrator, ScrapingConfi
 from app.services.web_scraper import WebScraperService
 from app.services.ml_service import MLService
 from app.database import get_db_session
-from sqlalchemy.orm import Session
+# from sqlalchemy.orm import Session  # Using MongoDB instead
 
 logger = logging.getLogger(__name__)
 

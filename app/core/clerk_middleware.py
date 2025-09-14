@@ -1,12 +1,12 @@
 from typing import Dict, Any, Optional, List, Union
 from fastapi import HTTPException, status, Depends, Request, Header
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import Session
+from motor.motor_asyncio import AsyncIOMotorDatabase
 from loguru import logger
 
 from app.core.clerk_auth import clerk_auth
 from app.core.rbac import Permission, has_permission, get_role_permissions
-from app.database.database import get_db_session
+from app.core.deps import get_database
 from app.models.mongodb_models import User, UserRole
 from app.database.services import UserService, EmployerService, JobSeekerService
 
@@ -18,7 +18,7 @@ class ClerkMiddleware:
     @staticmethod
     async def get_current_user_from_clerk(
         authorization: Optional[str] = Header(None),
-        db: Session = Depends(get_db_session)
+        db: AsyncIOMotorDatabase = Depends(get_database)
     ) -> Dict[str, Any]:
         """Get current user from Clerk session token"""
         

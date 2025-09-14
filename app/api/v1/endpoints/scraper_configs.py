@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
+# TODO: MongoDB Migration - Remove SQLAlchemy dependency
+# from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.database.database import get_db_session
 from app.services.scraper_config_service import ScraperConfigService
@@ -25,7 +26,7 @@ router = APIRouter()
 async def get_scraper_configs(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    db: Session = Depends(get_db_session),
+    db = Depends(get_db_session),  # TODO: MongoDB Migration - Remove Session type
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -46,7 +47,7 @@ async def get_scraper_configs(
 @router.post("/configs", response_model=ScraperConfigResponse, status_code=status.HTTP_201_CREATED)
 async def create_scraper_config(
     config_data: ScraperConfigCreate,
-    db: Session = Depends(get_db_session),
+    db = Depends(get_db_session),  # TODO: MongoDB Migration - Remove Session type
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -71,7 +72,7 @@ async def create_scraper_config(
 async def update_scraper_config(
     config_id: int,
     config_data: ScraperConfigUpdate,
-    db: Session = Depends(get_db_session),
+    db = Depends(get_db_session),  # TODO: MongoDB Migration - Remove Session type
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -99,7 +100,7 @@ async def update_scraper_config(
 @router.delete("/configs/{config_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_scraper_config(
     config_id: int,
-    db: Session = Depends(get_db_session),
+    db = Depends(get_db_session),  # TODO: MongoDB Migration - Remove Session type
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -127,7 +128,7 @@ async def delete_scraper_config(
 @router.get("/configs/{config_id}", response_model=ScraperConfigResponse)
 async def get_scraper_config(
     config_id: int,
-    db: Session = Depends(get_db_session),
+    db = Depends(get_db_session),  # TODO: MongoDB Migration - Remove Session type
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -154,7 +155,7 @@ async def get_scraper_config(
 @router.post("/configs/bulk", response_model=BulkScraperConfigResponse, status_code=status.HTTP_201_CREATED)
 async def create_bulk_configs(
     bulk_request: BulkScraperConfigCreate,
-    db: Session = Depends(get_db_session),
+    db = Depends(get_db_session),  # TODO: MongoDB Migration - Remove Session type
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -185,7 +186,7 @@ async def create_bulk_configs(
 @router.delete("/configs/bulk", status_code=status.HTTP_200_OK)
 async def delete_bulk_configs(
     config_ids: List[int],
-    db: Session = Depends(get_db_session),
+    db = Depends(get_db_session),  # TODO: MongoDB Migration - Remove Session type
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -221,7 +222,7 @@ async def delete_bulk_configs(
 @router.get("/configs/{config_id}/stats", response_model=ScraperConfigStats)
 async def get_config_stats(
     config_id: int,
-    db: Session = Depends(get_db_session),
+    db = Depends(get_db_session),  # TODO: MongoDB Migration - Remove Session type
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -248,7 +249,7 @@ async def get_config_stats(
 
 @router.get("/configs/active", response_model=List[ScraperConfigResponse])
 async def get_active_configs(
-    db: Session = Depends(get_db_session),
+    db = Depends(get_db_session),  # TODO: MongoDB Migration - Remove Session type
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -261,7 +262,7 @@ async def get_active_configs(
 
 @router.get("/configs/scheduled", response_model=List[ScraperConfigResponse])
 async def get_scheduled_configs(
-    db: Session = Depends(get_db_session),
+    db = Depends(get_db_session),  # TODO: MongoDB Migration - Remove Session type
     current_user: User = Depends(get_current_user)
 ):
     """

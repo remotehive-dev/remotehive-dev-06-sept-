@@ -11,7 +11,7 @@ celery_app = Celery(
     "remotehive",
     broker=settings.CELERY_BROKER_URL,
     backend=settings.CELERY_RESULT_BACKEND,
-    include=["app.tasks", "app.autoscraper.tasks"]
+    include=["app.tasks", "app.autoscraper.tasks", "app.tasks.monitoring"]
 )
 
 # Enhanced Celery configuration with monitoring and retry mechanisms
@@ -279,8 +279,25 @@ def task_failure_handler(sender=None, task_id=None, exception=None, traceback=No
 
 @signals.worker_ready.connect
 def worker_ready_handler(sender=None, **kwds):
-    """Log worker startup."""
+    """Log worker startup and initialize database manager."""
     try:
+        # Initialize database manager for worker processes
+        from app.database.database import get_database_manager
+        import asyncio
+        
+        db_manager = get_database_manager()
+        
+        # Initialize database manager in worker process
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(db_manager.initialize())
+            structured_logger.info("Database manager initialized in worker process")
+        except Exception as db_error:
+            structured_logger.error(f"Failed to initialize database manager in worker: {db_error}")
+        finally:
+            loop.close()
+        
         structured_logger.info(
             "Celery worker ready",
             extra={

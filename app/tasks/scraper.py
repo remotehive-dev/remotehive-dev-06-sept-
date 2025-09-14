@@ -12,7 +12,7 @@ from app.tasks.playwright_scraper import playwright_scrape_jobs, batch_playwrigh
 from datetime import datetime, timedelta
 import logging
 from typing import List, Dict, Any
-from sqlalchemy import and_, or_
+# from sqlalchemy import and_, or_  # Using MongoDB instead
 import requests
 import json
 import uuid

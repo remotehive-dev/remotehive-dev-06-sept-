@@ -10,7 +10,7 @@ from app.database.database import get_db_session
 # TODO: MongoDB Migration - Update User import to use MongoDB models
 # from app.database.models import User
 from app.models.mongodb_models import User
-from sqlalchemy.orm import Session
+# from sqlalchemy.orm import Session  # Using MongoDB instead
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -19,7 +19,7 @@ security = HTTPBearer()
 # Initialize handlers
 csv_handler = None
 
-def get_csv_handler(db: Session = Depends(get_db_session)):
+def get_csv_handler(db = Depends(get_db_session)):
     global csv_handler
     if csv_handler is None:
         progress_tracker = CSVProgressTracker(db)

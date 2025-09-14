@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+# from sqlalchemy.orm import Session  # Using MongoDB instead
 from typing import List, Optional
 from pydantic import BaseModel
 import json
@@ -76,7 +76,7 @@ slack_messages_storage = []
 @router.get("/config", response_model=SlackConfigResponse)
 async def get_slack_config(
     current_admin: User = Depends(get_current_admin_user),
-    db: Session = Depends(get_db)
+    db = Depends(get_db)  # TODO: MongoDB Migration - Remove Session type
 ):
     """
     Get current Slack configuration
@@ -102,7 +102,7 @@ async def get_slack_config(
 async def save_slack_config(
     config: SlackConfigRequest,
     current_admin: User = Depends(get_current_admin_user),
-    db: Session = Depends(get_db)
+    db = Depends(get_db)  # TODO: MongoDB Migration - Remove Session type
 ):
     """
     Save Slack configuration
@@ -157,7 +157,7 @@ async def save_slack_config(
 async def update_slack_config(
     config: SlackConfigRequest,
     current_admin: User = Depends(get_current_admin_user),
-    db: Session = Depends(get_db)
+    db = Depends(get_db)  # TODO: MongoDB Migration - Remove Session type
 ):
     """
     Update Slack configuration (partial update)
@@ -171,7 +171,7 @@ async def get_slack_messages(
     type: str = "all",
     status: str = "all",
     current_admin: User = Depends(get_current_admin_user),
-    db: Session = Depends(get_db)
+    db = Depends(get_db)  # TODO: MongoDB Migration - Remove Session type
 ):
     """
     Get Slack message history
@@ -205,7 +205,7 @@ async def get_slack_messages(
 async def send_slack_message(
     message: SlackMessageRequest,
     current_admin: User = Depends(get_current_admin_user),
-    db: Session = Depends(get_db)
+    db = Depends(get_db)  # TODO: MongoDB Migration - Remove Session type
 ):
     """
     Send a manual Slack message
@@ -267,7 +267,7 @@ async def send_slack_message(
 async def delete_slack_message(
     message_id: str,
     current_admin: User = Depends(get_current_admin_user),
-    db: Session = Depends(get_db)
+    db = Depends(get_db)  # TODO: MongoDB Migration - Remove Session type
 ):
     """
     Delete a Slack message record
@@ -298,7 +298,7 @@ async def delete_slack_message(
 @router.get("/test")
 async def test_slack_integration(
     current_admin: User = Depends(get_current_admin_user),
-    db: Session = Depends(get_db)
+    db = Depends(get_db)  # TODO: MongoDB Migration - Remove Session type
 ):
     """
     Test Slack integration

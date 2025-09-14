@@ -1,6 +1,6 @@
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime, timedelta
-from sqlalchemy.orm import Session
+# from sqlalchemy.orm import Session  # Using MongoDB instead
 from loguru import logger
 import requests
 import feedparser
@@ -52,8 +52,8 @@ class NormalizationResult:
 class ScrapingService:
     """Service for handling web scraping operations"""
     
-    def __init__(self, db_session: Session = None):
-        self.db = db_session or get_database_manager().get_sqlalchemy_session()
+    def __init__(self, db_session = None):
+        self.db = db_session or get_database_manager().get_session()
         self.session = requests.Session()
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
@@ -430,8 +430,8 @@ class ScrapingService:
 class NormalizationService:
     """Service for normalizing raw job data into structured format"""
     
-    def __init__(self, db_session: Session = None):
-        self.db = db_session or get_database_manager().get_sqlalchemy_session()
+    def __init__(self, db_session = None):
+        self.db = db_session or get_database_manager().get_session()
         self.job_post_service = JobPostService(self.db)
     
     def normalize_raw_jobs(self, job_board: JobBoard, scrape_job: ScrapeJob, limit: int = None) -> NormalizationResult:

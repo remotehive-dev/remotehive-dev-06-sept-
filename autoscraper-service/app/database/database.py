@@ -1,131 +1,133 @@
 #!/usr/bin/env python3
 """
 Database Manager for AutoScraper Service
-Handles database connections and session management
+Handles MongoDB Atlas connections and database operations
 """
 
 import time
+import asyncio
 from contextlib import asynccontextmanager
 from typing import Dict, Any
 from loguru import logger
-from sqlalchemy import create_engine
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import sessionmaker
 
 from config.settings import get_settings
-from app.models.models import Base
+from app.database.mongodb_manager import AutoScraperMongoDBManager
 
 settings = get_settings()
-from app.utils.metrics import metrics
-
-
-# Import models from models package for SQLAlchemy
 try:
-    from app.models import (
+    from app.utils.metrics import metrics
+except ImportError:
+    metrics = None
+
+# Import MongoDB models
+try:
+    from app.models.mongodb_models import (
         JobBoard, ScheduleConfig, ScrapeJob, ScrapeRun, 
-        RawJob, NormalizedJob, EngineState
+        RawJob, NormalizedJob, EngineState, ScrapingMetrics
     )
 except ImportError as e:
-    logger.warning(f"Could not import models: {e}")
+    logger.warning(f"Could not import MongoDB models: {e}")
 
 
 class DatabaseManager:
-    """Database manager for autoscraper service"""
+    """MongoDB database manager for autoscraper service"""
     
     def __init__(self):
-        # Convert sqlite URL to async if needed
-        database_url = settings.DATABASE_URL
-        if database_url.startswith("sqlite://"):
-            self.async_database_url = database_url.replace("sqlite://", "sqlite+aiosqlite://")
-        else:
-            self.async_database_url = database_url
-            
-        self.engine = None
-        self.async_session_maker = None
+        self.mongodb_manager = AutoScraperMongoDBManager()
         self._initialized = False
     
     async def initialize(self):
-        """Initialize database connections"""
+        """Initialize MongoDB connections"""
         if self._initialized:
             return
         try:
-            # Create async engine
-            self.engine = create_async_engine(
-                self.async_database_url,
-                echo=settings.ENVIRONMENT == "development",
-                pool_size=settings.DATABASE_POOL_SIZE,
-                max_overflow=settings.DATABASE_MAX_OVERFLOW,
-                pool_timeout=settings.DATABASE_POOL_TIMEOUT,
-                pool_recycle=settings.DATABASE_POOL_RECYCLE
+            # Connect to MongoDB Atlas
+            success = await self.mongodb_manager.connect(
+                connection_string=settings.MONGODB_URL,
+                database_name=settings.MONGODB_DATABASE_NAME
             )
             
-            # Create session maker
-            self.async_session_maker = async_sessionmaker(
-                self.engine,
-                class_=AsyncSession,
-                expire_on_commit=False
-            )
+            if not success:
+                raise Exception("Failed to connect to MongoDB Atlas")
             
-            # Create tables
-            async with self.engine.begin() as conn:
-                await conn.run_sync(Base.metadata.create_all)
+            # Create indexes for better performance
+            await self.mongodb_manager.create_indexes()
             
             self._initialized = True
-            logger.info("SQLAlchemy database initialized for autoscraper service")
+            logger.info("MongoDB Atlas database initialized for autoscraper service")
         except Exception as e:
-            logger.error(f"Failed to initialize database: {e}")
+            logger.error(f"Failed to initialize MongoDB database: {e}")
             raise
     
 
     
-    def get_session(self):
-        """Get database session (sync version - not recommended)"""
-        if not self.async_session_maker:
-            raise RuntimeError("Database not initialized")
-        return self.async_session_maker()
+    async def get_database(self):
+        """Get MongoDB database instance"""
+        if not self._initialized:
+            await self.initialize()
+        return self.mongodb_manager.database
     
-    @asynccontextmanager
-    async def get_session_context(self):
-        """Get database session context manager"""
-        if not self.async_session_maker:
-            raise RuntimeError("Database not initialized")
-            
-        async with self.async_session_maker() as session:
-            try:
-                yield session
-                await session.commit()
-            except Exception as e:
-                await session.rollback()
-                logger.error(f"Database session error: {e}")
-                raise
-    
-    async def health_check(self) -> dict:
-        """Perform database health check"""
-        try:
-            start_time = time.time()
-            
-            async with self.get_session_context() as session:
-                await session.execute("SELECT 1")
-            
-            duration = time.time() - start_time
-            
-            return {
-                "status": "healthy",
-                "response_time_ms": round(duration * 1000, 2)
-            }
-            
-        except Exception as e:
-            logger.error(f"Database health check failed: {e}")
-            return {
-                "status": "unhealthy",
-                "error": str(e)
-            }
+    async def get_collection(self, collection_name: str):
+        """Get MongoDB collection"""
+        database = await self.get_database()
+        return database[collection_name]
     
     async def close(self):
-        """Close database connections"""
-        if self.engine:
-            await self.engine.dispose()
-        logger.info("Database connections closed")
+        """Close MongoDB connections"""
+        await self.mongodb_manager.disconnect()
+        logger.info("MongoDB connections closed")
+    
+    async def health_check(self) -> Dict[str, Any]:
+        """Check MongoDB health"""
+        try:
+            success = await self.mongodb_manager.test_connection()
+            if success:
+                return {
+                    "status": "healthy",
+                    "database_type": "mongodb",
+                    "database_name": settings.MONGODB_DATABASE_NAME
+                }
+            else:
+                return {
+                    "status": "unhealthy",
+                    "error": "Connection test failed",
+                    "database_type": "mongodb"
+                }
+        except Exception as e:
+            logger.error(f"MongoDB health check failed: {e}")
+            return {
+                "status": "unhealthy",
+                "error": str(e),
+                "database_type": "mongodb"
+            }
+    
+    async def get_metrics(self) -> Dict[str, Any]:
+        """Get MongoDB metrics"""
+        try:
+            if not self._initialized:
+                return {
+                    "database_type": "mongodb",
+                    "initialized": False,
+                    "error": "Database not initialized"
+                }
+            
+            # Get MongoDB collection stats
+            collection_stats = await self.mongodb_manager.get_collection_stats()
+            
+            return {
+                "database_type": "mongodb",
+                "database_name": settings.MONGODB_DATABASE_NAME,
+                "collection_stats": collection_stats,
+                "initialized": self._initialized,
+                "connection_status": "connected" if self.mongodb_manager.client else "disconnected"
+            }
+        except Exception as e:
+            logger.error(f"Failed to get MongoDB metrics: {e}")
+            return {
+                "error": str(e),
+                "database_type": "mongodb",
+                "initialized": self._initialized
+            }
 
 
 # Create global database manager
@@ -147,26 +149,39 @@ def get_db_session_context():
     return db_manager.get_session_context()
 
 
-class DatabaseRetryMixin:
-    """Mixin for database operations with retry logic"""
+class MongoDBRetryMixin:
+    """Mixin for MongoDB operations with retry logic"""
     
-    @staticmethod
-    async def with_retry(func, max_retries: int = 3, delay: float = 1.0):
-        """Execute database operation with retry logic"""
+    async def execute_with_retry(self, operation, max_retries: int = 3, delay: float = 1.0):
+        """Execute MongoDB operation with retry logic"""
+        last_exception = None
+        
         for attempt in range(max_retries):
             try:
-                return await func()
+                return await operation()
             except Exception as e:
-                if attempt == max_retries - 1:
-                    logger.error(f"Database operation failed after {max_retries} attempts: {e}")
-                    raise
+                last_exception = e
+                logger.warning(f"MongoDB operation failed (attempt {attempt + 1}/{max_retries}): {e}")
                 
-                logger.warning(
-                    f"Database operation failed (attempt {attempt + 1}/{max_retries}): {e}. "
-                    f"Retrying in {delay}s..."
-                )
-                time.sleep(delay)
-                delay *= 2  # Exponential backoff
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(delay * (2 ** attempt))  # Exponential backoff
+                else:
+                    logger.error(f"MongoDB operation failed after {max_retries} attempts")
+                    raise last_exception
+
+
+class MongoDBOperationMixin:
+    """Mixin for MongoDB operation management"""
+    
+    async def with_session(self, operation):
+        """Execute operation with MongoDB session (for transactions if needed)"""
+        try:
+            # For simple operations, we don't need sessions
+            # MongoDB handles atomicity at document level
+            return await operation()
+        except Exception as e:
+            logger.error(f"MongoDB operation failed: {e}")
+            raise
 
 
 class TransactionManager:

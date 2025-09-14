@@ -1,11 +1,11 @@
 from fastapi import APIRouter, HTTPException, Depends, status, Query
-from sqlalchemy.orm import Session
+# from sqlalchemy.orm import Session  # Using MongoDB instead
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 import logging
 import json
 
-from app.core.database import get_db_session as get_db
+from app.database.database import get_db_session as get_db
 from app.core.auth import get_admin
 # from app.database.models import EmailTemplate, EmailLog, SystemSettings
 # TODO: Implement EmailTemplate and EmailLog models in MongoDB
@@ -30,7 +30,7 @@ from app.schemas.email import (
 )
 from app.tasks.email import send_email, render_email_template
 from app.core.config import settings
-from sqlalchemy import func, desc, or_
+# from sqlalchemy import func, desc, or_  # Using MongoDB instead
 from jinja2 import Template, TemplateSyntaxError
 import re
 
@@ -45,7 +45,7 @@ async def get_email_templates(
     search: Optional[str] = Query(None),
     category: Optional[str] = Query(None),
     is_active: Optional[bool] = Query(None),
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Using MongoDB instead
     current_user = Depends(get_admin)
 ):
     """Get paginated list of email templates"""
@@ -92,7 +92,7 @@ async def get_email_templates(
 @router.get("/templates/{template_id}", response_model=EmailTemplateSchema)
 async def get_email_template(
     template_id: int,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Using MongoDB instead
     current_user = Depends(get_admin)
 ):
     """Get a specific email template by ID"""
@@ -109,7 +109,7 @@ async def get_email_template(
 @router.post("/templates", response_model=EmailTemplateSchema)
 async def create_email_template(
     template_data: EmailTemplateCreate,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Using MongoDB instead
     current_user = Depends(get_admin)
 ):
     """Create a new email template"""
@@ -162,7 +162,7 @@ async def create_email_template(
 async def update_email_template(
     template_id: int,
     template_data: EmailTemplateUpdate,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Using MongoDB instead
     current_user = Depends(get_admin)
 ):
     """Update an existing email template"""
@@ -222,7 +222,7 @@ async def update_email_template(
 @router.delete("/templates/{template_id}")
 async def delete_email_template(
     template_id: int,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Using MongoDB instead
     current_user = Depends(get_admin)
 ):
     """Delete an email template"""
@@ -265,7 +265,7 @@ async def delete_email_template(
 async def preview_email_template(
     template_id: int,
     preview_data: EmailPreviewRequest,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Using MongoDB instead
     current_user = Depends(get_admin)
 ):
     """Preview an email template with sample data"""
@@ -329,7 +329,7 @@ async def preview_email_template(
 @router.post("/test", response_model=EmailTestResponse)
 async def test_email(
     test_data: EmailTestRequest,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Using MongoDB instead
     current_user = Depends(get_admin)
 ):
     """Send a test email"""
@@ -414,7 +414,7 @@ async def get_email_logs(
     search: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
     template_name: Optional[str] = Query(None),
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Using MongoDB instead
     current_user = Depends(get_admin)
 ):
     """Get paginated list of email logs"""
@@ -461,7 +461,7 @@ async def get_email_logs(
 @router.get("/stats", response_model=EmailStats)
 async def get_email_stats(
     days: int = Query(30, ge=1, le=365),
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Using MongoDB instead
     current_user = Depends(get_admin)
 ):
     """Get email statistics for the specified number of days"""
@@ -511,7 +511,7 @@ async def get_email_stats(
 @router.get("/smtp-settings", response_model=SMTPSettings)
 async def get_smtp_settings(
     current_user = Depends(get_admin),
-    db: Session = Depends(get_db)
+    # db: Session = Depends(get_db)  # Using MongoDB instead
 ):
     """Get current SMTP settings"""
     try:
@@ -566,7 +566,7 @@ async def get_smtp_settings(
 @router.put("/smtp-settings", response_model=SMTPSettings)
 async def update_smtp_settings(
     smtp_data: SMTPSettingsUpdate,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Using MongoDB instead
     current_user = Depends(get_admin)
 ):
     """Update SMTP settings"""

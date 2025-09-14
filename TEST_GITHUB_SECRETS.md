@@ -64,7 +64,7 @@
 ### Test SSH Connection Locally
 ```bash
 # Test if your SSH key works with the VPC
-ssh -i remotehive_key_github -o StrictHostKeyChecking=no ubuntu@210.79.128.138 "echo 'SSH connection successful'"
+ssh -i remotehive-vpc-key -o StrictHostKeyChecking=no ubuntu@210.79.128.138 "echo 'SSH connection successful'"
 ```
 
 ### Test VPC Accessibility
@@ -76,10 +76,10 @@ ping -c 3 210.79.128.138
 ### Verify SSH Key Format
 ```bash
 # Check if SSH key file is properly formatted
-head -1 remotehive_key_github
+head -1 remotehive-vpc-key
 # Should output: -----BEGIN OPENSSH PRIVATE KEY-----
 
-tail -1 remotehive_key_github  
+tail -1 remotehive-vpc-key  
 # Should output: -----END OPENSSH PRIVATE KEY-----
 ```
 

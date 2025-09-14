@@ -1,0 +1,48 @@
+[Unit]
+Description=RemoteHive Backend API Service
+After=network.target postgresql.service
+Wants=postgresql.service
+Requires=network.target
+
+[Service]
+Type=simple
+User=remotehive
+Group=remotehive
+WorkingDirectory=/opt/remotehive/backend
+Environment=PATH=/opt/remotehive/backend/venv/bin
+EnvironmentFile=/opt/remotehive/.env.production
+ExecStart=/opt/remotehive/backend/venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+ExecReload=/bin/kill -HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=5
+PrivateTmp=true
+Restart=always
+RestartSec=10
+StartLimitInterval=60
+StartLimitBurst=3
+
+# Security settings
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/remotehive/backend/logs /tmp
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+# Health check
+ExecStartPost=/bin/sleep 10
+ExecStartPost=/bin/bash -c 'curl -f http://localhost:8000/health || exit 1'
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=remotehive-backend
+
+[Install]
+WantedBy=multi-user.target

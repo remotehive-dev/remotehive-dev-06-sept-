@@ -11,7 +11,7 @@ from dataclasses import dataclass
 # from app.models.mongodb_models import MemoryUpload  # TODO: Create MemoryUpload MongoDB model
 # from app.core.enums import MemoryUploadStatus  # No longer needed, using string values
 from app.database import get_db_session
-from sqlalchemy.orm import Session
+# from sqlalchemy.orm import Session  # Using MongoDB instead
 
 logger = logging.getLogger(__name__)
 

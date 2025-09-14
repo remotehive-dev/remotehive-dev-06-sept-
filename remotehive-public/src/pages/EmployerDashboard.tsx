@@ -34,7 +34,8 @@ const EmployerDashboard: React.FC = () => {
     logo: user?.profile?.companyLogo || null,
     email: user?.email || 'contact@techcorp.com',
     phone: user?.profile?.phone || '+1 (555) 123-4567',
-    address: user?.profile?.address || 'San Francisco, CA'
+    address: user?.profile?.address || 'San Francisco, CA',
+    website: user?.profile?.website || 'https://techcorp.com'
   }
 
   const handleSignOut = async () => {

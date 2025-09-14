@@ -9,7 +9,7 @@ from app.database.mongodb_models import ScraperConfig, ScraperLog
 from datetime import datetime, timedelta
 import logging
 from typing import List, Dict, Any
-from sqlalchemy import and_, or_
+# from sqlalchemy import and_, or_  # Using MongoDB instead
 
 logger = logging.getLogger(__name__)
 

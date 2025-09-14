@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { Building2 } from 'lucide-react'
 
 interface SSOSignInButtonProps {
-  onSuccess?: () => void
+  onSuccess?: (data: { provider: string; token: string; role: 'employer' | 'job_seeker' }) => void
   onError?: (error: string) => void
   role?: 'employer' | 'job_seeker'
 }
@@ -54,12 +54,12 @@ const SSOSignInButton: React.FC<SSOSignInButtonProps> = ({
         
         if (event.data.type === 'SSO_AUTH_SUCCESS') {
           try {
-            await signInWithSSO({
+            const data = {
               provider,
               token: event.data.token,
               role
-            })
-            onSuccess?.()
+            }
+            onSuccess?.(data)
           } catch (error) {
             const message = error instanceof Error ? error.message : 'SSO sign-in failed'
             onError?.(message)

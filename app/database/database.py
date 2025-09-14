@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class DatabaseManager:
     """MongoDB database manager for RemoteHive application."""
     def __init__(self):
-        self.mongodb_manager = MongoDBManager()
+        self.mongodb_manager = None  # Will be created during initialization
         self._metrics = {
             'total_connections': 0,
             'failed_connections': 0,
@@ -29,20 +29,41 @@ class DatabaseManager:
     
 
     
-    async def initialize(self):
-        """Initialize MongoDB connection."""
+    async def initialize(self) -> None:
+        """Initialize MongoDB connection with current environment variables."""
         if self._initialized:
+            logger.info("Database manager already initialized")
             return
+        
         try:
-            await self.mongodb_manager.connect()
-            logger.info("MongoDB connection initialized successfully")
+            # Debug logging
+            logger.info(f"Initializing with MONGODB_URL: {settings.MONGODB_URL[:50]}...")
+            logger.info(f"Initializing with MONGODB_DATABASE_NAME: {settings.MONGODB_DATABASE_NAME}")
+            
+            # Create a fresh MongoDB manager instance
+            self.mongodb_manager = MongoDBManager()
+            
+            # Connect using current environment variables from settings
+            success = await self.mongodb_manager.connect(
+                connection_string=settings.MONGODB_URL,
+                database_name=settings.MONGODB_DATABASE_NAME
+            )
+            
+            if not success:
+                raise ConnectionError("Failed to connect to MongoDB Atlas")
+            
             self._initialized = True
+            logger.info(f"Database manager initialized successfully with Atlas URL: {settings.MONGODB_URL[:50]}...")
+            
         except Exception as e:
-            logger.error(f"Failed to initialize MongoDB connection: {e}")
+            logger.error(f"Failed to initialize database manager: {e}")
+            self._initialized = False
             raise
     
     async def create_tables(self):
         """Initialize MongoDB collections and indexes."""
+        if not self.mongodb_manager:
+            raise Exception("MongoDB manager not initialized. Call initialize() first.")
         try:
             await self.mongodb_manager.create_indexes()
             logger.info("MongoDB collections and indexes created successfully")
@@ -52,6 +73,8 @@ class DatabaseManager:
     
     async def drop_tables(self):
         """Drop MongoDB database."""
+        if not self.mongodb_manager:
+            raise Exception("MongoDB manager not initialized. Call initialize() first.")
         try:
             await self.mongodb_manager.drop_database()
             logger.info("MongoDB database dropped successfully")
@@ -61,6 +84,9 @@ class DatabaseManager:
     
     def get_session(self):
         """Get MongoDB database instance with connection tracking."""
+        if not self.mongodb_manager:
+            raise Exception("MongoDB manager not initialized. Call initialize() first.")
+        
         with self._lock:
             self._metrics['total_connections'] += 1
         
@@ -102,6 +128,14 @@ class DatabaseManager:
     
     async def health_check(self) -> Dict[str, Any]:
         """Enhanced health check for MongoDB connection."""
+        if not self.mongodb_manager:
+            return {
+                'status': 'unhealthy',
+                'error': 'MongoDB manager not initialized',
+                'timestamp': time.time(),
+                'metrics': self.get_metrics()
+            }
+        
         try:
             start_time = time.time()
             
@@ -135,6 +169,9 @@ class DatabaseManager:
     
     def get_pool_stats(self) -> Dict[str, Any]:
         """Get MongoDB connection statistics for monitoring."""
+        if not self.mongodb_manager:
+            return {}
+        
         try:
             # MongoDB doesn't have traditional connection pools like SQLAlchemy
             # But we can return connection info from the client
@@ -190,6 +227,15 @@ class DatabaseManager:
     
     def get_connection_info(self) -> Dict[str, Any]:
         """Get detailed MongoDB connection information."""
+        if not self.mongodb_manager:
+            return {
+                'database_type': 'mongodb',
+                'database_name': 'N/A',
+                'client_address': 'N/A',
+                'connection_string': 'Not initialized',
+                'status': 'Not initialized'
+            }
+        
         try:
             client = self.mongodb_manager.get_client()
             db = self.mongodb_manager.get_database()
@@ -261,6 +307,10 @@ def get_mongodb_session():
 async def init_database():
     """Initialize MongoDB and create indexes."""
     try:
+        # Force reinitialization by resetting the initialized flag
+        db_manager._initialized = False
+        db_manager.mongodb_manager = None
+        
         await db_manager.initialize()
         await db_manager.create_tables()
         logger.info("MongoDB initialization completed")

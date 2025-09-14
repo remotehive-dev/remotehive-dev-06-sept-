@@ -195,10 +195,6 @@ const ClerkSignUpForm: React.FC<ClerkSignUpProps> = ({ role, onBack }) => {
             routing="path"
             path="/clerk-register"
             signInUrl="/clerk-login"
-            onError={(error) => {
-              console.error('Clerk signup error:', error)
-              setClerkError(error.message || 'An error occurred during signup')
-            }}
             appearance={{
               elements: {
                 formButtonPrimary: `${role === 'employer' ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} text-sm normal-case`,

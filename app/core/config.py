@@ -26,8 +26,8 @@ class Settings(BaseSettings):
     ALLOWED_HOSTS: List[str] = [host.strip() for host in os.getenv("ALLOWED_HOSTS", "*").split(",")] if os.getenv("ALLOWED_HOSTS") else ["*"]
     
     # MongoDB Atlas Configuration (Primary Database)
-    MONGODB_URL: str = os.getenv("MONGODB_URL", "mongodb://localhost:27017/remotehive")
-    MONGODB_DATABASE_NAME: str = os.getenv("MONGODB_DATABASE_NAME", "remotehive_main")
+    MONGODB_URL: str = os.getenv("MONGODB_URL", "mongodb+srv://remotehiveofficial_db_user:b9z6QbkaiR3qc2KZ@remotehive.l5zq7k0.mongodb.net/?retryWrites=true&w=majority&appName=Remotehive")
+    MONGODB_DATABASE_NAME: str = os.getenv("MONGODB_DATABASE_NAME", "remotehive_production")
     
     # Database Connection Pool Settings
     DB_POOL_SIZE: int = int(os.getenv("DB_POOL_SIZE", "20"))
@@ -138,6 +138,16 @@ class Settings(BaseSettings):
     
     # Logging
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
+    ENABLE_FILE_LOGGING: bool = os.getenv("ENABLE_FILE_LOGGING", "true").lower() == "true"
+    ERROR_TRACKING_ENABLED: bool = os.getenv("ERROR_TRACKING_ENABLED", "true").lower() == "true"
+    LOG_FILE: str = os.getenv("LOG_FILE", "logs/remotehive.log")
+    ERROR_LOG_FILE: str = os.getenv("ERROR_LOG_FILE", "logs/errors.jsonl")
+    ENABLE_JSON_LOGS: bool = os.getenv("ENABLE_JSON_LOGS", "false").lower() == "true"
+    LOG_ROTATION: str = os.getenv("LOG_ROTATION", "10 MB")
+    LOG_RETENTION: str = os.getenv("LOG_RETENTION", "30 days")
+    SERVICE_NAME: str = os.getenv("SERVICE_NAME", "remotehive")
+    PERFORMANCE_LOGGING: bool = os.getenv("PERFORMANCE_LOGGING", "true").lower() == "true"
+    SLOW_QUERY_THRESHOLD: float = float(os.getenv("SLOW_QUERY_THRESHOLD", "1.0"))
     
     # Service URLs and Health Endpoints
     AUTOSCRAPER_SERVICE_URL: str = os.getenv("AUTOSCRAPER_SERVICE_URL", "http://localhost:8003")

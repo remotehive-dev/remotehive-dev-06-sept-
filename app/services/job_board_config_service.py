@@ -9,8 +9,8 @@ from urllib.parse import urlparse
 
 import aiohttp
 import pandas as pd
-from sqlalchemy.orm import Session
-from sqlalchemy import select, and_
+# from sqlalchemy.orm import Session  # Using MongoDB instead
+# from sqlalchemy import select, and_  # Using MongoDB instead
 
 # TODO: Migrate ScraperMemory and CSVImport to MongoDB or handle differently
 # from app.database.models import ScraperConfig, ScraperMemory, CSVImport
@@ -44,7 +44,7 @@ class JobBoardConfigService:
     # All valid columns
     ALL_COLUMNS = REQUIRED_COLUMNS + list(OPTIONAL_COLUMNS.keys())
     
-    def __init__(self, db: Session):
+    def __init__(self, db=None):  # db: Session - Using MongoDB instead
         self.db = db
     
     async def validate_csv_format(self, file_content: bytes) -> Tuple[bool, str, Optional[pd.DataFrame]]:

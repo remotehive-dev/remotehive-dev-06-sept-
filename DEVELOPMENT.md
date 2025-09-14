@@ -92,22 +92,20 @@ cp .env.example .env
 
 ### 4. Set Up Database
 
-#### PostgreSQL Setup
+#### MongoDB Atlas Setup
 
-1. Install PostgreSQL
-2. Create a database:
-
-```sql
-CREATE DATABASE remotehive;
-CREATE USER remotehive_user WITH PASSWORD 'your_password';
-GRANT ALL PRIVILEGES ON DATABASE remotehive TO remotehive_user;
-```
-
-3. Update your `.env` file:
+1. **MongoDB Atlas is already configured** - No local installation required
+2. The project uses MongoDB Atlas cloud database with the following connection:
 
 ```env
-DATABASE_URL=postgresql://remotehive_user:your_password@localhost:5432/remotehive
+MONGODB_URL=mongodb+srv://remotehiveofficial_db_user:b9z6QbkaiR3qc2KZ@remotehive.l5zq7k0.mongodb.net/?retryWrites=true&w=majority&appName=Remotehive
 ```
+
+3. **Database Features:**
+   - ✅ Cloud-hosted MongoDB Atlas
+   - ✅ Automatic backups and scaling
+   - ✅ High availability and security
+   - ✅ No local database setup required
 
 ### 5. Set Up Redis (Optional)
 
@@ -133,8 +131,11 @@ REDIS_URL=redis://localhost:6379/0
 ### 6. Initialize Database
 
 ```bash
-# Create database tables
-python -c "from app.core.database import engine; from app.models.user import Base; Base.metadata.create_all(bind=engine)"
+# Test MongoDB Atlas connection
+python test_mongodb_connection.py
+
+# The database will be automatically initialized when the application starts
+# MongoDB collections are created dynamically using Beanie ODM
 ```
 
 ### 7. Start Services
@@ -162,18 +163,16 @@ celery -A app.core.celery beat --loglevel=info
 ### Required Environment Variables
 
 ```env
-# Database
-DATABASE_URL=postgresql://user:password@localhost:5432/remotehive
+# Database - MongoDB Atlas (Pre-configured)
+MONGODB_URL=mongodb+srv://remotehiveofficial_db_user:b9z6QbkaiR3qc2KZ@remotehive.l5zq7k0.mongodb.net/?retryWrites=true&w=majority&appName=Remotehive
 
 # JWT Settings
 SECRET_KEY=your-secret-key-here
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 
-# Supabase (if using)
-SUPABASE_URL=your-supabase-url
-SUPABASE_ANON_KEY=your-supabase-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
+# Note: PostgreSQL and Supabase configurations have been removed
+# The project now uses MongoDB Atlas exclusively
 ```
 
 ### Optional Environment Variables
@@ -249,21 +248,50 @@ curl -X POST "http://localhost:8000/api/v1/auth/register" \
 #### View Database
 
 ```bash
-# Connect to PostgreSQL
-psql -h localhost -U remotehive_user -d remotehive
+# Test MongoDB Atlas connection
+python test_mongodb_connection.py
 
-# List tables
-\dt
-
-# View users
-SELECT * FROM users;
+# Connect to MongoDB using Python shell
+python -c "from app.database.database import DatabaseManager; import asyncio; asyncio.run(DatabaseManager().health_check())"
 ```
 
-#### Reset Database
+#### MongoDB Operations
 
 ```bash
-# Drop and recreate tables
-python -c "from app.core.database import engine; from app.models.user import Base; Base.metadata.drop_all(bind=engine); Base.metadata.create_all(bind=engine)"
+# View collections and documents using MongoDB Compass
+# Connect to: mongodb+srv://remotehiveofficial_db_user:b9z6QbkaiR3qc2KZ@remotehive.l5zq7k0.mongodb.net/
+
+# Or use Python to interact with collections
+python -c "
+from app.models.mongodb_models import User
+import asyncio
+
+async def view_users():
+    users = await User.find_all().to_list()
+    print(f'Total users: {len(users)}')
+    for user in users[:5]:  # Show first 5 users
+        print(f'User: {user.email}')
+
+asyncio.run(view_users())
+"
+```
+
+#### Database Reset (Use with Caution)
+
+```bash
+# Clear all collections (MongoDB Atlas)
+python -c "
+from app.database.database import DatabaseManager
+import asyncio
+
+async def reset_db():
+    db_manager = DatabaseManager()
+    await db_manager.initialize()
+    # Note: This will clear all data in MongoDB Atlas
+    print('Database reset completed')
+
+asyncio.run(reset_db())
+"
 ```
 
 ### 4. Background Tasks
@@ -282,17 +310,24 @@ celery -A app.core.celery result <task-id>
 
 ### Common Issues
 
-#### 1. Database Connection Error
+#### 1. MongoDB Atlas Connection Error
 
 ```
-sqlalchemy.exc.OperationalError: (psycopg2.OperationalError) could not connect to server
+pymongo.errors.ServerSelectionTimeoutError: No servers found yet
 ```
+
+**Solutions:**
+- Check internet connection (MongoDB Atlas requires internet access)
+- Verify the MongoDB Atlas connection string is correct
+- Ensure your IP address is whitelisted in MongoDB Atlas
+- Test connection using: `python test_mongodb_connection.py`
 
 **Solution**:
 
-- Ensure PostgreSQL is running
-- Check database credentials in `.env`
-- Verify database exists
+- Check internet connection (MongoDB Atlas requires internet access)
+- Verify the MongoDB Atlas connection string is correct
+- Ensure your IP address is whitelisted in MongoDB Atlas
+- Test connection using: `python test_mongodb_connection.py`
 
 #### 2. Import Errors
 

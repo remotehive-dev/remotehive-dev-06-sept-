@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
+# from sqlalchemy.orm import Session  # Using MongoDB instead
 from typing import List, Optional
 from app.core.security import get_current_user, require_admin, require_super_admin
 from app.core.database import get_db
@@ -19,7 +19,7 @@ router = APIRouter()
 @router.post("/test-send")
 def test_send_email(
     email_request: EmailTestRequest,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Using MongoDB instead
     current_user = Depends(require_admin)
 ):
     """Test sending email to specified address"""
@@ -55,7 +55,7 @@ def test_send_email(
 def get_email_users(
     skip: int = 0,
     limit: int = 100,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Using MongoDB instead
     current_user = Depends(require_admin)
 ):
     """Get all email users"""
@@ -67,7 +67,7 @@ def get_email_users(
 def search_email_users(
     q: str = Query(..., description="Search query for email address or name"),
     limit: int = 50,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Using MongoDB instead
     current_user = Depends(require_admin)
 ):
     """Search email users by email address or name"""
@@ -82,7 +82,7 @@ def search_email_users(
 @router.post("/", response_model=dict)
 def create_email_user(
     email_user: EmailUserCreate,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Using MongoDB instead
     current_user = Depends(require_admin)
 ):
     """Create new email user with welcome email"""
@@ -118,7 +118,7 @@ def create_email_user(
 @router.post("/{user_id}/reset-password")
 def reset_user_password(
     user_id: str,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Using MongoDB instead
     current_user = Depends(require_super_admin)
 ):
     """Reset user password (Super Admin only)"""
@@ -139,7 +139,7 @@ def reset_user_password(
 @router.post("/send-email")
 def send_email(
     email_request: EmailSendRequest,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Using MongoDB instead
     current_user = Depends(require_admin)
 ):
     """Send email from user account"""
@@ -181,7 +181,7 @@ def get_user_messages(
     folder_name: str,
     skip: int = 0,
     limit: int = 50,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Using MongoDB instead
     current_user = Depends(require_admin)
 ):
     """Get user messages from specific folder (inbox, sent, drafts, spam, trash, starred)"""
@@ -215,7 +215,7 @@ def get_user_messages(
 @router.post("/messages/{message_id}/star")
 def star_message(
     message_id: str,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Using MongoDB instead
     current_user = Depends(require_admin)
 ):
     """Star/unstar a message"""
@@ -249,7 +249,7 @@ def star_message(
 @router.post("/messages/{message_id}/spam")
 def move_to_spam(
     message_id: str,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Using MongoDB instead
     current_user = Depends(require_admin)
 ):
     """Move message to spam folder"""
@@ -283,7 +283,7 @@ def move_to_spam(
 @router.get("/{user_id}", response_model=EmailUserResponse)
 def get_email_user(
     user_id: str,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Using MongoDB instead
     current_user = Depends(require_admin)
 ):
     """Get email user by ID"""
@@ -304,7 +304,7 @@ def get_email_user(
 def update_email_user(
     user_id: str,
     email_user_update: EmailUserUpdate,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Using MongoDB instead
     current_user = Depends(require_admin)
 ):
     """Update email user"""
@@ -334,7 +334,7 @@ def update_email_user(
 @router.delete("/{user_id}")
 def delete_email_user(
     user_id: str,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Using MongoDB instead
     current_user = Depends(require_admin)
 ):
     """Delete email user (soft delete)"""

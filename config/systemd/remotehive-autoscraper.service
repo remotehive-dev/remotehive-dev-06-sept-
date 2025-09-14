@@ -1,0 +1,47 @@
+[Unit]
+Description=RemoteHive Autoscraper Service
+After=network.target
+Requires=network.target
+
+[Service]
+Type=simple
+User=remotehive
+Group=remotehive
+WorkingDirectory=/opt/remotehive/autoscraper-service
+Environment=PATH=/opt/remotehive/autoscraper-service/venv/bin
+EnvironmentFile=/opt/remotehive/.env.production
+ExecStart=/opt/remotehive/autoscraper-service/venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8001 --workers 2
+ExecReload=/bin/kill -HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=5
+PrivateTmp=true
+Restart=always
+RestartSec=10
+StartLimitInterval=60
+StartLimitBurst=3
+
+# Security settings
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/remotehive/autoscraper-service/logs /tmp
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=2048
+
+# Health check
+ExecStartPost=/bin/sleep 10
+ExecStartPost=/bin/bash -c 'curl -f http://localhost:8001/health || exit 1'
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=remotehive-autoscraper
+
+[Install]
+WantedBy=multi-user.target

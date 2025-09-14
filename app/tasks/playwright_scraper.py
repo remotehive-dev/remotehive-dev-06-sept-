@@ -16,7 +16,7 @@ from ..scraper.exceptions import (
 )
 from ..models.jobs import JobPost, ScrapingSession
 from ..models.tasks import TaskResult
-from ..core.database import get_db_session
+from ..database.database import get_db_session
 from ..core.monitoring import app_monitor
 from ..performance.tracker import PerformanceTracker
 from ..utils.notifications import NotificationService

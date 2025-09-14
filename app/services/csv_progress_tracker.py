@@ -1,8 +1,6 @@
 import asyncio
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
-from sqlalchemy.orm import Session
-from sqlalchemy import func
 import json
 
 # from app.database.models import CSVImport, CSVImportLog  # TODO: Migrate CSVImport and CSVImportLog to MongoDB models
@@ -14,8 +12,8 @@ class CSVProgressTracker:
     Service for tracking and managing CSV import progress with real-time updates.
     """
     
-    def __init__(self, db: Session):
-        self.db = db
+    def __init__(self, db=None):
+        self.db = db  # TODO: Replace with MongoDB connection when models are migrated
         self._progress_callbacks = {}
         self._active_imports = set()
     

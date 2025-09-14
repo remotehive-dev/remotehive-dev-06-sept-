@@ -7,7 +7,7 @@ import re
 from dataclasses import dataclass
 
 import google.generativeai as genai
-from sqlalchemy.orm import Session
+# from sqlalchemy.orm import Session  # Using MongoDB instead
 
 try:
     from core.config import settings
@@ -393,7 +393,7 @@ Special instructions:
         
         return merged
     
-    async def _log_parsing_analytics(self, scraper_config_id: str, parsed_data: ParsedJobData, db: Session):
+    async def _log_parsing_analytics(self, scraper_config_id: str, parsed_data: ParsedJobData, db=None):  # db: Session - Using MongoDB instead
         """Log parsing analytics for monitoring and improvement"""
         try:
             analytics = AnalyticsMetrics(

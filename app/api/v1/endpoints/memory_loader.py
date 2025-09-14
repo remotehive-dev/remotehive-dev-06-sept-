@@ -15,7 +15,7 @@ from app.services.memory_loader import MemoryLoader, ProcessingProgress
 from app.core.enums import MemoryUploadStatus
 from app.core.auth import get_current_user
 from app.database import get_db_session
-from sqlalchemy.orm import Session
+# from sqlalchemy.orm import Session  # Using MongoDB instead
 
 router = APIRouter()
 
@@ -39,7 +39,7 @@ class MemoryUploadResponse(BaseModel):
 @router.get("/", response_model=Dict[str, List[MemoryUploadResponse]])
 async def get_memories(
     current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db_session)
+    db = Depends(get_db_session)  # db: Any - Using MongoDB instead
 ):
     """Get all memory uploads as memories for the frontend"""
     try:
@@ -100,7 +100,7 @@ async def upload_memory_csv(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db_session)
+    db = Depends(get_db_session)  # db: Any - Using MongoDB instead
 ):
     """Upload memory CSV file for processing"""
     try:
@@ -182,7 +182,7 @@ async def list_memory_uploads(
     limit: int = 50,
     offset: int = 0,
     current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db_session)
+    db = Depends(get_db_session)  # db: Any - Using MongoDB instead
 ):
     """List memory uploads with optional filtering"""
     try:
@@ -218,7 +218,7 @@ async def list_memory_uploads(
 async def get_memory_upload(
     upload_id: str,
     current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db_session)
+    db = Depends(get_db_session)  # db: Any - Using MongoDB instead
 ):
     """Get detailed information about a memory upload"""
     try:
@@ -253,7 +253,7 @@ async def get_memory_upload(
 async def get_memory_context(
     upload_id: str,
     current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db_session)
+    db = Depends(get_db_session)  # db: Any - Using MongoDB instead
 ):
     """Get processed memory context for a completed upload"""
     try:
@@ -342,7 +342,7 @@ async def validate_memory_csv(
 async def get_processing_progress(
     upload_id: str,
     current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db_session)
+    db = Depends(get_db_session)  # db: Any - Using MongoDB instead
 ):
     """Get real-time processing progress for a memory upload"""
     try:
@@ -401,7 +401,7 @@ async def download_csv_template():
 async def delete_memory_upload(
     upload_id: str,
     current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db_session)
+    db = Depends(get_db_session)  # db: Any - Using MongoDB instead
 ):
     """Delete a memory upload and its data"""
     try:
@@ -435,7 +435,7 @@ async def delete_memory_upload(
 async def stream_processing_progress(
     upload_id: str,
     current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db_session)
+    db = Depends(get_db_session)  # db: Any - Using MongoDB instead
 ):
     """Stream real-time processing progress updates"""
     async def generate_progress_stream():

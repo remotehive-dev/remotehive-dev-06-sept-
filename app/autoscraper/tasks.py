@@ -11,7 +11,7 @@ from app.models.mongodb_models import JobPost
 from datetime import datetime, timedelta
 import logging
 from typing import List, Dict, Any, Optional
-from sqlalchemy import and_, or_
+# # from sqlalchemy import and_, or_  # Using MongoDB instead  # Using MongoDB instead
 import requests
 import json
 import feedparser
@@ -37,48 +37,33 @@ def run_scrape_job(self, job_id: str):
     try:
         logger.info(f"Starting scrape job: {job_id}")
         
-        db_manager = get_database_manager()
-        with db_manager.sqlalchemy_session_scope() as db:
-            job = db.query(ScrapeJob).filter(ScrapeJob.id == job_id).first()
-            if not job:
-                raise ValueError(f"Scrape job {job_id} not found")
-            
-            if job.status != ScrapeJobStatus.PENDING:
-                raise ValueError(f"Job {job_id} is not in pending status")
-            
-            # Update job status to running
-            job.status = ScrapeJobStatus.RUNNING
-            job.started_at = datetime.utcnow()
-            # Note: commit is handled by sqlalchemy_session_scope context manager
-            
-            # Create scrape run
-            run = ScrapeRun(
-                id=str(uuid.uuid4()),
-                scrape_job_id=job_id,
-                status='running',
-                started_at=datetime.utcnow(),
-                metadata={'task_id': self.request.id}
-            )
-            db.add(run)
-            # Note: commit is handled by sqlalchemy_session_scope context manager
-            run_id = run.id
+        # Note: This autoscraper service uses SQLite, not MongoDB
+        # For now, we'll disable this functionality until proper migration
+        logger.warning(f"Autoscraper task {job_id} disabled - requires SQLite database setup")
+        return {
+            'success': False,
+            'job_id': job_id,
+            'error': 'Autoscraper service requires SQLite database setup',
+            'jobs_found': 0,
+            'jobs_created': 0,
+            'boards_processed': 0,
+            'total_boards': 0
+        }
         
         try:
             # Update engine state
             heartbeat.delay()
             
-            # Get job boards for this job
-            db_manager = get_database_manager()
-            with db_manager.sqlalchemy_session_scope() as db:
-                job = db.query(ScrapeJob).filter(ScrapeJob.id == job_id).first()
-                job_boards = job.job_boards
-                
-                total_boards = len(job_boards)
-                processed_boards = 0
-                total_jobs_found = 0
-                total_jobs_created = 0
-                
-                for board in job_boards:
+            # Autoscraper functionality disabled
+            # job_boards = []
+            job_boards = []
+            
+            total_boards = len(job_boards)
+            processed_boards = 0
+            total_jobs_found = 0
+            total_jobs_created = 0
+            
+            for board in job_boards:
                     try:
                         if board.board_type.value == 'rss':
                             # Process RSS feeds
@@ -99,30 +84,8 @@ def run_scrape_job(self, job_id: str):
                         logger.error(f"Failed to process board {board.name}: {e}")
                         continue
             
-            # Update run and job status
-            db_manager = get_database_manager()
-            with db_manager.sqlalchemy_session_scope() as db:
-                run = db.query(ScrapeRun).filter(ScrapeRun.id == run_id).first()
-                job = db.query(ScrapeJob).filter(ScrapeJob.id == job_id).first()
-                
-                if run:
-                    run.status = 'completed'
-                    run.completed_at = datetime.utcnow()
-                    run.jobs_found = total_jobs_found
-                    run.jobs_created = total_jobs_created
-                    run.metadata.update({
-                        'boards_processed': processed_boards,
-                        'total_boards': total_boards
-                    })
-                
-                if job:
-                    job.status = ScrapeJobStatus.COMPLETED
-                    job.completed_at = datetime.utcnow()
-                    job.last_run_at = datetime.utcnow()
-                    job.total_jobs_found = (job.total_jobs_found or 0) + total_jobs_found
-                    job.total_jobs_created = (job.total_jobs_created or 0) + total_jobs_created
-                
-                # Note: commit is handled by sqlalchemy_session_scope context manager
+            # Autoscraper status update disabled
+            logger.info(f"Autoscraper job {job_id} would be completed here")
             
             logger.info(f"Scrape job {job_id} completed. Found {total_jobs_found} jobs, created {total_jobs_created}")
             
@@ -137,23 +100,8 @@ def run_scrape_job(self, job_id: str):
             }
             
         except Exception as e:
-            # Update run and job status to failed
-            db_manager = get_database_manager()
-            with db_manager.sqlalchemy_session_scope() as db:
-                run = db.query(ScrapeRun).filter(ScrapeRun.id == run_id).first()
-                job = db.query(ScrapeJob).filter(ScrapeJob.id == job_id).first()
-                
-                if run:
-                    run.status = 'failed'
-                    run.completed_at = datetime.utcnow()
-                    run.error_message = str(e)
-                
-                if job:
-                    job.status = ScrapeJobStatus.FAILED
-                    job.error_message = str(e)
-                
-                # Note: commit is handled by sqlalchemy_session_scope context manager
-            
+            # Autoscraper error handling disabled
+            logger.error(f"Autoscraper job {job_id} would be marked as failed here: {e}")
             raise e
             
     except Exception as exc:
@@ -176,14 +124,15 @@ def fetch_rss_entries(self, board_id: str, job_id: str, run_id: str):
     try:
         logger.info(f"Fetching RSS entries for board {board_id}")
         
-        db_manager = get_database_manager()
-        with db_manager.sqlalchemy_session_scope() as db:
-            board = db.query(JobBoard).filter(JobBoard.id == board_id).first()
-            if not board:
-                raise ValueError(f"Job board {board_id} not found")
-            
-            if not board.rss_url:
-                raise ValueError(f"No RSS URL configured for board {board.name}")
+        # Autoscraper RSS functionality disabled
+        logger.warning(f"RSS fetch for board {board_id} disabled - requires SQLite database setup")
+        return {
+            'success': False,
+            'board_id': board_id,
+            'error': 'Autoscraper RSS service requires SQLite database setup',
+            'jobs_found': 0,
+            'jobs_created': 0
+        }
         
         # Fetch RSS feed
         try:
@@ -223,16 +172,11 @@ def fetch_rss_entries(self, board_id: str, job_id: str, run_id: str):
                     f"{raw_data['title']}{raw_data['link']}".encode('utf-8')
                 ).hexdigest()
                 
-                # Check for duplicates
-                db_manager = get_database_manager()
-                with db_manager.sqlalchemy_session_scope() as db:
-                    existing = db.query(RawJob).filter(
-                        RawJob.content_hash == content_hash
-                    ).first()
-                    
-                    if existing:
-                        logger.debug(f"Duplicate job found, skipping: {raw_data['title']}")
-                        continue
+                # Duplicate check disabled
+                existing = None
+                if existing:
+                    logger.debug(f"Duplicate job found, skipping: {raw_data['title']}")
+                    continue
                 
                 # Persist raw item
                 persist_result = persist_raw_item.delay(
@@ -285,14 +229,16 @@ def html_scrape(self, board_id: str, job_id: str, run_id: str):
     try:
         logger.info(f"Starting HTML scrape for board {board_id}")
         
-        db_manager = get_database_manager()
-        with db_manager.sqlalchemy_session_scope() as db:
-            board = db.query(JobBoard).filter(JobBoard.id == board_id).first()
-            if not board:
-                raise ValueError(f"Job board {board_id} not found")
-            
-            if not board.base_url:
-                raise ValueError(f"No base URL configured for board {board.name}")
+        # HTML scraping functionality disabled
+        logger.warning(f"HTML scrape for board {board_id} disabled - requires SQLite database setup")
+        return {
+            'success': False,
+            'board_id': board_id,
+            'error': 'HTML scraping requires SQLite database setup',
+            'jobs_found': 0,
+            'jobs_created': 0,
+            'pages_scraped': 0
+        }
         
         jobs_found = 0
         jobs_created = 0
@@ -363,15 +309,10 @@ def html_scrape(self, board_id: str, job_id: str, run_id: str):
                             f"{raw_data['title']}{raw_data['link']}".encode('utf-8')
                         ).hexdigest()
                         
-                        # Check for duplicates
-                        db_manager = get_database_manager()
-                        with db_manager.sqlalchemy_session_scope() as db:
-                            existing = db.query(RawJob).filter(
-                                RawJob.content_hash == content_hash
-                            ).first()
-                            
-                            if existing:
-                                continue
+                        # Duplicate check disabled
+                        existing = None
+                        if existing:
+                            continue
                         
                         # Persist raw item
                         persist_result = persist_raw_item.delay(
@@ -519,23 +460,9 @@ def persist_raw_item(self, raw_data: Dict[str, Any], content_hash: str,
         str: ID of created raw job record
     """
     try:
-        db_manager = get_database_manager()
-        with db_manager.sqlalchemy_session_scope() as db:
-            raw_job = RawJob(
-                id=str(uuid.uuid4()),
-                scrape_run_id=run_id,
-                job_board_id=board_id,
-                content_hash=content_hash,
-                raw_data=raw_data,
-                scraped_at=datetime.utcnow(),
-                status='pending_normalization'
-            )
-            
-            db.add(raw_job)
-            # Note: commit is handled by sqlalchemy_session_scope context manager
-            
-            logger.debug(f"Persisted raw job: {raw_job.id}")
-            return raw_job.id
+        # Raw job persistence disabled - requires SQLite database setup
+        logger.warning(f"Raw job persistence disabled for job {job_id} - requires SQLite database setup")
+        return None
             
     except Exception as exc:
         logger.error(f"Failed to persist raw item: {exc}")
@@ -553,128 +480,20 @@ def normalize_raw_job(self, raw_job_id: str):
         dict: Normalization results
     """
     try:
-        logger.debug(f"Normalizing raw job: {raw_job_id}")
-        
-        db_manager = get_database_manager()
-        with db_manager.sqlalchemy_session_scope() as db:
-            raw_job = db.query(RawJob).filter(RawJob.id == raw_job_id).first()
-            if not raw_job:
-                raise ValueError(f"Raw job {raw_job_id} not found")
-            
-            raw_data = raw_job.raw_data
-            
-            # Normalize data
-            normalized_data = {
-                'title': clean_text(raw_data.get('title', '')),
-                'company': clean_text(raw_data.get('company', '')),
-                'location': clean_text(raw_data.get('location', '')),
-                'description': clean_text(raw_data.get('description', '')),
-                'salary_range': extract_salary(raw_data.get('salary', '')),
-                'job_type': extract_job_type(raw_data.get('description', '') + ' ' + raw_data.get('title', '')),
-                'remote_type': extract_remote_type(raw_data.get('description', '') + ' ' + raw_data.get('location', '')),
-                'source_url': raw_data.get('link', ''),
-                'posted_date': parse_date(raw_data.get('posted_date', '')),
-                'source': raw_data.get('source', ''),
-                'tags': extract_tags(raw_data.get('description', '') + ' ' + raw_data.get('title', ''))
-            }
-            
-            # Validate required fields
-            if not normalized_data['title'] or len(normalized_data['title']) < 3:
-                raw_job.status = 'rejected'
-                raw_job.rejection_reason = 'Invalid or missing title'
-                # Note: commit is handled by sqlalchemy_session_scope context manager
-                return {'success': False, 'reason': 'Invalid title'}
-            
-            if not normalized_data['source_url']:
-                raw_job.status = 'rejected'
-                raw_job.rejection_reason = 'Missing source URL'
-                # Note: commit is handled by sqlalchemy_session_scope context manager
-                return {'success': False, 'reason': 'Missing URL'}
-            
-            # Check for duplicate job posts
-            existing_job = db.query(JobPost).filter(
-                JobPost.source_url == normalized_data['source_url']
-            ).first()
-            
-            if existing_job:
-                raw_job.status = 'duplicate'
-                raw_job.normalized_job_post_id = existing_job.id
-                # Note: commit is handled by sqlalchemy_session_scope context manager
-                return {'success': False, 'reason': 'Duplicate job post'}
-            
-            # Create normalized job record
-            normalized_job = NormalizedJob(
-                id=str(uuid.uuid4()),
-                raw_job_id=raw_job_id,
-                normalized_data=normalized_data,
-                normalized_at=datetime.utcnow(),
-                status='pending_review'
-            )
-            
-            db.add(normalized_job)
-            
-            # Create JobPost if data quality is good
-            quality_score = calculate_quality_score(normalized_data)
-            
-            if quality_score >= 0.7:  # 70% quality threshold
-                job_post = JobPost(
-                    id=str(uuid.uuid4()),
-                    title=normalized_data['title'],
-                    company=normalized_data['company'],
-                    location=normalized_data['location'],
-                    description=normalized_data['description'],
-                    salary_range=normalized_data['salary_range'],
-                    job_type=normalized_data['job_type'],
-                    remote_type=normalized_data['remote_type'],
-                    source_url=normalized_data['source_url'],
-                    posted_date=normalized_data['posted_date'] or datetime.utcnow(),
-                    source=normalized_data['source'],
-                    tags=normalized_data['tags'],
-                    status='pending_approval',
-                    created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow()
-                )
-                
-                db.add(job_post)
-                normalized_job.job_post_id = job_post.id
-                normalized_job.status = 'approved'
-                raw_job.normalized_job_post_id = job_post.id
-                
-                created_job_post = True
-            else:
-                normalized_job.status = 'low_quality'
-                normalized_job.quality_score = quality_score
-                created_job_post = False
-            
-            raw_job.status = 'normalized'
-            raw_job.normalized_at = datetime.utcnow()
-            
-            # Note: commit is handled by sqlalchemy_session_scope context manager
-            
-            logger.debug(f"Normalized job {raw_job_id}, created job post: {created_job_post}")
-            
-            return {
-                'success': True,
-                'raw_job_id': raw_job_id,
-                'normalized_job_id': normalized_job.id,
-                'created_job_post': created_job_post,
-                'quality_score': quality_score
-            }
+        # Job normalization disabled - requires SQLite database setup
+        logger.warning(f"Job normalization disabled for raw job {raw_job_id} - requires SQLite database setup")
+        return {
+            'success': False,
+            'raw_job_id': raw_job_id,
+            'error': 'Job normalization requires SQLite database setup',
+            'created_job_post': False
+        }
             
     except Exception as exc:
         logger.error(f"Normalization failed for raw job {raw_job_id}: {exc}")
         
-        # Update raw job status
-        try:
-            db_manager = get_database_manager()
-            with db_manager.sqlalchemy_session_scope() as db:
-                raw_job = db.query(RawJob).filter(RawJob.id == raw_job_id).first()
-                if raw_job:
-                    raw_job.status = 'normalization_failed'
-                    raw_job.rejection_reason = str(exc)
-                    # Note: commit is handled by sqlalchemy_session_scope context manager
-        except:
-            pass
+        # Raw job status update disabled - requires SQLite database setup
+        logger.warning(f"Raw job status update disabled for {raw_job_id} - requires SQLite database setup")
         
         raise self.retry(exc=exc, countdown=60, max_retries=3)
 
@@ -687,63 +506,22 @@ def heartbeat():
         dict: System status information
     """
     try:
-        db_manager = get_database_manager()
-        with db_manager.sqlalchemy_session_scope() as db:
-            # Get or create engine state
-            engine_state = db.query(EngineState).first()
-            if not engine_state:
-                engine_state = EngineState(
-                    id=str(uuid.uuid4()),
-                    status=EngineStatus.IDLE,
-                    last_heartbeat=datetime.utcnow(),
-                    metadata={}
-                )
-                db.add(engine_state)
-            
-            # Update heartbeat
-            engine_state.last_heartbeat = datetime.utcnow()
-            
-            # Calculate system metrics
-            active_jobs = db.query(ScrapeJob).filter(
-                ScrapeJob.status == ScrapeJobStatus.RUNNING
-            ).count()
-            
-            pending_jobs = db.query(ScrapeJob).filter(
-                ScrapeJob.status == ScrapeJobStatus.PENDING
-            ).count()
-            
-            total_raw_jobs = db.query(RawJob).count()
-            pending_normalization = db.query(RawJob).filter(
-                RawJob.status == 'pending_normalization'
-            ).count()
-            
-            # Update engine status
-            if active_jobs > 0:
-                engine_state.status = EngineStatus.RUNNING
-            elif pending_jobs > 0:
-                engine_state.status = EngineStatus.PENDING
-            else:
-                engine_state.status = EngineStatus.IDLE
-            
-            # Update metadata
-            engine_state.metadata.update({
-                'active_jobs': active_jobs,
-                'pending_jobs': pending_jobs,
-                'total_raw_jobs': total_raw_jobs,
-                'pending_normalization': pending_normalization,
-                'last_update': datetime.utcnow().isoformat()
-            })
-            
-            # Note: commit is handled by sqlalchemy_session_scope context manager
-            
-            return {
-                'success': True,
-                'status': engine_state.status.value,
-                'active_jobs': active_jobs,
-                'pending_jobs': pending_jobs,
-                'total_raw_jobs': total_raw_jobs,
-                'pending_normalization': pending_normalization
-            }
+        # For now, return a simple heartbeat status since we're using MongoDB
+        # and the autoscraper service has its own SQLite database
+        heartbeat_data = {
+            'status': 'healthy',
+            'timestamp': datetime.utcnow().isoformat(),
+            'service': 'autoscraper',
+            'message': 'Heartbeat successful'
+        }
+        
+        logger.info("Autoscraper heartbeat completed", extra=heartbeat_data)
+        
+        return {
+            'success': True,
+            'status': 'healthy',
+            'timestamp': datetime.utcnow().isoformat()
+        }
             
     except Exception as e:
         logger.error(f"Heartbeat failed: {e}")

@@ -2,8 +2,8 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import List, Optional
 from datetime import datetime, date
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
-from app.core.database import get_db
+from motor.motor_asyncio import AsyncIOMotorDatabase
+from app.core.deps import get_database
 
 router = APIRouter()
 
@@ -65,14 +65,14 @@ class UpdateTransactionRequest(BaseModel):
     failure_reason: Optional[str] = None
 
 @router.get("/plans", response_model=List[PaymentPlan])
-async def get_payment_plans(active_only: bool = True, db: Session = Depends(get_db)):
+async def get_payment_plans(active_only: bool = True, db: AsyncIOMotorDatabase = Depends(get_database)):
     """Get all payment plans"""
     # TODO: Implement payment plans with MySQL database
     # For now, return empty list to allow server to start
     return []
 
 @router.get("/gateways", response_model=List[PaymentGateway])
-async def get_payment_gateways(active_only: bool = True, db: Session = Depends(get_db)):
+async def get_payment_gateways(active_only: bool = True, db: AsyncIOMotorDatabase = Depends(get_database)):
     """Get all payment gateways"""
     # TODO: Implement payment gateways with MySQL database
     # For now, return empty list to allow server to start
@@ -85,7 +85,7 @@ async def get_transactions(
     status: Optional[str] = None,
     gateway: Optional[str] = None,
     customer_email: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     """Get transactions with pagination and filtering"""
     # TODO: Implement transactions with MySQL database
@@ -93,19 +93,19 @@ async def get_transactions(
     return []
 
 @router.post("/transactions", response_model=Transaction)
-async def create_transaction(transaction: CreateTransactionRequest, db: Session = Depends(get_db)):
+async def create_transaction(transaction: CreateTransactionRequest, db: AsyncIOMotorDatabase = Depends(get_database)):
     """Create a new transaction"""
     # TODO: Implement transaction creation with MySQL database
     raise HTTPException(status_code=501, detail="Transaction creation not implemented yet")
 
 @router.put("/transactions/{transaction_id}", response_model=Transaction)
-async def update_transaction(transaction_id: str, update_data: UpdateTransactionRequest, db: Session = Depends(get_db)):
+async def update_transaction(transaction_id: str, update_data: UpdateTransactionRequest, db: AsyncIOMotorDatabase = Depends(get_database)):
     """Update a transaction"""
     # TODO: Implement transaction update with MySQL database
     raise HTTPException(status_code=501, detail="Transaction update not implemented yet")
 
 @router.get("/transactions/{transaction_id}", response_model=Transaction)
-async def get_transaction(transaction_id: str, db: Session = Depends(get_db)):
+async def get_transaction(transaction_id: str, db: AsyncIOMotorDatabase = Depends(get_database)):
     """Get a specific transaction by ID"""
     # TODO: Implement transaction retrieval with MySQL database
     raise HTTPException(status_code=404, detail="Transaction not found")
@@ -114,7 +114,7 @@ async def get_transaction(transaction_id: str, db: Session = Depends(get_db)):
 async def get_payment_analytics(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     """Get payment analytics"""
     # TODO: Implement payment analytics with MySQL database

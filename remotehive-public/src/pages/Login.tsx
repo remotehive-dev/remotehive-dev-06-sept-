@@ -16,7 +16,7 @@ interface LoginForm {
 const Login: React.FC = () => {
   const navigate = useNavigate()
   const location = useLocation()
-  const { signIn, loading } = useAuth()
+  const { signIn, signInWithGoogle, signInWithLinkedIn, signInWithSSO, loading } = useAuth()
   
   const [formData, setFormData] = useState<LoginForm>({
     email: '',

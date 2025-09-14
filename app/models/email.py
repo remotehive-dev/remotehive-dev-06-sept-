@@ -1,7 +1,7 @@
-from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, Table, Enum
-from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
-from sqlalchemy.dialects.postgresql import UUID
+# from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, Table, Enum  # Using MongoDB instead
+# from sqlalchemy.orm import relationship  # Using MongoDB instead
+# from sqlalchemy.sql import func  # Using MongoDB instead
+# from sqlalchemy.dialects.postgresql import UUID  # Using MongoDB instead
 from datetime import datetime
 import uuid
 import enum

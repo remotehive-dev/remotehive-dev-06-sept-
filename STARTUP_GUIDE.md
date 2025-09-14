@@ -140,14 +140,40 @@ Ensure the following environment variables are set:
 # Required for JWT authentication
 export JWT_SECRET_KEY="your-secret-key-here"
 
-# Database configuration
-export DATABASE_URL="sqlite:///./remotehive.db"
+# Database configuration - MongoDB Atlas (Pre-configured)
+export MONGODB_URL="mongodb+srv://remotehiveofficial_db_user:b9z6QbkaiR3qc2KZ@remotehive.l5zq7k0.mongodb.net/?retryWrites=true&w=majority&appName=Remotehive"
+
+# Note: SQLite configuration has been replaced with MongoDB Atlas
 
 # Redis configuration (optional)
 export REDIS_URL="redis://localhost:6379/0"
 
 # Environment setting
 export ENVIRONMENT="development"
+```
+
+### Example .env File
+
+```env
+# Database Configuration - MongoDB Atlas (Pre-configured)
+MONGODB_URL=mongodb+srv://remotehiveofficial_db_user:b9z6QbkaiR3qc2KZ@remotehive.l5zq7k0.mongodb.net/?retryWrites=true&w=majority&appName=Remotehive
+
+# JWT Configuration
+SECRET_KEY=your-secret-key-here
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+# Redis Configuration (Optional)
+REDIS_URL=redis://localhost:6379
+
+# Email Configuration (Optional)
+SMTP_SERVER=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=your-email@gmail.com
+SMTP_PASSWORD=your-app-password
+
+# Note: SQLite and PostgreSQL configurations have been removed
+# The project now uses MongoDB Atlas exclusively
 ```
 
 ### Configuration Files
@@ -215,11 +241,26 @@ cd ../remotehive-public && npm install
 4. **Check configuration files** and environment variables
 
 #### Database Issues
-```bash
-# Reset database (development only)
-rm -f remotehive.db
-python -m alembic upgrade head
-```
+
+**Problem**: MongoDB Atlas connection errors
+
+**Solutions**:
+1. **Test MongoDB Atlas connection**:
+   ```bash
+   python test_mongodb_connection.py
+   ```
+
+2. **Check internet connectivity** (MongoDB Atlas requires internet access)
+
+3. **Verify MongoDB Atlas configuration**:
+   - Ensure your IP address is whitelisted in MongoDB Atlas
+   - Verify the connection string is correct in `.env`
+   - Check MongoDB Atlas cluster status
+
+4. **Common MongoDB Atlas errors**:
+   - `ServerSelectionTimeoutError`: Network/firewall issues
+   - `AuthenticationFailed`: Incorrect credentials
+   - `NetworkTimeout`: Internet connectivity issues
 
 ### Debug Mode
 

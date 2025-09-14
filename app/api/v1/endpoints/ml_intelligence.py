@@ -1,10 +1,11 @@
 from typing import Dict, List, Optional, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+# from sqlalchemy.orm import Session  # Using MongoDB instead
 from pydantic import BaseModel, Field
 from datetime import datetime
+from motor.motor_asyncio import AsyncIOMotorDatabase
 
-from app.core.deps import get_db
+from app.core.deps import get_database  # Using MongoDB instead
 from ....services.ml_intelligence import (
     MLIntelligenceEngine, 
     MLPrediction, 
@@ -132,7 +133,7 @@ async def analyze_selector_patterns(
 @router.post("/learn-from-session/{session_id}", response_model=LearningMetricsResponse)
 async def learn_from_scraping_session(
     session_id: int,
-    db: Session = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_database),  # Using MongoDB instead
     current_user: User = Depends(get_current_user)
 ):
     """Learn from scraping session results to improve future predictions"""
@@ -233,7 +234,7 @@ async def get_training_status(
 @router.post("/retrain-models")
 async def retrain_models(
     force: bool = Query(default=False, description="Force retraining even with limited data"),
-    db: Session = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_database),  # Using MongoDB instead
     current_user: User = Depends(get_current_user)
 ):
     """Manually trigger model retraining"""

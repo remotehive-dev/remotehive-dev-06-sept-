@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 # from sqlalchemy.orm import Session, joinedload, noload  # Commented out - using MongoDB
-from sqlalchemy import and_, or_, func, desc, asc, text
+# from sqlalchemy import and_, or_, func, desc, asc, text  # Commented out - using MongoDB
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 import uuid

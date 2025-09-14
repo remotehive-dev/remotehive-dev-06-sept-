@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+# from sqlalchemy.orm import Session  # Using MongoDB instead
 from typing import List, Optional
 from pydantic import BaseModel, EmailStr
 import logging
@@ -48,7 +48,7 @@ async def get_employers(
     search: Optional[str] = Query(None, description="Search term for company name, industry, or city"),
     limit: int = Query(50, ge=1, le=100, description="Number of employers to return"),
     skip: int = Query(0, ge=0, description="Number of employers to skip"),
-    db: Session = Depends(get_db_session)
+    db = Depends(get_db_session)
 ):
     """Get list of employers with optional search and pagination."""
     try:
@@ -62,7 +62,7 @@ async def get_employers(
         # Get total count for pagination
         total_query = db.query(Employer)
         if search:
-            from sqlalchemy import or_
+            # from sqlalchemy import or_  # TODO: MongoDB Migration - Remove SQLAlchemy dependency
             total_query = total_query.filter(
                 or_(
                     Employer.company_name.ilike(f'%{search}%'),
@@ -85,7 +85,7 @@ async def get_employers(
 @router.post("/", response_model=EmployerResponse, status_code=201)
 async def create_employer(
     employer_data: EmployerCreate,
-    db: Session = Depends(get_db_session)
+    db = Depends(get_db_session)
 ):
     """Create a new employer."""
     try:
@@ -135,7 +135,7 @@ async def create_employer(
 @router.get("/{employer_id}", response_model=EmployerResponse)
 async def get_employer(
     employer_id: int,
-    db: Session = Depends(get_db_session)
+    db = Depends(get_db_session)
 ):
     """Get employer by ID."""
     try:
@@ -156,7 +156,7 @@ async def get_employer(
 async def update_employer(
     employer_id: int,
     employer_data: EmployerCreate,
-    db: Session = Depends(get_db_session)
+    db = Depends(get_db_session)
 ):
     """Update employer information."""
     try:
@@ -196,7 +196,7 @@ async def update_employer(
 @router.delete("/{employer_id}")
 async def delete_employer(
     employer_id: int,
-    db: Session = Depends(get_db_session)
+    db = Depends(get_db_session)
 ):
     """Delete employer."""
     try:

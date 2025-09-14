@@ -476,10 +476,10 @@ class ApplicationMonitor:
         # Database health check
         async def check_database():
             try:
-                from ..database.database import DatabaseManager
-                db_manager = DatabaseManager()
-                health_result = await db_manager.health_check()
-                return health_result.get("status") == "healthy"
+                from ..database.mongodb_models import User
+                # Simple MongoDB health check by attempting to find a user
+                await User.find_one()
+                return True
             except Exception:
                 return False
         

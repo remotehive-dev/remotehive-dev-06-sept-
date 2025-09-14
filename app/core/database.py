@@ -1,13 +1,14 @@
 from loguru import logger
-from app.database.database import get_db_session, init_database, get_database_manager
+from app.database.database import init_database
 from app.database.mongodb_models import User, UserRole
 from app.core.security import get_password_hash
 
 # Database session dependency for FastAPI
 def get_db():
     """Get MongoDB database for FastAPI dependency injection"""
-    db_manager = get_database_manager()
-    return db_manager.get_session()
+    # MongoDB doesn't need session management like SQLAlchemy
+    # Return None as MongoDB operations are handled directly through Beanie models
+    return None
 
 async def init_db():
     """Initialize MongoDB and create default data"""
@@ -54,9 +55,10 @@ async def create_default_data():
 async def health_check() -> bool:
     """Check MongoDB health"""
     try:
-        db_manager = get_database_manager()
-        result = await db_manager.health_check()
-        return result if isinstance(result, bool) else result.get('status') == 'healthy'
+        # Simple MongoDB health check by attempting to find a user
+        # This will test the MongoDB connection
+        await User.find_one()
+        return True
     except Exception as e:
         logger.error(f"MongoDB health check failed: {e}")
         return False

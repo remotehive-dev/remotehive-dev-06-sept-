@@ -1,6 +1,6 @@
 from typing import Optional, List, Dict, Any, TypeVar, Generic, Union
-from sqlalchemy.orm import Query, Session
-from sqlalchemy import desc, asc, func, text
+# from sqlalchemy.orm import Query, Session  # Using MongoDB instead
+# from sqlalchemy import desc, asc, func, text  # Using MongoDB instead
 from pydantic import BaseModel, Field
 from datetime import datetime
 import base64
@@ -259,7 +259,7 @@ class PaginationHelper:
                     search_conditions.append(column.ilike(f"%{search_term}%"))
             
             if search_conditions:
-                from sqlalchemy import or_
+                # from sqlalchemy import or_  # TODO: MongoDB Migration - Remove SQLAlchemy dependency
                 query = query.filter(or_(*search_conditions))
         
         # Apply filters

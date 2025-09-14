@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 
 interface LinkedInSignInButtonProps {
-  onSuccess?: () => void
+  onSuccess?: (data: { code: string; role: 'employer' | 'job_seeker' }) => void
   onError?: (error: string) => void
   role?: 'employer' | 'job_seeker'
 }
@@ -43,11 +43,11 @@ const LinkedInSignInButton: React.FC<LinkedInSignInButtonProps> = ({
         
         if (event.data.type === 'LINKEDIN_AUTH_SUCCESS') {
           try {
-            await signInWithLinkedIn({
+            const data = {
               code: event.data.code,
               role
-            })
-            onSuccess?.()
+            }
+            onSuccess?.(data)
           } catch (error) {
             const message = error instanceof Error ? error.message : 'LinkedIn sign-in failed'
             onError?.(message)

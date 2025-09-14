@@ -1,0 +1,557 @@
+# RemoteHive Alert Configuration
+# This file defines alert rules, thresholds, and notification settings
+
+# =============================================================================
+# GLOBAL ALERT SETTINGS
+# =============================================================================
+
+global:
+  # Default alert settings
+  enabled: true
+  cooldown_period: 300  # 5 minutes between same alert types
+  max_alerts_per_hour: 20
+  alert_retention_days: 30
+  
+  # Notification channels
+  notifications:
+    email:
+      enabled: true
+      smtp_server: "smtp.gmail.com"
+      smtp_port: 587
+      smtp_username: "alerts@remotehive.com"
+      smtp_password: "${SMTP_PASSWORD}"
+      from_address: "alerts@remotehive.com"
+      to_addresses:
+        - "admin@remotehive.com"
+        - "devops@remotehive.com"
+      
+    slack:
+      enabled: true
+      webhook_url: "${SLACK_WEBHOOK_URL}"
+      channel: "#alerts"
+      username: "RemoteHive Monitor"
+      icon_emoji: ":warning:"
+      
+    sms:
+      enabled: false
+      provider: "twilio"
+      account_sid: "${TWILIO_ACCOUNT_SID}"
+      auth_token: "${TWILIO_AUTH_TOKEN}"
+      from_number: "+1234567890"
+      to_numbers:
+        - "+1987654321"
+        
+    webhook:
+      enabled: false
+      url: "https://api.remotehive.com/alerts"
+      method: "POST"
+      headers:
+        Authorization: "Bearer ${WEBHOOK_TOKEN}"
+        Content-Type: "application/json"
+
+# =============================================================================
+# SYSTEM RESOURCE ALERTS
+# =============================================================================
+
+system_resources:
+  cpu:
+    - name: "High CPU Usage"
+      metric: "cpu_usage_percent"
+      threshold: 80
+      operator: ">"
+      duration: 300  # 5 minutes
+      severity: "warning"
+      message: "CPU usage is above 80% for more than 5 minutes"
+      
+    - name: "Critical CPU Usage"
+      metric: "cpu_usage_percent"
+      threshold: 95
+      operator: ">"
+      duration: 60  # 1 minute
+      severity: "critical"
+      message: "CPU usage is critically high (>95%)"
+      
+  memory:
+    - name: "High Memory Usage"
+      metric: "memory_usage_percent"
+      threshold: 85
+      operator: ">"
+      duration: 300
+      severity: "warning"
+      message: "Memory usage is above 85% for more than 5 minutes"
+      
+    - name: "Critical Memory Usage"
+      metric: "memory_usage_percent"
+      threshold: 95
+      operator: ">"
+      duration: 60
+      severity: "critical"
+      message: "Memory usage is critically high (>95%)"
+      
+  disk:
+    - name: "High Disk Usage"
+      metric: "disk_usage_percent"
+      threshold: 85
+      operator: ">"
+      duration: 0  # Immediate
+      severity: "warning"
+      message: "Disk usage is above 85%"
+      
+    - name: "Critical Disk Usage"
+      metric: "disk_usage_percent"
+      threshold: 95
+      operator: ">"
+      duration: 0
+      severity: "critical"
+      message: "Disk usage is critically high (>95%)"
+      
+  load:
+    - name: "High System Load"
+      metric: "load_average_1m"
+      threshold: 5.0
+      operator: ">"
+      duration: 300
+      severity: "warning"
+      message: "System load average is high for more than 5 minutes"
+      
+    - name: "Critical System Load"
+      metric: "load_average_1m"
+      threshold: 10.0
+      operator: ">"
+      duration: 60
+      severity: "critical"
+      message: "System load average is critically high"
+
+# =============================================================================
+# SERVICE ALERTS
+# =============================================================================
+
+services:
+  backend:
+    - name: "Backend Service Down"
+      service: "remotehive-backend"
+      check_type: "systemd_status"
+      expected_status: "active"
+      severity: "critical"
+      message: "RemoteHive backend service is not running"
+      
+    - name: "Backend High Memory"
+      service: "remotehive-backend"
+      check_type: "process_memory"
+      threshold: 1024  # MB
+      operator: ">"
+      severity: "warning"
+      message: "Backend service is using excessive memory"
+      
+  autoscraper:
+    - name: "Autoscraper Service Down"
+      service: "remotehive-autoscraper"
+      check_type: "systemd_status"
+      expected_status: "active"
+      severity: "critical"
+      message: "RemoteHive autoscraper service is not running"
+      
+  frontend:
+    - name: "Admin Panel Down"
+      service: "remotehive-admin"
+      check_type: "pm2_status"
+      expected_status: "online"
+      severity: "critical"
+      message: "Admin panel is not running"
+      
+    - name: "Public Website Down"
+      service: "remotehive-public"
+      check_type: "pm2_status"
+      expected_status: "online"
+      severity: "critical"
+      message: "Public website is not running"
+
+# =============================================================================
+# NETWORK AND PORT ALERTS
+# =============================================================================
+
+network:
+  ports:
+    - name: "Backend API Port Closed"
+      port: 8000
+      protocol: "tcp"
+      severity: "critical"
+      message: "Backend API port 8000 is not listening"
+      
+    - name: "Autoscraper Port Closed"
+      port: 8001
+      protocol: "tcp"
+      severity: "critical"
+      message: "Autoscraper port 8001 is not listening"
+      
+    - name: "Admin Panel Port Closed"
+      port: 3000
+      protocol: "tcp"
+      severity: "critical"
+      message: "Admin panel port 3000 is not listening"
+      
+    - name: "Public Website Port Closed"
+      port: 5173
+      protocol: "tcp"
+      severity: "critical"
+      message: "Public website port 5173 is not listening"
+      
+    - name: "HTTP Port Closed"
+      port: 80
+      protocol: "tcp"
+      severity: "warning"
+      message: "HTTP port 80 is not listening"
+      
+    - name: "HTTPS Port Closed"
+      port: 443
+      protocol: "tcp"
+      severity: "warning"
+      message: "HTTPS port 443 is not listening"
+
+# =============================================================================
+# APPLICATION HEALTH ALERTS
+# =============================================================================
+
+health_checks:
+  endpoints:
+    - name: "Backend Health Check Failed"
+      url: "http://localhost:8000/health"
+      method: "GET"
+      expected_status: 200
+      timeout: 10
+      severity: "critical"
+      message: "Backend health check endpoint is not responding"
+      
+    - name: "Autoscraper Health Check Failed"
+      url: "http://localhost:8001/health"
+      method: "GET"
+      expected_status: 200
+      timeout: 10
+      severity: "critical"
+      message: "Autoscraper health check endpoint is not responding"
+      
+    - name: "Admin Panel Unreachable"
+      url: "http://localhost:3000"
+      method: "GET"
+      expected_status: 200
+      timeout: 10
+      severity: "warning"
+      message: "Admin panel is not reachable"
+      
+    - name: "Public Website Unreachable"
+      url: "http://localhost:5173"
+      method: "GET"
+      expected_status: 200
+      timeout: 10
+      severity: "warning"
+      message: "Public website is not reachable"
+      
+  response_time:
+    - name: "Slow Backend Response"
+      url: "http://localhost:8000/health"
+      threshold: 5000  # milliseconds
+      operator: ">"
+      severity: "warning"
+      message: "Backend API is responding slowly"
+      
+    - name: "Very Slow Backend Response"
+      url: "http://localhost:8000/health"
+      threshold: 10000
+      operator: ">"
+      severity: "critical"
+      message: "Backend API response time is critically slow"
+
+# =============================================================================
+# DATABASE ALERTS
+# =============================================================================
+
+database:
+  connectivity:
+    - name: "Database Connection Failed"
+      host: "${DB_HOST:-localhost}"
+      port: "${DB_PORT:-5432}"
+      database: "${DB_NAME:-remotehive}"
+      username: "${DB_USER:-postgres}"
+      severity: "critical"
+      message: "Cannot connect to PostgreSQL database"
+      
+  performance:
+    - name: "High Database Connections"
+      metric: "active_connections"
+      threshold: 80
+      operator: ">"
+      severity: "warning"
+      message: "Database has high number of active connections"
+      
+    - name: "Slow Database Queries"
+      metric: "avg_query_time"
+      threshold: 1000  # milliseconds
+      operator: ">"
+      severity: "warning"
+      message: "Database queries are running slowly"
+      
+  storage:
+    - name: "Database Storage High"
+      metric: "database_size_mb"
+      threshold: 10240  # 10GB
+      operator: ">"
+      severity: "warning"
+      message: "Database size is growing large"
+
+# =============================================================================
+# REDIS ALERTS
+# =============================================================================
+
+redis:
+  connectivity:
+    - name: "Redis Connection Failed"
+      host: "${REDIS_HOST:-localhost}"
+      port: "${REDIS_PORT:-6379}"
+      severity: "warning"
+      message: "Cannot connect to Redis server"
+      
+  performance:
+    - name: "High Redis Memory Usage"
+      metric: "used_memory_mb"
+      threshold: 512
+      operator: ">"
+      severity: "warning"
+      message: "Redis is using high memory"
+      
+    - name: "Redis Slow Queries"
+      metric: "slowlog_len"
+      threshold: 10
+      operator: ">"
+      severity: "warning"
+      message: "Redis has slow queries in the log"
+
+# =============================================================================
+# SECURITY ALERTS
+# =============================================================================
+
+security:
+  ssl_certificates:
+    - name: "SSL Certificate Expiring Soon"
+      domains:
+        - "remotehive.com"
+        - "admin.remotehive.com"
+        - "api.remotehive.com"
+      threshold: 30  # days
+      operator: "<"
+      severity: "warning"
+      message: "SSL certificate expires in less than 30 days"
+      
+    - name: "SSL Certificate Expiring Very Soon"
+      domains:
+        - "remotehive.com"
+        - "admin.remotehive.com"
+        - "api.remotehive.com"
+      threshold: 7  # days
+      operator: "<"
+      severity: "critical"
+      message: "SSL certificate expires in less than 7 days"
+      
+  failed_logins:
+    - name: "High Failed Login Attempts"
+      metric: "failed_logins_per_hour"
+      threshold: 50
+      operator: ">"
+      severity: "warning"
+      message: "High number of failed login attempts detected"
+      
+    - name: "Brute Force Attack"
+      metric: "failed_logins_per_minute"
+      threshold: 10
+      operator: ">"
+      severity: "critical"
+      message: "Possible brute force attack detected"
+      
+  log_errors:
+    - name: "High Error Rate in Logs"
+      metric: "error_count_per_hour"
+      threshold: 100
+      operator: ">"
+      severity: "warning"
+      message: "High number of errors detected in application logs"
+      
+    - name: "Critical Errors in Logs"
+      patterns:
+        - "CRITICAL"
+        - "FATAL"
+        - "EMERGENCY"
+      severity: "critical"
+      message: "Critical errors detected in application logs"
+
+# =============================================================================
+# BUSINESS METRICS ALERTS
+# =============================================================================
+
+business_metrics:
+  scraping:
+    - name: "Low Scraping Success Rate"
+      metric: "scraping_success_rate_percent"
+      threshold: 80
+      operator: "<"
+      duration: 1800  # 30 minutes
+      severity: "warning"
+      message: "Job scraping success rate is below 80%"
+      
+    - name: "No Jobs Scraped"
+      metric: "jobs_scraped_per_hour"
+      threshold: 1
+      operator: "<"
+      duration: 3600  # 1 hour
+      severity: "critical"
+      message: "No jobs have been scraped in the last hour"
+      
+  user_activity:
+    - name: "Low User Activity"
+      metric: "active_users_per_hour"
+      threshold: 5
+      operator: "<"
+      duration: 7200  # 2 hours
+      severity: "info"
+      message: "User activity is lower than expected"
+      
+  api_usage:
+    - name: "High API Error Rate"
+      metric: "api_error_rate_percent"
+      threshold: 5
+      operator: ">"
+      duration: 900  # 15 minutes
+      severity: "warning"
+      message: "API error rate is above 5%"
+
+# =============================================================================
+# ALERT ESCALATION RULES
+# =============================================================================
+
+escalation:
+  rules:
+    - name: "Critical Alert Escalation"
+      conditions:
+        - severity: "critical"
+        - duration: 900  # 15 minutes
+      actions:
+        - type: "email"
+          recipients:
+            - "cto@remotehive.com"
+            - "oncall@remotehive.com"
+        - type: "sms"
+          recipients:
+            - "+1987654321"
+            
+    - name: "Service Down Escalation"
+      conditions:
+        - alert_type: "service_down"
+        - duration: 300  # 5 minutes
+      actions:
+        - type: "slack"
+          channel: "#critical-alerts"
+        - type: "webhook"
+          url: "https://api.pagerduty.com/incidents"
+          
+    - name: "Multiple Alerts Escalation"
+      conditions:
+        - alert_count: 5
+        - time_window: 600  # 10 minutes
+      actions:
+        - type: "email"
+          recipients:
+            - "management@remotehive.com"
+        - type: "slack"
+          channel: "#management"
+
+# =============================================================================
+# ALERT SUPPRESSION RULES
+# =============================================================================
+
+suppression:
+  rules:
+    - name: "Maintenance Window"
+      schedule:
+        - day: "sunday"
+          start_time: "02:00"
+          end_time: "04:00"
+          timezone: "UTC"
+      suppress_alerts:
+        - "service_down"
+        - "high_cpu"
+        - "high_memory"
+        
+    - name: "Deployment Window"
+      tags:
+        - "deployment"
+      duration: 1800  # 30 minutes
+      suppress_alerts:
+        - "service_down"
+        - "endpoint_down"
+        
+    - name: "Known Issue Suppression"
+      conditions:
+        - alert_name: "Database Connection Failed"
+        - source_host: "db-maintenance-server"
+      duration: 3600  # 1 hour
+
+# =============================================================================
+# ALERT TEMPLATES
+# =============================================================================
+
+templates:
+  email:
+    subject: "[{{ .Severity | upper }}] RemoteHive Alert: {{ .AlertName }}"
+    body: |
+      Alert: {{ .AlertName }}
+      Severity: {{ .Severity | upper }}
+      Message: {{ .Message }}
+      
+      Host: {{ .Host }}
+      Timestamp: {{ .Timestamp }}
+      Duration: {{ .Duration }}
+      
+      {% if .Metric %}
+      Metric: {{ .Metric }}
+      Current Value: {{ .CurrentValue }}
+      Threshold: {{ .Threshold }}
+      {% endif %}
+      
+      {% if .RunbookURL %}
+      Runbook: {{ .RunbookURL }}
+      {% endif %}
+      
+      Dashboard: https://monitoring.remotehive.com/dashboard
+      
+  slack:
+    title: "🚨 RemoteHive Alert"
+    color_map:
+      info: "good"
+      warning: "warning"
+      critical: "danger"
+    fields:
+      - title: "Alert"
+        value: "{{ .AlertName }}"
+        short: true
+      - title: "Severity"
+        value: "{{ .Severity | upper }}"
+        short: true
+      - title: "Host"
+        value: "{{ .Host }}"
+        short: true
+      - title: "Time"
+        value: "{{ .Timestamp }}"
+        short: true
+      - title: "Message"
+        value: "{{ .Message }}"
+        short: false
+
+# =============================================================================
+# RUNBOOK LINKS
+# =============================================================================
+
+runbooks:
+  "High CPU Usage": "https://docs.remotehive.com/runbooks/high-cpu"
+  "High Memory Usage": "https://docs.remotehive.com/runbooks/high-memory"
+  "Service Down": "https://docs.remotehive.com/runbooks/service-down"
+  "Database Connection Failed": "https://docs.remotehive.com/runbooks/database-issues"
+  "SSL Certificate Expiring": "https://docs.remotehive.com/runbooks/ssl-renewal"
+  "High Error Rate": "https://docs.remotehive.com/runbooks/error

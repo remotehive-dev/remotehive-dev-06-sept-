@@ -4,8 +4,8 @@ import uuid
 import logging
 from datetime import datetime
 from typing import List, Dict, Any, Optional
-from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
+# from sqlalchemy.orm import Session  # Using MongoDB instead
+# from sqlalchemy import and_, or_  # Using MongoDB instead
 import re
 import asyncio
 from urllib.parse import urlparse
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 class WebsiteManagementService:
     """Service for managing bulk website uploads and operations."""
     
-    def __init__(self, db: Session):
+    def __init__(self, db=None):  # db: Session - Using MongoDB instead
         self.db = db
         self.required_fields = ['name', 'url', 'category']
         self.optional_fields = [
@@ -458,7 +458,7 @@ class WebsiteManagementService:
         ).count()
         
         # Get category distribution
-        from sqlalchemy import func
+        # from sqlalchemy import func  # TODO: MongoDB Migration - Remove SQLAlchemy dependency
         category_stats = self.db.query(
             ManagedWebsite.category,
             func.count(ManagedWebsite.id).label('count')

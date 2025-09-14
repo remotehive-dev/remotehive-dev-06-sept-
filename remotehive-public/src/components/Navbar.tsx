@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext'
 import NotificationBell from './NotificationBell'
 
 const Navbar: React.FC = () => {
-  const { user, userProfile, signOut } = useAuth()
+  const { user, signOut } = useAuth()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const location = useLocation()
@@ -80,7 +80,7 @@ const Navbar: React.FC = () => {
                     <User className="h-4 w-4 text-white" />
                   </div>
                   <span className="text-sm font-medium">
-                    {userProfile?.full_name || user.email}
+                    {user.name || `${user.first_name} ${user.last_name}` || user.email}
                   </span>
                 </button>
 
@@ -93,7 +93,7 @@ const Navbar: React.FC = () => {
                       className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50"
                     >
                       <Link
-                        to={userProfile?.role === 'employer' ? '/employer/dashboard' : '/jobseeker/dashboard'}
+                        to={user.role === 'employer' ? '/employer/dashboard' : '/jobseeker/dashboard'}
                         className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                         onClick={() => setIsUserMenuOpen(false)}
                       >
@@ -173,11 +173,11 @@ const Navbar: React.FC = () => {
                       <User className="h-4 w-4 text-white" />
                     </div>
                     <span className="ml-3 text-sm font-medium text-gray-700">
-                      {userProfile?.full_name || user.email}
+                      {user.name || `${user.first_name} ${user.last_name}` || user.email}
                     </span>
                   </div>
                   <Link
-                    to={userProfile?.role === 'employer' ? '/employer/dashboard' : '/jobseeker/dashboard'}
+                    to={user.role === 'employer' ? '/employer/dashboard' : '/jobseeker/dashboard'}
                     className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
                     onClick={() => setIsMenuOpen(false)}
                   >

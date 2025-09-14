@@ -35,12 +35,14 @@ class AutoscraperSettings(BaseSettings):
         "http://127.0.0.1:3001"
     ]
     
-    # Database Configuration
-    DATABASE_URL: str = "sqlite:///./autoscraper.db"
-    DATABASE_POOL_SIZE: int = 5
-    DATABASE_MAX_OVERFLOW: int = 10
-    DATABASE_POOL_TIMEOUT: int = 30
-    DATABASE_POOL_RECYCLE: int = 3600
+    # MongoDB Atlas Configuration
+    MONGODB_URL: str = os.getenv("MONGODB_URL", "mongodb+srv://remotehiveofficial_db_user:b9z6QbkaiR3qc2KZ@remotehive.l5zq7k0.mongodb.net/?retryWrites=true&w=majority&appName=Remotehive")
+    MONGODB_DATABASE_NAME: str = os.getenv("MONGODB_DATABASE_NAME", "remotehive_autoscraper")
+    MONGODB_MAX_POOL_SIZE: int = int(os.getenv("MONGODB_MAX_POOL_SIZE", "50"))
+    MONGODB_MIN_POOL_SIZE: int = int(os.getenv("MONGODB_MIN_POOL_SIZE", "5"))
+    MONGODB_SERVER_SELECTION_TIMEOUT: int = int(os.getenv("MONGODB_SERVER_SELECTION_TIMEOUT", "10000"))
+    MONGODB_CONNECT_TIMEOUT: int = int(os.getenv("MONGODB_CONNECT_TIMEOUT", "15000"))
+    MONGODB_SOCKET_TIMEOUT: int = int(os.getenv("MONGODB_SOCKET_TIMEOUT", "30000"))
     DB_SLOW_QUERY_THRESHOLD: float = float(os.getenv("DB_SLOW_QUERY_THRESHOLD", "1.0"))
     
     # Redis Configuration (for rate limiting and caching)
@@ -169,7 +171,8 @@ if settings.ENVIRONMENT == "production":
     settings.LOG_LEVEL = "WARNING"
     settings.WORKERS = max(4, os.cpu_count() or 4)
     settings.RATE_LIMIT_REQUESTS_PER_WINDOW = 1000
-    settings.DATABASE_POOL_SIZE = 20
+    settings.MONGODB_MAX_POOL_SIZE = 100
+    settings.MONGODB_MIN_POOL_SIZE = 10
     
 elif settings.ENVIRONMENT == "staging":
     # Staging overrides

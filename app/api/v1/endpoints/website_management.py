@@ -2,13 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Q
 from fastapi.responses import Response, StreamingResponse
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field, validator
-from sqlalchemy.orm import Session
+from motor.motor_asyncio import AsyncIOMotorDatabase
 import logging
 import uuid
 import io
 from datetime import datetime
 
-from app.core.deps import get_db, get_current_user
+from app.core.deps import get_database, get_current_user
 from app.models.mongodb_models import User
 from app.services.website_management_service import WebsiteManagementService
 from app.services.website_template_service import WebsiteTemplateService
@@ -22,7 +22,7 @@ router = APIRouter()
 
 @router.get("/", response_model=Dict[str, List[Any]])
 async def get_websites(
-    db: Session = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_database),
     current_user: User = Depends(get_current_user)
 ):
     """Get all websites for the frontend"""
@@ -77,7 +77,7 @@ async def upload_websites(
     auto_categorize: bool = Form(False),
     default_rate_limit: int = Form(5),
     default_max_pages: int = Form(100),
-    db: Session = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_database),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -121,7 +121,7 @@ async def upload_websites(
 @router.get("/status/{upload_id}", response_model=WebsiteUploadStatus)
 async def get_upload_status(
     upload_id: str,
-    db: Session = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_database),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -148,7 +148,7 @@ async def get_upload_status(
 async def get_upload_history(
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
-    db: Session = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_database),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -177,7 +177,7 @@ async def get_upload_history(
 @router.delete("/cancel/{upload_id}")
 async def cancel_upload(
     upload_id: str,
-    db: Session = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_database),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -231,7 +231,7 @@ async def validate_websites(
 
 @router.get("/stats")
 async def get_website_stats(
-    db: Session = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_database),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -255,7 +255,7 @@ async def list_websites(
     status: Optional[str] = Query(None),
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
-    db: Session = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_database),  # Using MongoDB instead
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -289,7 +289,7 @@ async def list_websites(
 async def update_website(
     website_id: int,
     website_config: WebsiteConfig,
-    db: Session = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_database),  # Using MongoDB instead
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -320,7 +320,7 @@ async def update_website(
 @router.delete("/delete/{website_id}")
 async def delete_website(
     website_id: int,
-    db: Session = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_database),  # Using MongoDB instead
     current_user: User = Depends(get_current_user)
 ):
     """

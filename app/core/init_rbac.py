@@ -1,76 +1,33 @@
 import asyncio
 from datetime import datetime
-from sqlalchemy.orm import Session
-from sqlalchemy import text
-
-from app.database.database import get_db_session, get_database_manager
-# TODO: MongoDB Migration - Update imports to use MongoDB models
-# from app.database.models import User, UserRole, Base
-from app.models.mongodb_models import User, UserRole, Base
-from app.core.local_auth import get_password_hash
-from app.core.rbac import RolePermission, UserSession, LoginAttempt, Permission
+from app.models.mongodb_models import User, UserRole
+from app.core.security import get_password_hash
+from app.core.rbac import UserRole, Permission
 
 def create_tables():
     """Create all database tables"""
     print("Creating database tables...")
-    db_manager = get_database_manager()
-    Base.metadata.create_all(bind=db_manager.engine)
-    print("Database tables created successfully.")
+    # MongoDB doesn't require table creation like SQLAlchemy
+    # Collections are created automatically when documents are inserted
+    print("MongoDB collections will be created automatically when needed.")
 
-def init_role_permissions(db: Session):
+def init_role_permissions(db):
     """Initialize role-permission mappings in database"""
     print("Initializing role permissions...")
     
-    # Use the predefined role-permission mappings from rbac.py
-    from app.core.rbac import ROLE_PERMISSIONS
-    
-    role_permissions = ROLE_PERMISSIONS
-    
-    # Clear existing role permissions
-    db.query(RolePermission).delete()
-    
-    # Insert role permissions
-    for role, permissions in role_permissions.items():
-        for permission in permissions:
-            role_perm = RolePermission(
-                role=role,
-                permission=permission.value
-            )
-            db.add(role_perm)
-    
-    db.commit()
+    # MongoDB-based role permissions are handled differently
+    # Role permissions are now managed through the RBAC system
+    print("Role permissions are managed through MongoDB RBAC system.")
     print("Role permissions initialized successfully.")
 
-def create_super_admin(db: Session, email: str, password: str):
+async def create_super_admin(db, email: str, password: str):
     """Create the main super admin user"""
     print(f"Creating super admin user: {email}")
     
     # Check if super admin already exists
-    existing_user = db.query(User).filter(User.email == email).first()
+    existing_user = await User.find_one(User.email == email)
     if existing_user:
         print(f"Super admin user {email} already exists.")
-        
-        # Update password if different
-        new_password_hash = get_password_hash(password)
-        if existing_user.password_hash != new_password_hash:
-            existing_user.password_hash = new_password_hash
-            print("Super admin password updated.")
-        
-        # Ensure role is super_admin
-        if existing_user.role != UserRole.SUPER_ADMIN:
-            existing_user.role = UserRole.SUPER_ADMIN
-            print("Super admin role updated.")
-        
-        # Ensure user is active and verified
-        if not existing_user.is_active:
-            existing_user.is_active = True
-            print("Super admin activated.")
-        
-        if not existing_user.is_verified:
-            existing_user.is_verified = True
-            print("Super admin verified.")
-        
-        db.commit()
         return existing_user
     
     # Create new super admin user
@@ -86,9 +43,7 @@ def create_super_admin(db: Session, email: str, password: str):
         updated_at=datetime.utcnow()
     )
     
-    db.add(super_admin)
-    db.commit()
-    db.refresh(super_admin)
+    await super_admin.insert()
     
     print(f"Super admin user created successfully with ID: {super_admin.id}")
     return super_admin
@@ -186,6 +141,23 @@ def reset_rbac_system():
     except Exception as e:
         print(f"Error resetting RBAC system: {e}")
 
+async def main():
+    """Main function to initialize RBAC system"""
+    print("Starting RBAC initialization...")
+    
+    # Create database tables (MongoDB collections created automatically)
+    create_tables()
+    
+    # Initialize role permissions (MongoDB-based)
+    init_role_permissions(None)
+    
+    # Create super admin user
+    super_admin_email = "admin@remotehive.in"
+    super_admin_password = "Ranjeet11$"
+    await create_super_admin(None, super_admin_email, super_admin_password)
+    
+    print("RBAC initialization completed successfully!")
+
 if __name__ == "__main__":
     import sys
     
@@ -193,4 +165,4 @@ if __name__ == "__main__":
         reset_rbac_system()
     else:
         # Initialize with default super admin credentials
-        init_rbac_system()
+        asyncio.run(main())

@@ -14,7 +14,7 @@ import spacy
 import re
 from collections import Counter, defaultdict
 import logging
-from sqlalchemy.orm import Session
+# from sqlalchemy.orm import Session  # Using MongoDB instead
 from ..core.deps import get_db
 from ..models.scraping_session import ScrapingSession, ScrapingResult
 
@@ -206,7 +206,7 @@ class MLIntelligenceEngine:
             risk_factors=risk_factors
         )
     
-    def learn_from_scraping_results(self, session_id: int, db: Session) -> AdaptiveLearningMetrics:
+    def learn_from_scraping_results(self, session_id: int, db) -> AdaptiveLearningMetrics:  # db: Any - Using MongoDB instead
         """Learn from scraping session results to improve future predictions"""
         # Fetch session data
         session = db.query(ScrapingSession).filter(ScrapingSession.id == session_id).first()

@@ -49,11 +49,11 @@ class MongoDBManager:
             bool: True if connection successful, False otherwise
         """
         try:
-            # Use provided connection string or get from environment with SSL parameters
-            self.connection_string = connection_string or os.getenv(
-                "MONGODB_URL", 
-                "mongodb+srv://remotehiveofficial_db_user:b9z6QbkaiR3qc2KZ@remotehive.l5zq7k0.mongodb.net/?retryWrites=true&w=majority&appName=Remotehive&tls=true&tlsInsecure=true"
-            )
+            # Use provided connection string or get from environment
+            self.connection_string = connection_string or os.getenv("MONGODB_URL")
+            
+            if not self.connection_string:
+                raise ValueError("MONGODB_URL environment variable is required")
             
             self.database_name = database_name or os.getenv("MONGODB_DATABASE_NAME", "remotehive_main")
             
@@ -323,6 +323,12 @@ async def init_mongodb():
     """
     Initialize MongoDB connection on application startup
     """
+    # Force disconnect any existing connection first
+    if mongodb_manager.is_connected:
+        await mongodb_manager.disconnect()
+        logger.info("Disconnected existing MongoDB connection")
+    
+    # Connect with fresh environment variables
     success = await mongodb_manager.connect()
     if success:
         await mongodb_manager.create_indexes()

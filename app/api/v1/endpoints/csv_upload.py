@@ -1,6 +1,6 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, BackgroundTasks
 from fastapi.responses import JSONResponse
-from sqlalchemy.orm import Session
+# from sqlalchemy.orm import Session  # Using MongoDB instead
 from typing import List, Dict, Any, Optional
 import csv
 import io
@@ -60,7 +60,7 @@ async def upload_csv_file(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     config: Optional[str] = None,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Using MongoDB instead
     current_user: dict = Depends(require_permission("admin:csv_upload"))
 ):
     """
@@ -129,7 +129,7 @@ async def upload_csv_file(
 @router.get("/status/{upload_id}", response_model=CSVImportStatus)
 async def get_import_status(
     upload_id: str,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Using MongoDB instead
     current_user: dict = Depends(require_permission("admin:csv_upload"))
 ):
     """
@@ -155,7 +155,7 @@ async def get_import_status(
 async def get_import_history(
     limit: int = 50,
     offset: int = 0,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Using MongoDB instead
     current_user: dict = Depends(require_permission("admin:csv_upload"))
 ):
     """
@@ -187,7 +187,7 @@ async def get_import_history(
 @router.delete("/cancel/{upload_id}")
 async def cancel_import(
     upload_id: str,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Using MongoDB instead
     current_user: dict = Depends(require_permission("admin:csv_upload"))
 ):
     """
@@ -256,7 +256,7 @@ async def download_csv_template(
 async def validate_csv_data(
     file: UploadFile = File(...),
     config: Optional[str] = None,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Using MongoDB instead
     current_user: dict = Depends(require_permission("admin:csv_upload"))
 ):
     """
@@ -317,7 +317,7 @@ async def upload_job_board_csv(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     test_accessibility: bool = True,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Using MongoDB instead
     current_user: dict = Depends(require_permission("admin:csv_upload"))
 ):
     """
@@ -386,7 +386,7 @@ async def upload_job_board_csv(
 @router.get("/job-boards/status/{upload_id}")
 async def get_job_board_import_status(
     upload_id: str,
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Using MongoDB instead
     current_user: dict = Depends(require_permission("admin:csv_upload"))
 ):
     """
@@ -442,7 +442,7 @@ async def download_job_board_csv_template(
 @router.post("/job-boards/validate")
 async def validate_job_board_csv(
     file: UploadFile = File(...),
-    db: Session = Depends(get_db),
+    # db: Session = Depends(get_db),  # Using MongoDB instead
     current_user: dict = Depends(require_permission("admin:csv_upload"))
 ):
     """

@@ -1,10 +1,16 @@
 #!/bin/bash
 
 # RemoteHive Rollback Script
-# Handles emergency rollbacks for Docker Compose and Kubernetes deployments
-# Usage: ./rollback.sh [docker|k8s] [environment] [options]
+# This script handles emergency rollback of RemoteHive deployment
 
-set -e
+set -e  # Exit on any error
+
+# Configuration
+APP_NAME="remotehive"
+APP_DIR="/opt/remotehive"
+BACKUP_DIR="/opt/remotehive-backups"
+LOG_FILE="/var/log/remotehive-rollback.log"
+SERVICES=("remotehive-backend" "remotehive-autoscraper" "remotehive-admin" "remotehive-public")
 
 # Colors for output
 RED='\033[0;31m'
@@ -13,535 +19,427 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Default values
-PLATFORM="docker"
-ENVIRONMENT="prod"
-NAMESPACE="remotehive"
-TARGET_VERSION=""
-BACKUP_DATA=true
-FORCE_ROLLBACK=false
-DRY_RUN=false
-VERBOSE=false
-ROLLBACK_TIMEOUT=300
+# Logging function
+log() {
+    echo -e "[$(date +'%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
+}
 
-# Script directory
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-BACKUP_DIR="$PROJECT_ROOT/backups"
-ROLLBACK_LOG="$BACKUP_DIR/rollback-$(date +%Y%m%d-%H%M%S).log"
-
-# Logging functions
 log_info() {
-    local message="$1"
-    echo -e "${BLUE}[INFO]${NC} $message" | tee -a "$ROLLBACK_LOG"
+    log "${BLUE}[INFO]${NC} $1"
 }
 
 log_success() {
-    local message="$1"
-    echo -e "${GREEN}[SUCCESS]${NC} $message" | tee -a "$ROLLBACK_LOG"
+    log "${GREEN}[SUCCESS]${NC} $1"
 }
 
 log_warning() {
-    local message="$1"
-    echo -e "${YELLOW}[WARNING]${NC} $message" | tee -a "$ROLLBACK_LOG"
+    log "${YELLOW}[WARNING]${NC} $1"
 }
 
 log_error() {
-    local message="$1"
-    echo -e "${RED}[ERROR]${NC} $message" | tee -a "$ROLLBACK_LOG"
+    log "${RED}[ERROR]${NC} $1"
 }
 
-log_verbose() {
-    if [[ "$VERBOSE" == "true" ]]; then
-        local message="$1"
-        echo -e "${BLUE}[VERBOSE]${NC} $message" | tee -a "$ROLLBACK_LOG"
-    fi
+# Error handling
+error_exit() {
+    log_error "$1"
+    log_error "Rollback failed. Check logs at $LOG_FILE"
+    exit 1
 }
 
-# Help function
-show_help() {
+# Show usage
+show_usage() {
     cat << EOF
-RemoteHive Rollback Script
+Usage: $0 [OPTIONS]
 
-Usage: $0 [PLATFORM] [ENVIRONMENT] [OPTIONS]
-
-PLATFORM:
-    docker      Rollback Docker Compose deployment (default)
-    k8s         Rollback Kubernetes deployment
-
-ENVIRONMENT:
-    dev         Development environment
-    staging     Staging environment
-    prod        Production environment (default)
-
-OPTIONS:
-    -v, --version VERSION        Target version to rollback to (required)
-    -n, --namespace NAMESPACE    Kubernetes namespace (default: remotehive)
-    --no-backup                  Skip data backup before rollback
-    --force                      Force rollback without confirmation
-    --timeout SECONDS            Rollback timeout in seconds (default: 300)
-    --dry-run                    Show what would be rolled back
-    --verbose                    Enable verbose logging
-    -h, --help                   Show this help message
+Options:
+  -b, --backup BACKUP_ID    Rollback to specific backup (e.g., backup-20231201-143022)
+  -l, --list               List available backups
+  -f, --force              Force rollback without confirmation
+  -h, --help               Show this help message
 
 Examples:
-    $0 docker prod -v v1.2.2                    # Rollback Docker to v1.2.2
-    $0 k8s staging -v v1.1.0 --force           # Force rollback K8s to v1.1.0
-    $0 docker prod -v v1.2.2 --no-backup       # Rollback without backup
-    $0 k8s prod -v v1.1.0 --dry-run            # Show rollback plan
-
-Environment Variables:
-    DOCKER_REGISTRY     Docker registry URL
-    KUBECONFIG          Kubernetes config file path
-    ROLLBACK_TIMEOUT    Override default timeout
+  $0 --list                          # List available backups
+  $0 --backup backup-20231201-143022 # Rollback to specific backup
+  $0 --force                         # Rollback to latest backup without confirmation
 
 EOF
 }
 
 # Parse command line arguments
-parse_args() {
+parse_arguments() {
+    BACKUP_ID=""
+    LIST_BACKUPS=false
+    FORCE_ROLLBACK=false
+    
     while [[ $# -gt 0 ]]; do
         case $1 in
-            docker|k8s)
-                PLATFORM="$1"
-                shift
-                ;;
-            dev|staging|prod)
-                ENVIRONMENT="$1"
-                shift
-                ;;
-            -v|--version)
-                TARGET_VERSION="$2"
+            -b|--backup)
+                BACKUP_ID="$2"
                 shift 2
                 ;;
-            -n|--namespace)
-                NAMESPACE="$2"
-                shift 2
-                ;;
-            --no-backup)
-                BACKUP_DATA=false
+            -l|--list)
+                LIST_BACKUPS=true
                 shift
                 ;;
-            --force)
+            -f|--force)
                 FORCE_ROLLBACK=true
                 shift
                 ;;
-            --timeout)
-                ROLLBACK_TIMEOUT="$2"
-                shift 2
-                ;;
-            --dry-run)
-                DRY_RUN=true
-                shift
-                ;;
-            --verbose)
-                VERBOSE=true
-                shift
-                ;;
             -h|--help)
-                show_help
+                show_usage
                 exit 0
                 ;;
             *)
                 log_error "Unknown option: $1"
-                show_help
+                show_usage
                 exit 1
                 ;;
         esac
     done
-    
-    # Validate required arguments
-    if [[ -z "$TARGET_VERSION" ]]; then
-        log_error "Target version is required. Use -v or --version option."
-        show_help
-        exit 1
+}
+
+# Check if running as root or with sudo
+check_permissions() {
+    if [[ $EUID -ne 0 ]]; then
+        error_exit "This script must be run as root or with sudo"
     fi
 }
 
-# Initialize backup directory and logging
-init_logging() {
-    mkdir -p "$BACKUP_DIR"
+# List available backups
+list_backups() {
+    log_info "Available backups:"
     
-    log_info "RemoteHive Rollback Script Started"
-    log_info "Timestamp: $(date)"
-    log_info "Platform: $PLATFORM"
-    log_info "Environment: $ENVIRONMENT"
-    log_info "Target Version: $TARGET_VERSION"
-    log_info "Backup Data: $BACKUP_DATA"
-    log_info "Force Rollback: $FORCE_ROLLBACK"
-    log_info "Dry Run: $DRY_RUN"
-    log_info "Log File: $ROLLBACK_LOG"
-}
-
-# Check prerequisites
-check_prerequisites() {
-    log_info "Checking prerequisites..."
-    
-    # Check Docker
-    if ! command -v docker &> /dev/null; then
-        log_error "Docker is not installed or not in PATH"
-        exit 1
+    if [[ ! -d "$BACKUP_DIR" ]]; then
+        log_warning "No backup directory found at $BACKUP_DIR"
+        return 1
     fi
     
-    # Check Docker Compose for docker platform
-    if [[ "$PLATFORM" == "docker" ]]; then
-        if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
-            log_error "Docker Compose is not installed or not in PATH"
-            exit 1
-        fi
+    local backups=()
+    while IFS= read -r -d '' backup; do
+        backups+=("$(basename "$backup")")
+    done < <(find "$BACKUP_DIR" -maxdepth 1 -type d -name "backup-*" -print0 | sort -z)
+    
+    if [[ ${#backups[@]} -eq 0 ]]; then
+        log_warning "No backups found in $BACKUP_DIR"
+        return 1
     fi
     
-    # Check kubectl for k8s platform
-    if [[ "$PLATFORM" == "k8s" ]]; then
-        if ! command -v kubectl &> /dev/null; then
-            log_error "kubectl is not installed or not in PATH"
-            exit 1
-        fi
+    echo
+    printf "%-25s %-20s %-15s\n" "Backup ID" "Date" "Size"
+    printf "%-25s %-20s %-15s\n" "-------------------------" "--------------------" "---------------"
+    
+    for backup in "${backups[@]}"; do
+        local backup_path="$BACKUP_DIR/$backup"
+        local backup_date=$(echo "$backup" | sed 's/backup-//; s/-/ /')
+        local backup_size=$(du -sh "$backup_path" 2>/dev/null | cut -f1 || echo "Unknown")
         
-        # Check cluster connectivity
-        if ! kubectl cluster-info &> /dev/null; then
-            log_error "Cannot connect to Kubernetes cluster"
-            exit 1
-        fi
-    fi
+        printf "%-25s %-20s %-15s\n" "$backup" "$backup_date" "$backup_size"
+    done
     
-    log_success "Prerequisites check passed"
+    echo
+    log_info "Latest backup: ${backups[-1]}"
 }
 
-# Get current deployment version
-get_current_version() {
-    log_info "Getting current deployment version..."
-    
-    local current_version="unknown"
-    
-    if [[ "$PLATFORM" == "docker" ]]; then
-        # Try to get version from running container labels
-        if command -v docker-compose &> /dev/null; then
-            current_version=$(docker-compose ps -q backend 2>/dev/null | head -1 | xargs docker inspect --format '{{ index .Config.Labels "version" }}' 2>/dev/null || echo "unknown")
-        else
-            current_version=$(docker compose ps -q backend 2>/dev/null | head -1 | xargs docker inspect --format '{{ index .Config.Labels "version" }}' 2>/dev/null || echo "unknown")
-        fi
-    elif [[ "$PLATFORM" == "k8s" ]]; then
-        # Get version from deployment image tag
-        current_version=$(kubectl get deployment backend-api -n "$NAMESPACE" -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null | cut -d':' -f2 || echo "unknown")
+# Get latest backup
+get_latest_backup() {
+    if [[ ! -d "$BACKUP_DIR" ]]; then
+        error_exit "No backup directory found at $BACKUP_DIR"
     fi
     
-    log_info "Current version: $current_version"
-    echo "$current_version"
+    local latest_backup=$(find "$BACKUP_DIR" -maxdepth 1 -type d -name "backup-*" | sort | tail -n 1)
+    
+    if [[ -z "$latest_backup" ]]; then
+        error_exit "No backups found in $BACKUP_DIR"
+    fi
+    
+    echo "$(basename "$latest_backup")"
+}
+
+# Validate backup
+validate_backup() {
+    local backup_id="$1"
+    local backup_path="$BACKUP_DIR/$backup_id"
+    
+    if [[ ! -d "$backup_path" ]]; then
+        error_exit "Backup not found: $backup_path"
+    fi
+    
+    # Check if backup contains essential files
+    local essential_files=("requirements.txt" "app" "autoscraper-service")
+    for file in "${essential_files[@]}"; do
+        if [[ ! -e "$backup_path/$file" ]]; then
+            log_warning "Essential file/directory missing in backup: $file"
+        fi
+    done
+    
+    log_success "Backup validation completed: $backup_id"
 }
 
 # Confirm rollback
 confirm_rollback() {
-    if [[ "$FORCE_ROLLBACK" == "true" || "$DRY_RUN" == "true" ]]; then
+    local backup_id="$1"
+    
+    if [[ "$FORCE_ROLLBACK" == "true" ]]; then
         return 0
     fi
     
-    local current_version
-    current_version=$(get_current_version)
-    
     echo
-    log_warning "ROLLBACK CONFIRMATION REQUIRED"
-    echo "  Platform: $PLATFORM"
-    echo "  Environment: $ENVIRONMENT"
-    echo "  Current Version: $current_version"
-    echo "  Target Version: $TARGET_VERSION"
-    echo "  Backup Data: $BACKUP_DATA"
+    log_warning "⚠️  ROLLBACK CONFIRMATION ⚠️"
+    log_warning "This will rollback RemoteHive to backup: $backup_id"
+    log_warning "Current deployment will be stopped and replaced."
     echo
     
-    read -p "Are you sure you want to proceed with the rollback? (yes/no): " -r
+    read -p "Are you sure you want to proceed? (yes/no): " -r
     if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
         log_info "Rollback cancelled by user"
         exit 0
     fi
-    
-    log_info "Rollback confirmed by user"
 }
 
-# Backup current data
-backup_data() {
-    if [[ "$BACKUP_DATA" != "true" || "$DRY_RUN" == "true" ]]; then
-        if [[ "$DRY_RUN" == "true" ]]; then
-            log_info "[DRY RUN] Would backup current data"
-        fi
-        return 0
+# Create emergency backup of current state
+create_emergency_backup() {
+    log_info "Creating emergency backup of current state..."
+    
+    local emergency_backup="emergency-$(date +%Y%m%d-%H%M%S)"
+    local emergency_path="$BACKUP_DIR/$emergency_backup"
+    
+    if [[ -d "$APP_DIR" ]]; then
+        mkdir -p "$BACKUP_DIR"
+        cp -r "$APP_DIR" "$emergency_path"
+        log_success "Emergency backup created: $emergency_backup"
+    else
+        log_warning "No current deployment found to backup"
     fi
-    
-    log_info "Creating data backup before rollback..."
-    
-    local backup_timestamp
-    backup_timestamp=$(date +%Y%m%d-%H%M%S)
-    local data_backup_dir="$BACKUP_DIR/data-backup-$backup_timestamp"
-    
-    mkdir -p "$data_backup_dir"
-    
-    if [[ "$PLATFORM" == "docker" ]]; then
-        # Backup Docker volumes
-        log_info "Backing up Docker volumes..."
-        
-        # MongoDB data
-        if docker volume ls | grep -q "mongodb_data"; then
-            log_verbose "Backing up MongoDB data"
-            docker run --rm -v mongodb_data:/data -v "$data_backup_dir":/backup alpine tar czf /backup/mongodb_data.tar.gz -C /data .
-        fi
-        
-        # Redis data
-        if docker volume ls | grep -q "redis_data"; then
-            log_verbose "Backing up Redis data"
-            docker run --rm -v redis_data:/data -v "$data_backup_dir":/backup alpine tar czf /backup/redis_data.tar.gz -C /data .
-        fi
-        
-        # Celery beat data
-        if docker volume ls | grep -q "celery_beat_data"; then
-            log_verbose "Backing up Celery beat data"
-            docker run --rm -v celery_beat_data:/data -v "$data_backup_dir":/backup alpine tar czf /backup/celery_beat_data.tar.gz -C /data .
-        fi
-        
-    elif [[ "$PLATFORM" == "k8s" ]]; then
-        # Backup Kubernetes persistent volumes
-        log_info "Backing up Kubernetes persistent volumes..."
-        
-        # MongoDB backup
-        log_verbose "Creating MongoDB backup"
-        kubectl exec -n "$NAMESPACE" deployment/mongodb -- mongodump --out /tmp/backup
-        kubectl cp "$NAMESPACE/$(kubectl get pods -n "$NAMESPACE" -l app=mongodb -o jsonpath='{.items[0].metadata.name}')":/tmp/backup "$data_backup_dir/mongodb-backup"
-        
-        # Redis backup
-        log_verbose "Creating Redis backup"
-        kubectl exec -n "$NAMESPACE" deployment/redis -- redis-cli BGSAVE
-        kubectl cp "$NAMESPACE/$(kubectl get pods -n "$NAMESPACE" -l app=redis -o jsonpath='{.items[0].metadata.name}')":/data/dump.rdb "$data_backup_dir/redis-dump.rdb"
-    fi
-    
-    log_success "Data backup completed: $data_backup_dir"
 }
 
-# Rollback Docker Compose deployment
-rollback_docker() {
-    log_info "Rolling back Docker Compose deployment..."
+# Stop services
+stop_services() {
+    log_info "Stopping RemoteHive services..."
     
-    cd "$PROJECT_ROOT"
-    
-    # Determine compose file
-    local compose_file="docker-compose.yml"
-    case $ENVIRONMENT in
-        "dev")
-            compose_file="docker-compose.dev.yml"
-            ;;
-        "staging")
-            compose_file="docker-compose.staging.yml"
-            ;;
-        "prod")
-            compose_file="docker-compose.yml"
-            ;;
-    esac
-    
-    if [[ ! -f "$compose_file" ]]; then
-        log_error "Compose file not found: $compose_file"
-        exit 1
-    fi
-    
-    # Export target version
-    export REMOTEHIVE_VERSION="$TARGET_VERSION"
-    export REMOTEHIVE_ENV="$ENVIRONMENT"
-    
-    if [[ "$DRY_RUN" == "true" ]]; then
-        log_info "[DRY RUN] Would rollback using: $compose_file with version $TARGET_VERSION"
-        return 0
-    fi
-    
-    # Stop current services
-    log_info "Stopping current services..."
-    if command -v docker-compose &> /dev/null; then
-        docker-compose -f "$compose_file" down
-    else
-        docker compose -f "$compose_file" down
-    fi
-    
-    # Pull target version images
-    log_info "Pulling target version images..."
-    if command -v docker-compose &> /dev/null; then
-        docker-compose -f "$compose_file" pull
-    else
-        docker compose -f "$compose_file" pull
-    fi
-    
-    # Start services with target version
-    log_info "Starting services with target version..."
-    if command -v docker-compose &> /dev/null; then
-        docker-compose -f "$compose_file" up -d
-    else
-        docker compose -f "$compose_file" up -d
-    fi
-    
-    log_success "Docker Compose rollback completed"
-}
-
-# Rollback Kubernetes deployment
-rollback_kubernetes() {
-    log_info "Rolling back Kubernetes deployment..."
-    
-    if [[ "$DRY_RUN" == "true" ]]; then
-        log_info "[DRY RUN] Would rollback Kubernetes deployments to version $TARGET_VERSION"
-        return 0
-    fi
-    
-    # Get all deployments in namespace
-    local deployments
-    deployments=$(kubectl get deployments -n "$NAMESPACE" -o jsonpath='{.items[*].metadata.name}')
-    
-    if [[ -z "$deployments" ]]; then
-        log_error "No deployments found in namespace: $NAMESPACE"
-        exit 1
-    fi
-    
-    # Update each deployment with target version
-    for deployment in $deployments; do
-        log_info "Rolling back deployment: $deployment"
-        
-        # Get current image name without tag
-        local image_name
-        image_name=$(kubectl get deployment "$deployment" -n "$NAMESPACE" -o jsonpath='{.spec.template.spec.containers[0].image}' | cut -d':' -f1)
-        
-        # Update deployment with target version
-        kubectl set image deployment/"$deployment" "$deployment"="$image_name:$TARGET_VERSION" -n "$NAMESPACE"
-        
-        log_verbose "Updated $deployment to use $image_name:$TARGET_VERSION"
+    for service in "${SERVICES[@]}"; do
+        if systemctl is-active --quiet "$service" 2>/dev/null; then
+            log_info "Stopping $service..."
+            systemctl stop "$service" || log_warning "Failed to stop $service"
+        else
+            log_info "Service $service is not running"
+        fi
     done
     
-    # Wait for rollout to complete
-    log_info "Waiting for rollback to complete..."
-    for deployment in $deployments; do
-        kubectl rollout status deployment/"$deployment" -n "$NAMESPACE" --timeout="${ROLLBACK_TIMEOUT}s"
-    done
-    
-    log_success "Kubernetes rollback completed"
+    log_success "Services stopped"
 }
 
-# Verify rollback
-verify_rollback() {
-    if [[ "$DRY_RUN" == "true" ]]; then
-        return 0
+# Restore from backup
+restore_backup() {
+    local backup_id="$1"
+    local backup_path="$BACKUP_DIR/$backup_id"
+    
+    log_info "Restoring from backup: $backup_id"
+    
+    # Remove current deployment
+    if [[ -d "$APP_DIR" ]]; then
+        rm -rf "$APP_DIR"
     fi
     
-    log_info "Verifying rollback..."
+    # Restore from backup
+    cp -r "$backup_path" "$APP_DIR"
     
-    local verification_failed=false
+    # Set proper permissions
+    chown -R www-data:www-data "$APP_DIR"
+    chmod -R 755 "$APP_DIR"
     
-    if [[ "$PLATFORM" == "docker" ]]; then
-        # Check Docker Compose services
-        log_info "Checking Docker Compose services..."
+    log_success "Backup restored successfully"
+}
+
+# Restore database (if applicable)
+restore_database() {
+    log_info "Checking for database backup..."
+    
+    local db_backup="$BACKUP_DIR/db-$(echo "$BACKUP_ID" | sed 's/backup-//')"
+    
+    if [[ -f "$db_backup.sql" ]]; then
+        log_info "Restoring database from $db_backup.sql"
         
-        # Wait for services to be healthy
-        local max_attempts=30
-        local attempt=1
+        # This is a placeholder - actual database restoration depends on your setup
+        # For PostgreSQL: psql -d remotehive < "$db_backup.sql"
+        # For MySQL: mysql remotehive < "$db_backup.sql"
+        # For SQLite: cp "$db_backup.db" "$APP_DIR/database.db"
         
-        while [[ $attempt -le $max_attempts ]]; do
-            log_verbose "Health check attempt $attempt/$max_attempts"
+        log_warning "Database restoration not implemented - manual intervention may be required"
+    else
+        log_info "No database backup found, skipping database restoration"
+    fi
+}
+
+# Start services
+start_services() {
+    log_info "Starting RemoteHive services..."
+    
+    # Reload systemd in case service files changed
+    systemctl daemon-reload
+    
+    # Start services
+    for service in "${SERVICES[@]}"; do
+        if [[ -f "/etc/systemd/system/$service.service" ]]; then
+            log_info "Starting $service..."
+            systemctl start "$service"
             
-            if curl -f -s http://localhost:8000/health > /dev/null 2>&1; then
-                log_success "Backend service is healthy"
+            # Wait and check if service started successfully
+            sleep 3
+            if systemctl is-active --quiet "$service"; then
+                log_success "$service started successfully"
+            else
+                log_error "Failed to start $service"
+                systemctl status "$service" --no-pager
+            fi
+        else
+            log_warning "Service file for $service not found"
+        fi
+    done
+    
+    # Reload nginx
+    if systemctl is-active --quiet nginx; then
+        systemctl reload nginx
+        log_success "Nginx reloaded successfully"
+    fi
+}
+
+# Health check after rollback
+health_check() {
+    log_info "Performing post-rollback health checks..."
+    
+    local health_check_timeout=60
+    local check_interval=5
+    local elapsed=0
+    
+    # Define service endpoints
+    local endpoints=(
+        "http://localhost:8000/health:Backend API"
+        "http://localhost:8001/health:Autoscraper Service"
+        "http://localhost:3000:Admin Panel"
+        "http://localhost:5173:Public Website"
+    )
+    
+    local failed_checks=0
+    
+    for endpoint_info in "${endpoints[@]}"; do
+        IFS=':' read -r endpoint name <<< "$endpoint_info"
+        
+        log_info "Checking $name at $endpoint..."
+        elapsed=0
+        
+        while [[ $elapsed -lt $health_check_timeout ]]; do
+            if curl -f --max-time 10 "$endpoint" &>/dev/null; then
+                log_success "$name is healthy"
                 break
             fi
             
-            if [[ $attempt -eq $max_attempts ]]; then
-                log_error "Backend service health check failed"
-                verification_failed=true
-                break
-            fi
-            
-            sleep 10
-            ((attempt++))
+            sleep $check_interval
+            elapsed=$((elapsed + check_interval))
         done
         
-    elif [[ "$PLATFORM" == "k8s" ]]; then
-        # Check Kubernetes deployments
-        log_info "Checking Kubernetes deployments..."
-        
-        if ! kubectl wait --for=condition=available --timeout=300s deployment --all -n "$NAMESPACE"; then
-            log_error "Some deployments are not ready"
-            verification_failed=true
+        if [[ $elapsed -ge $health_check_timeout ]]; then
+            log_error "$name health check failed after ${health_check_timeout}s"
+            ((failed_checks++))
         fi
-    fi
+    done
     
-    # Verify version
-    local current_version
-    current_version=$(get_current_version)
-    
-    if [[ "$current_version" == "$TARGET_VERSION" ]]; then
-        log_success "Version verification passed: $current_version"
+    if [[ $failed_checks -gt 0 ]]; then
+        log_warning "$failed_checks service(s) failed health checks"
+        return 1
     else
-        log_error "Version verification failed. Expected: $TARGET_VERSION, Got: $current_version"
-        verification_failed=true
+        log_success "All services passed health checks"
+        return 0
     fi
-    
-    if [[ "$verification_failed" == "true" ]]; then
-        log_error "Rollback verification failed"
-        exit 1
-    fi
-    
-    log_success "Rollback verification completed successfully"
 }
 
-# Show rollback status
-show_status() {
-    log_info "Rollback Status:"
+# Generate rollback report
+generate_rollback_report() {
+    local backup_id="$1"
+    local report_file="/var/log/remotehive-rollback-$(date +%Y%m%d-%H%M%S).report"
     
-    if [[ "$PLATFORM" == "docker" ]]; then
-        echo
-        log_info "Docker Compose Services:"
-        if command -v docker-compose &> /dev/null; then
-            docker-compose ps
+    log_info "Generating rollback report..."
+    
+    cat > "$report_file" << EOF
+RemoteHive Rollback Report
+==========================
+
+Rollback Date: $(date)
+Rolled Back To: $backup_id
+Triggered By: ${USER:-"unknown"}
+Reason: ${ROLLBACK_REASON:-"Not specified"}
+
+Service Status After Rollback:
+EOF
+    
+    for service in "${SERVICES[@]}"; do
+        if systemctl is-active --quiet "$service" 2>/dev/null; then
+            echo "✅ $service: Running" >> "$report_file"
         else
-            docker compose ps
+            echo "❌ $service: Not Running" >> "$report_file"
         fi
-        
-    elif [[ "$PLATFORM" == "k8s" ]]; then
-        echo
-        log_info "Kubernetes Deployments:"
-        kubectl get deployments -n "$NAMESPACE" -o wide
-        
-        echo
-        log_info "Pod Status:"
-        kubectl get pods -n "$NAMESPACE"
-    fi
-}
-
-# Cleanup function
-cleanup() {
-    log_info "Rollback script completed"
+    done
+    
+    echo "" >> "$report_file"
+    echo "System Information:" >> "$report_file"
+    echo "- OS: $(lsb_release -d | cut -f2)" >> "$report_file"
+    echo "- Memory: $(free -h | awk 'NR==2{printf "%.1fG used / %.1fG total", $3/1024, $2/1024}')" >> "$report_file"
+    echo "- Disk: $(df -h / | awk 'NR==2{printf "%s used / %s total (%s)", $3, $2, $5}')" >> "$report_file"
+    
+    log_success "Rollback report generated: $report_file"
+    cat "$report_file"
 }
 
 # Main rollback function
 main() {
-    init_logging
+    log_info "Starting RemoteHive rollback process..."
     
-    if [[ "$DRY_RUN" == "true" ]]; then
-        log_warning "DRY RUN MODE - No actual changes will be made"
+    check_permissions
+    
+    # Handle list backups option
+    if [[ "$LIST_BACKUPS" == "true" ]]; then
+        list_backups
+        exit 0
     fi
     
-    # Set trap for cleanup
-    trap cleanup EXIT
-    
-    # Execute rollback steps
-    check_prerequisites
-    confirm_rollback
-    backup_data
-    
-    if [[ "$PLATFORM" == "docker" ]]; then
-        rollback_docker
-    elif [[ "$PLATFORM" == "k8s" ]]; then
-        rollback_kubernetes
+    # Determine backup to use
+    if [[ -z "$BACKUP_ID" ]]; then
+        BACKUP_ID=$(get_latest_backup)
+        log_info "No backup specified, using latest: $BACKUP_ID"
     fi
     
-    verify_rollback
+    validate_backup "$BACKUP_ID"
+    confirm_rollback "$BACKUP_ID"
     
-    if [[ "$DRY_RUN" != "true" ]]; then
-        show_status
+    create_emergency_backup
+    stop_services
+    restore_backup "$BACKUP_ID"
+    restore_database
+    start_services
+    
+    # Wait for services to stabilize
+    log_info "Waiting for services to stabilize..."
+    sleep 10
+    
+    if health_check; then
+        log_success "RemoteHive rollback completed successfully!"
+        log_info "Rolled back to: $BACKUP_ID"
+    else
+        log_error "Rollback completed but some services failed health checks"
+        log_error "Manual intervention may be required"
     fi
     
-    log_success "RemoteHive rollback completed successfully!"
-    log_info "Rollback log saved to: $ROLLBACK_LOG"
+    generate_rollback_report "$BACKUP_ID"
+    
+    log_info "Services are available at:"
+    log_info "  - Backend API: http://$(hostname -I | awk '{print $1}'):8000"
+    log_info "  - Autoscraper: http://$(hostname -I | awk '{print $1}'):8001"
+    log_info "  - Admin Panel: http://$(hostname -I | awk '{print $1}'):3000"
+    log_info "  - Public Website: http://$(hostname -I | awk '{print $1}'):5173"
 }
 
 # Parse arguments and run main function
-parse_args "$@"
-main
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    parse_arguments "$@"
+    main
+fi

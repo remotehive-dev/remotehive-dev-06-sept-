@@ -4,7 +4,7 @@ from typing import Optional, List
 from datetime import datetime
 import logging
 import os
-from app.core.database import get_db_session
+from app.database.database import get_db_session
 from app.core.auth import get_admin
 from app.services.slack_service import SlackService
 # from app.database.models import ContactSubmission  # Commented out - model doesn't exist yet

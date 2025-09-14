@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 
 interface GoogleSignInButtonProps {
-  onSuccess?: () => void
+  onSuccess?: (data: { token: string; role: 'employer' | 'job_seeker' }) => void
   onError?: (error: string) => void
   role?: 'employer' | 'job_seeker'
 }
@@ -25,11 +25,11 @@ const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
           client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
           callback: async (response: any) => {
             try {
-              await signInWithGoogle({
+              const data = {
                 token: response.credential,
                 role
-              })
-              onSuccess?.()
+              }
+              onSuccess?.(data)
             } catch (error) {
               const message = error instanceof Error ? error.message : 'Google sign-in failed'
               onError?.(message)

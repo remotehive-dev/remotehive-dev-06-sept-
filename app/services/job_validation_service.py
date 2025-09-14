@@ -6,7 +6,7 @@ from datetime import datetime
 from dataclasses import dataclass, asdict
 from enum import Enum
 
-from sqlalchemy.orm import Session
+# from sqlalchemy.orm import Session  # Using MongoDB instead
 from ..database.database import get_db_session
 # TODO: Migrate to MongoDB models - JobPost exists in app.models.mongodb_models, AnalyticsMetrics needs to be created
 # from app.database.models import JobPost, AnalyticsMetrics
