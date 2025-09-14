@@ -1,0 +1,313 @@
+name: Manual Deployment & Operations
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+        - production
+        - staging
+        - development
+      
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'deploy'
+        type: choice
+        options:
+        - deploy
+        - rollback
+        - restart
+        - health-check
+        - logs
+      
+      branch:
+        description: 'Branch to deploy (for deploy action)'
+        required: false
+        default: 'main'
+        type: string
+      
+      service:
+        description: 'Specific service to operate on (optional)'
+        required: false
+        type: choice
+        options:
+        - all
+        - backend
+        - autoscraper
+        - admin
+        - public
+        - redis
+        - nginx
+
+jobs:
+  manual-operation:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+      if: github.event.inputs.action == 'deploy'
+      with:
+        ref: ${{ github.event.inputs.branch }}
+    
+    - name: Setup SSH
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.VPC_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H ${{ secrets.VPC_HOST }} >> ~/.ssh/known_hosts
+    
+    - name: Deploy Application
+      if: github.event.inputs.action == 'deploy'
+      run: |
+        ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.VPC_HOST }} << 'EOF'
+          set -e
+          
+          echo "🚀 Starting deployment to ${{ github.event.inputs.environment }}..."
+          
+          # Navigate to project directory
+          cd /home/ubuntu/RemoteHive
+          
+          # Backup current deployment
+          echo "📦 Creating backup..."
+          sudo cp -r /home/ubuntu/RemoteHive /home/ubuntu/RemoteHive_backup_$(date +%Y%m%d_%H%M%S) || true
+          
+          # Pull latest code
+          echo "📥 Pulling latest code from ${{ github.event.inputs.branch }}..."
+          git fetch origin
+          git checkout ${{ github.event.inputs.branch }}
+          git pull origin ${{ github.event.inputs.branch }}
+          
+          # Stop services based on selection
+          echo "🛑 Stopping services..."
+          if [[ "${{ github.event.inputs.service }}" == "all" || "${{ github.event.inputs.service }}" == "backend" ]]; then
+            sudo systemctl stop remotehive-backend || true
+          fi
+          
+          if [[ "${{ github.event.inputs.service }}" == "all" || "${{ github.event.inputs.service }}" == "autoscraper" ]]; then
+            sudo systemctl stop remotehive-autoscraper || true
+          fi
+          
+          if [[ "${{ github.event.inputs.service }}" == "all" || "${{ github.event.inputs.service }}" == "admin" || "${{ github.event.inputs.service }}" == "public" ]]; then
+            pm2 stop all || true
+          fi
+          
+          # Install dependencies and build
+          echo "📦 Installing dependencies..."
+          python3 -m pip install --user -r requirements.txt
+          
+          if [[ "${{ github.event.inputs.service }}" == "all" || "${{ github.event.inputs.service }}" == "admin" ]]; then
+            cd remotehive-admin
+            npm ci --production
+            npm run build
+            cd ..
+          fi
+          
+          if [[ "${{ github.event.inputs.service }}" == "all" || "${{ github.event.inputs.service }}" == "public" ]]; then
+            cd remotehive-public
+            npm ci --production
+            npm run build
+            cd ..
+          fi
+          
+          # Update environment configuration
+          echo "⚙️ Updating environment configuration..."
+          cat > .env << 'ENVEOF'
+        MONGODB_URL=${{ secrets.MONGODB_URL }}
+        JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}
+        JWT_ALGORITHM=HS256
+        JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
+        REDIS_URL=redis://localhost:6379
+        ENVIRONMENT=${{ github.event.inputs.environment }}
+        DEBUG=false
+        CORS_ORIGINS=${{ secrets.CORS_ORIGINS }}
+        SMTP_SERVER=${{ secrets.SMTP_SERVER }}
+        SMTP_PORT=${{ secrets.SMTP_PORT }}
+        SMTP_USERNAME=${{ secrets.SMTP_USERNAME }}
+        SMTP_PASSWORD=${{ secrets.SMTP_PASSWORD }}
+        ADMIN_EMAIL=${{ secrets.ADMIN_EMAIL }}
+        ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
+        ENVEOF
+          
+          # Start services
+          echo "🚀 Starting services..."
+          if [[ "${{ github.event.inputs.service }}" == "all" || "${{ github.event.inputs.service }}" == "backend" ]]; then
+            sudo systemctl start remotehive-backend
+            sudo systemctl enable remotehive-backend
+          fi
+          
+          if [[ "${{ github.event.inputs.service }}" == "all" || "${{ github.event.inputs.service }}" == "autoscraper" ]]; then
+            sudo systemctl start remotehive-autoscraper
+            sudo systemctl enable remotehive-autoscraper
+          fi
+          
+          if [[ "${{ github.event.inputs.service }}" == "all" || "${{ github.event.inputs.service }}" == "admin" || "${{ github.event.inputs.service }}" == "public" ]]; then
+            pm2 start ecosystem.config.js --env ${{ github.event.inputs.environment }}
+            pm2 save
+          fi
+          
+          echo "✅ Deployment completed successfully!"
+        EOF
+    
+    - name: Rollback Application
+      if: github.event.inputs.action == 'rollback'
+      run: |
+        ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.VPC_HOST }} << 'EOF'
+          set -e
+          
+          echo "🔄 Starting rollback process..."
+          
+          # Find the most recent backup
+          BACKUP_DIR=$(ls -td /home/ubuntu/RemoteHive_backup_* 2>/dev/null | head -1)
+          
+          if [ -z "$BACKUP_DIR" ]; then
+            echo "❌ No backup found for rollback!"
+            exit 1
+          fi
+          
+          echo "📦 Rolling back to: $BACKUP_DIR"
+          
+          # Stop current services
+          echo "🛑 Stopping current services..."
+          sudo systemctl stop remotehive-backend || true
+          sudo systemctl stop remotehive-autoscraper || true
+          pm2 stop all || true
+          
+          # Backup current state before rollback
+          sudo mv /home/ubuntu/RemoteHive /home/ubuntu/RemoteHive_failed_$(date +%Y%m%d_%H%M%S)
+          
+          # Restore from backup
+          sudo cp -r "$BACKUP_DIR" /home/ubuntu/RemoteHive
+          sudo chown -R ubuntu:ubuntu /home/ubuntu/RemoteHive
+          
+          cd /home/ubuntu/RemoteHive
+          
+          # Start services
+          echo "🚀 Starting rolled back services..."
+          sudo systemctl start remotehive-backend
+          sudo systemctl start remotehive-autoscraper
+          pm2 start ecosystem.config.js --env ${{ github.event.inputs.environment }}
+          
+          echo "✅ Rollback completed successfully!"
+        EOF
+    
+    - name: Restart Services
+      if: github.event.inputs.action == 'restart'
+      run: |
+        ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.VPC_HOST }} << 'EOF'
+          echo "🔄 Restarting services..."
+          
+          if [[ "${{ github.event.inputs.service }}" == "all" || "${{ github.event.inputs.service }}" == "backend" ]]; then
+            sudo systemctl restart remotehive-backend
+            echo "✅ Backend restarted"
+          fi
+          
+          if [[ "${{ github.event.inputs.service }}" == "all" || "${{ github.event.inputs.service }}" == "autoscraper" ]]; then
+            sudo systemctl restart remotehive-autoscraper
+            echo "✅ Autoscraper restarted"
+          fi
+          
+          if [[ "${{ github.event.inputs.service }}" == "all" || "${{ github.event.inputs.service }}" == "admin" || "${{ github.event.inputs.service }}" == "public" ]]; then
+            pm2 restart all
+            echo "✅ Frontend services restarted"
+          fi
+          
+          if [[ "${{ github.event.inputs.service }}" == "all" || "${{ github.event.inputs.service }}" == "redis" ]]; then
+            sudo systemctl restart redis-server
+            echo "✅ Redis restarted"
+          fi
+          
+          if [[ "${{ github.event.inputs.service }}" == "all" || "${{ github.event.inputs.service }}" == "nginx" ]]; then
+            sudo systemctl restart nginx
+            echo "✅ Nginx restarted"
+          fi
+        EOF
+    
+    - name: Health Check
+      if: github.event.inputs.action == 'health-check'
+      run: |
+        ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.VPC_HOST }} << 'EOF'
+          echo "🏥 Performing health checks..."
+          
+          echo "=== System Resources ==="
+          df -h
+          free -h
+          uptime
+          
+          echo "\n=== Service Status ==="
+          sudo systemctl status remotehive-backend --no-pager -l || true
+          sudo systemctl status remotehive-autoscraper --no-pager -l || true
+          pm2 status || true
+          sudo systemctl status redis-server --no-pager -l || true
+          sudo systemctl status nginx --no-pager -l || true
+          
+          echo "\n=== Port Status ==="
+          sudo netstat -tlnp | grep -E ':(8000|8001|3000|5173|6379|80|443)'
+          
+          echo "\n=== API Health Checks ==="
+          curl -s http://localhost:8000/health | jq . || echo "Backend health check failed"
+          curl -s http://localhost:8001/health | jq . || echo "Autoscraper health check failed"
+          
+          echo "\n=== Recent Logs ==="
+          echo "Backend logs:"
+          sudo journalctl -u remotehive-backend --no-pager -n 5 || true
+          
+          echo "\nAutoscraper logs:"
+          sudo journalctl -u remotehive-autoscraper --no-pager -n 5 || true
+          
+          echo "\nPM2 logs:"
+          pm2 logs --lines 5 || true
+        EOF
+    
+    - name: View Logs
+      if: github.event.inputs.action == 'logs'
+      run: |
+        ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.VPC_HOST }} << 'EOF'
+          echo "📋 Viewing recent logs..."
+          
+          if [[ "${{ github.event.inputs.service }}" == "all" || "${{ github.event.inputs.service }}" == "backend" ]]; then
+            echo "=== Backend Logs ==="
+            sudo journalctl -u remotehive-backend --no-pager -n 20
+          fi
+          
+          if [[ "${{ github.event.inputs.service }}" == "all" || "${{ github.event.inputs.service }}" == "autoscraper" ]]; then
+            echo "\n=== Autoscraper Logs ==="
+            sudo journalctl -u remotehive-autoscraper --no-pager -n 20
+          fi
+          
+          if [[ "${{ github.event.inputs.service }}" == "all" || "${{ github.event.inputs.service }}" == "admin" || "${{ github.event.inputs.service }}" == "public" ]]; then
+            echo "\n=== PM2 Logs ==="
+            pm2 logs --lines 20
+          fi
+          
+          if [[ "${{ github.event.inputs.service }}" == "all" || "${{ github.event.inputs.service }}" == "nginx" ]]; then
+            echo "\n=== Nginx Error Logs ==="
+            sudo tail -20 /var/log/nginx/error.log
+            echo "\n=== Nginx Access Logs ==="
+            sudo tail -20 /var/log/nginx/access.log
+          fi
+        EOF
+    
+    - name: Cleanup SSH
+      if: always()
+      run: |
+        rm -f ~/.ssh/id_rsa
+    
+    - name: Operation Summary
+      if: always()
+      run: |
+        echo "## 🎯 Manual Operation Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Action:** ${{ github.event.inputs.action }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Environment:** ${{ github.event.inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Service:** ${{ github.event.inputs.service }}" >> $GITHUB_STEP_SUMMARY
+        if [[ "${{ github.event.inputs.action }}" == "deploy" ]]; then
+          echo "**Branch:** ${{ github.event.inputs.branch }}" >> $GITHUB_STEP_SUMMARY
+        fi
+        echo "**Status:** ${{ job.status == 'success' && '✅ Completed' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Timestamp:** $(date -u)" >> $GITHUB_STEP_SUMMARY

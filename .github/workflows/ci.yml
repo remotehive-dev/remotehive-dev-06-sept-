@@ -1,0 +1,237 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches: [ main, develop, feature/* ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  lint-and-format:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Set up Node.js 18
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: |
+          remotehive-admin/package-lock.json
+          remotehive-public/package-lock.json
+    
+    - name: Install Python linting tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install black flake8 isort mypy
+    
+    - name: Lint Python code with flake8
+      run: |
+        flake8 app/ autoscraper-service/ --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 app/ autoscraper-service/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    
+    - name: Check Python code formatting with black
+      run: |
+        black --check app/ autoscraper-service/
+    
+    - name: Check Python imports with isort
+      run: |
+        isort --check-only app/ autoscraper-service/
+    
+    - name: Install Admin Panel dependencies
+      run: |
+        cd remotehive-admin
+        npm ci
+    
+    - name: Lint Admin Panel
+      run: |
+        cd remotehive-admin
+        npm run lint
+    
+    - name: Install Public Website dependencies
+      run: |
+        cd remotehive-public
+        npm ci
+    
+    - name: Lint Public Website
+      run: |
+        cd remotehive-public
+        npm run lint
+
+  test-backend:
+    runs-on: ubuntu-latest
+    
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Cache Python dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov pytest-asyncio httpx
+    
+    - name: Run backend tests
+      run: |
+        python -m pytest tests/ -v --tb=short --cov=app --cov-report=xml --cov-report=term-missing
+      env:
+        MONGODB_URL: mongodb://localhost:27017/remotehive_test
+        REDIS_URL: redis://localhost:6379
+        JWT_SECRET_KEY: test-secret-key-for-ci
+        ENVIRONMENT: test
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: backend
+        name: backend-coverage
+
+  test-autoscraper:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Install autoscraper dependencies
+      run: |
+        cd autoscraper-service
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-asyncio httpx
+    
+    - name: Run autoscraper tests
+      run: |
+        cd autoscraper-service
+        python -m pytest tests/ -v --tb=short
+      env:
+        ENVIRONMENT: test
+
+  test-frontend:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        app: [remotehive-admin, remotehive-public]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Node.js 18
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: ${{ matrix.app }}/package-lock.json
+    
+    - name: Install dependencies
+      run: |
+        cd ${{ matrix.app }}
+        npm ci
+    
+    - name: Run tests
+      run: |
+        cd ${{ matrix.app }}
+        npm test -- --coverage --watchAll=false
+    
+    - name: Build application
+      run: |
+        cd ${{ matrix.app }}
+        npm run build
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ matrix.app }}-build
+        path: ${{ matrix.app }}/dist/
+        retention-days: 7
+
+  security-scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+    
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+    
+    - name: Python Security Check
+      run: |
+        pip install safety bandit
+        safety check -r requirements.txt
+        bandit -r app/ autoscraper-service/ -f json -o bandit-report.json || true
+    
+    - name: Node.js Security Audit
+      run: |
+        cd remotehive-admin && npm audit --audit-level=high
+        cd ../remotehive-public && npm audit --audit-level=high
+
+  build-summary:
+    needs: [lint-and-format, test-backend, test-autoscraper, test-frontend, security-scan]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Build Summary
+      run: |
+        echo "## 🚀 CI Pipeline Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Lint & Format | ${{ needs.lint-and-format.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Backend Tests | ${{ needs.test-backend.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Autoscraper Tests | ${{ needs.test-autoscraper.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Frontend Tests | ${{ needs.test-frontend.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Security Scan | ${{ needs.security-scan.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [[ "${{ needs.lint-and-format.result }}" == "success" && "${{ needs.test-backend.result }}" == "success" && "${{ needs.test-autoscraper.result }}" == "success" && "${{ needs.test-frontend.result }}" == "success" ]]; then
+          echo "🎉 All checks passed! Ready for deployment." >> $GITHUB_STEP_SUMMARY
+        else
+          echo "⚠️ Some checks failed. Please review and fix the issues." >> $GITHUB_STEP_SUMMARY
+        fi

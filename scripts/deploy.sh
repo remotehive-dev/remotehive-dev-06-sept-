@@ -1,16 +1,17 @@
 #!/bin/bash
 
-# RemoteHive Production Deployment Script
-# This script handles the complete deployment of RemoteHive to the VPC
+# RemoteHive Deployment Script
+# This script deploys the RemoteHive application directly to VPC without Docker/Kubernetes
 
 set -e  # Exit on any error
 
 # Configuration
-APP_NAME="remotehive"
-APP_DIR="/opt/remotehive"
-BACKUP_DIR="/opt/remotehive-backups"
+APP_DIR="/home/ubuntu/RemoteHive"
+BACKUP_DIR="/home/ubuntu/backups"
 LOG_FILE="/var/log/remotehive-deploy.log"
-SERVICES=("remotehive-backend" "remotehive-autoscraper" "remotehive-admin" "remotehive-public")
+GIT_REPO="https://github.com/YOUR_USERNAME/RemoteHive.git"
+BRANCH="${1:-main}"
+ENVIRONMENT="${2:-production}"
 
 # Colors for output
 RED='\033[0;31m'
@@ -21,447 +22,302 @@ NC='\033[0m' # No Color
 
 # Logging function
 log() {
-    echo -e "[$(date +'%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
+    echo -e "${BLUE}[$(date +'%Y-%m-%d %H:%M:%S')]${NC} $1" | tee -a "$LOG_FILE"
 }
 
-log_info() {
-    log "${BLUE}[INFO]${NC} $1"
-}
-
-log_success() {
-    log "${GREEN}[SUCCESS]${NC} $1"
-}
-
-log_warning() {
-    log "${YELLOW}[WARNING]${NC} $1"
-}
-
-log_error() {
-    log "${RED}[ERROR]${NC} $1"
-}
-
-# Error handling
-error_exit() {
-    log_error "$1"
-    log_error "Deployment failed. Check logs at $LOG_FILE"
+error() {
+    echo -e "${RED}[ERROR]${NC} $1" | tee -a "$LOG_FILE"
     exit 1
 }
 
-# Cleanup function
-cleanup() {
-    log_info "Cleaning up temporary files..."
-    rm -f /tmp/remotehive-*.tmp
+success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1" | tee -a "$LOG_FILE"
 }
 
-# Set trap for cleanup
-trap cleanup EXIT
-
-# Check if running as root or with sudo
-check_permissions() {
-    if [[ $EUID -ne 0 ]]; then
-        error_exit "This script must be run as root or with sudo"
-    fi
+warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1" | tee -a "$LOG_FILE"
 }
 
-# Validate environment
-validate_environment() {
-    log_info "Validating deployment environment..."
-    
-    # Check required commands
-    local required_commands=("git" "python3" "pip3" "node" "npm" "systemctl" "nginx")
-    for cmd in "${required_commands[@]}"; do
-        if ! command -v "$cmd" &> /dev/null; then
-            error_exit "Required command '$cmd' not found"
-        fi
-    done
-    
-    # Check Python version
-    local python_version=$(python3 --version | cut -d' ' -f2 | cut -d'.' -f1-2)
-    if [[ "$python_version" < "3.9" ]]; then
-        error_exit "Python 3.9+ required, found $python_version"
-    fi
-    
-    # Check Node version
-    local node_version=$(node --version | cut -d'v' -f2 | cut -d'.' -f1)
-    if [[ "$node_version" -lt "18" ]]; then
-        error_exit "Node.js 18+ required, found v$node_version"
-    fi
-    
-    # Check disk space (minimum 5GB)
-    local available_space=$(df / | awk 'NR==2 {print $4}')
-    if [[ "$available_space" -lt 5242880 ]]; then  # 5GB in KB
-        log_warning "Low disk space detected. Available: $(($available_space / 1024 / 1024))GB"
-    fi
-    
-    # Validate required environment variables
-    local required_vars=("JWT_SECRET_KEY" "MONGODB_URL" "REDIS_URL")
-    for var in "${required_vars[@]}"; do
-        if [[ -z "${!var}" ]]; then
-            log_error "Required environment variable $var is not set"
-            return 1
-        fi
-    done
-    
-    log_success "Environment validation completed"
-}
+# Check if running as root
+if [[ $EUID -eq 0 ]]; then
+   error "This script should not be run as root for security reasons"
+fi
 
-# Create backup
-create_backup() {
-    log_info "Creating backup of current deployment..."
-    
-    local backup_timestamp=$(date +%Y%m%d-%H%M%S)
-    local backup_path="$BACKUP_DIR/backup-$backup_timestamp"
-    
-    mkdir -p "$BACKUP_DIR"
-    
-    if [[ -d "$APP_DIR" ]]; then
-        cp -r "$APP_DIR" "$backup_path"
-        log_success "Backup created at $backup_path"
-        
-        # Database backup (MongoDB Atlas - handled by Atlas)
-        echo "Database backup handled by MongoDB Atlas automatic backups..."
-        echo "Skipping local backup - using Atlas Point-in-Time Recovery"
-        
-        # Keep only last 5 backups
-        local backup_count=$(ls -1 "$BACKUP_DIR" | wc -l)
-        if [[ "$backup_count" -gt 5 ]]; then
-            ls -1t "$BACKUP_DIR" | tail -n +6 | xargs -I {} rm -rf "$BACKUP_DIR/{}"
-            log_info "Cleaned up old backups"
-        fi
+# Pre-deployment checks
+log "Starting RemoteHive deployment..."
+log "Branch: $BRANCH"
+log "Environment: $ENVIRONMENT"
+
+# Create necessary directories
+sudo mkdir -p "$BACKUP_DIR"
+sudo mkdir -p "$(dirname "$LOG_FILE")"
+sudo chown ubuntu:ubuntu "$BACKUP_DIR"
+sudo touch "$LOG_FILE"
+sudo chown ubuntu:ubuntu "$LOG_FILE"
+
+# Function to check service status
+check_service() {
+    local service_name=$1
+    if systemctl is-active --quiet "$service_name"; then
+        success "$service_name is running"
+        return 0
     else
-        log_info "No existing deployment found, skipping backup"
+        warning "$service_name is not running"
+        return 1
     fi
 }
 
-# Stop services
+# Function to backup current deployment
+backup_deployment() {
+    if [ -d "$APP_DIR" ]; then
+        local backup_name="remotehive_backup_$(date +%Y%m%d_%H%M%S)"
+        log "Creating backup: $backup_name"
+        sudo cp -r "$APP_DIR" "$BACKUP_DIR/$backup_name"
+        success "Backup created successfully"
+    else
+        warning "No existing deployment found to backup"
+    fi
+}
+
+# Function to stop services
 stop_services() {
-    log_info "Stopping RemoteHive services..."
+    log "Stopping RemoteHive services..."
     
-    for service in "${SERVICES[@]}"; do
-        if systemctl is-active --quiet "$service"; then
-            log_info "Stopping $service..."
-            systemctl stop "$service" || log_warning "Failed to stop $service"
-        else
-            log_info "Service $service is not running"
-        fi
-    done
+    # Stop systemd services
+    sudo systemctl stop remotehive-backend || warning "Failed to stop backend service"
+    sudo systemctl stop remotehive-autoscraper || warning "Failed to stop autoscraper service"
     
-    # Stop nginx if it's running RemoteHive config
-    if systemctl is-active --quiet nginx; then
-        log_info "Reloading nginx configuration..."
-        systemctl reload nginx || log_warning "Failed to reload nginx"
-    fi
+    # Stop PM2 processes
+    pm2 stop all || warning "Failed to stop PM2 processes"
+    
+    success "Services stopped"
 }
 
-# Update application code
-update_code() {
-    log_info "Updating application code..."
+# Function to start services
+start_services() {
+    log "Starting RemoteHive services..."
     
-    # Create app directory if it doesn't exist
-    mkdir -p "$APP_DIR"
+    # Start systemd services
+    sudo systemctl start remotehive-backend
+    sudo systemctl enable remotehive-backend
+    
+    sudo systemctl start remotehive-autoscraper
+    sudo systemctl enable remotehive-autoscraper
+    
+    # Start PM2 processes
     cd "$APP_DIR"
+    pm2 start ecosystem.config.js --env "$ENVIRONMENT"
+    pm2 save
     
-    # Clone or update repository
-    if [[ -d ".git" ]]; then
-        log_info "Updating existing repository..."
+    success "Services started"
+}
+
+# Function to deploy code
+deploy_code() {
+    log "Deploying code from branch: $BRANCH"
+    
+    if [ -d "$APP_DIR" ]; then
+        cd "$APP_DIR"
         git fetch origin
-        git reset --hard origin/main
+        git checkout "$BRANCH"
+        git pull origin "$BRANCH"
     else
-        log_info "Cloning repository..."
-        # Note: In production, this should use the actual repository URL
-        # For now, we'll copy from the current directory
-        if [[ -n "$GITHUB_WORKSPACE" ]]; then
-            cp -r "$GITHUB_WORKSPACE"/* .
-        else
-            error_exit "No source code found. Set GITHUB_WORKSPACE or ensure git repository exists."
-        fi
+        log "Cloning repository..."
+        git clone "$GIT_REPO" "$APP_DIR"
+        cd "$APP_DIR"
+        git checkout "$BRANCH"
     fi
     
-    # Set proper permissions
-    chown -R www-data:www-data "$APP_DIR"
-    chmod -R 755 "$APP_DIR"
-    
-    log_success "Code updated successfully"
+    success "Code deployed successfully"
 }
 
-# Setup Python backend
-setup_backend() {
-    log_info "Setting up Python backend..."
+# Function to install dependencies
+install_dependencies() {
+    log "Installing Python dependencies..."
+    cd "$APP_DIR"
+    
+    # Install Python dependencies
+    python3 -m pip install --user -r requirements.txt
+    
+    # Install Node.js dependencies for admin panel
+    if [ -d "remotehive-admin" ]; then
+        log "Installing admin panel dependencies..."
+        cd remotehive-admin
+        npm ci --production
+        npm run build
+        cd ..
+    fi
+    
+    # Install Node.js dependencies for public website
+    if [ -d "remotehive-public" ]; then
+        log "Installing public website dependencies..."
+        cd remotehive-public
+        npm ci --production
+        npm run build
+        cd ..
+    fi
+    
+    success "Dependencies installed successfully"
+}
+
+# Function to update configuration
+update_configuration() {
+    log "Updating configuration for environment: $ENVIRONMENT"
     
     cd "$APP_DIR"
     
-    # Create virtual environment
-    if [[ ! -d "venv" ]]; then
-        python3 -m venv venv
-    fi
+    # Create environment file
+    cat > .env << EOF
+MONGODB_URL=${MONGODB_URL}
+JWT_SECRET_KEY=${JWT_SECRET_KEY}
+JWT_ALGORITHM=HS256
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
+REDIS_URL=redis://localhost:6379
+ENVIRONMENT=${ENVIRONMENT}
+DEBUG=false
+CORS_ORIGINS=${CORS_ORIGINS}
+SMTP_SERVER=${SMTP_SERVER}
+SMTP_PORT=${SMTP_PORT}
+SMTP_USERNAME=${SMTP_USERNAME}
+SMTP_PASSWORD=${SMTP_PASSWORD}
+ADMIN_EMAIL=${ADMIN_EMAIL}
+ADMIN_PASSWORD=${ADMIN_PASSWORD}
+EOF
     
-    # Activate virtual environment and install dependencies
-    source venv/bin/activate
-    pip install --upgrade pip
-    pip install -r requirements.txt
-    
-    # Run database migrations if they exist
-    if [[ -f "alembic.ini" ]]; then
-        log_info "Running database migrations..."
-        alembic upgrade head || log_warning "Database migration failed"
-    fi
-    
-    log_success "Backend setup completed"
+    success "Configuration updated"
 }
 
-# Setup autoscraper service
-setup_autoscraper() {
-    log_info "Setting up Autoscraper service..."
+# Function to run health checks
+health_check() {
+    log "Running health checks..."
     
-    cd "$APP_DIR/autoscraper-service"
+    sleep 10  # Wait for services to start
     
-    # Create virtual environment for autoscraper
-    if [[ ! -d "venv" ]]; then
-        python3 -m venv venv
+    # Check backend health
+    if curl -f -s http://localhost:8000/health > /dev/null; then
+        success "Backend health check passed"
+    else
+        error "Backend health check failed"
     fi
+    
+    # Check autoscraper health
+    if curl -f -s http://localhost:8001/health > /dev/null; then
+        success "Autoscraper health check passed"
+    else
+        error "Autoscraper health check failed"
+    fi
+    
+    # Check service status
+    check_service "remotehive-backend"
+    check_service "remotehive-autoscraper"
+    
+    success "All health checks passed"
+}
+
+# Function to cleanup old backups
+cleanup_backups() {
+    log "Cleaning up old backups (keeping last 5)..."
+    
+    cd "$BACKUP_DIR"
+    ls -t remotehive_backup_* 2>/dev/null | tail -n +6 | xargs -r rm -rf
+    
+    success "Backup cleanup completed"
+}
+
+# Main deployment process
+main() {
+    log "=== RemoteHive Deployment Started ==="
+    
+    # Pre-deployment backup
+    backup_deployment
+    
+    # Stop services
+    stop_services
+    
+    # Deploy code
+    deploy_code
     
     # Install dependencies
-    source venv/bin/activate
-    pip install --upgrade pip
-    pip install -r requirements.txt || {
-        # Fallback to basic FastAPI installation
-        pip install fastapi uvicorn requests beautifulsoup4 selenium
-    }
+    install_dependencies
     
-    log_success "Autoscraper service setup completed"
-}
-
-# Setup frontend applications
-setup_frontend() {
-    log_info "Setting up frontend applications..."
+    # Update configuration
+    update_configuration
     
-    # Setup Admin Panel
-    if [[ -d "$APP_DIR/remotehive-admin" ]]; then
-        log_info "Building Admin Panel..."
-        cd "$APP_DIR/remotehive-admin"
-        npm ci --production
-        npm run build
-        
-        # Create PM2 ecosystem file if it doesn't exist
-        if [[ ! -f "ecosystem.config.js" ]]; then
-            cat > ecosystem.config.js << 'EOF'
-module.exports = {
-  apps: [{
-    name: 'remotehive-admin',
-    script: 'npm',
-    args: 'run preview',
-    cwd: '/opt/remotehive/remotehive-admin',
-    env: {
-      NODE_ENV: 'production',
-      PORT: 3000
-    },
-    instances: 1,
-    autorestart: true,
-    watch: false,
-    max_memory_restart: '1G'
-  }]
-};
-EOF
-        fi
-    fi
-    
-    # Setup Public Website
-    if [[ -d "$APP_DIR/remotehive-public" ]]; then
-        log_info "Building Public Website..."
-        cd "$APP_DIR/remotehive-public"
-        npm ci --production
-        npm run build
-        
-        # Create PM2 ecosystem file if it doesn't exist
-        if [[ ! -f "ecosystem.config.js" ]]; then
-            cat > ecosystem.config.js << 'EOF'
-module.exports = {
-  apps: [{
-    name: 'remotehive-public',
-    script: 'npm',
-    args: 'run preview',
-    cwd: '/opt/remotehive/remotehive-public',
-    env: {
-      NODE_ENV: 'production',
-      PORT: 5173
-    },
-    instances: 1,
-    autorestart: true,
-    watch: false,
-    max_memory_restart: '1G'
-  }]
-};
-EOF
-        fi
-    fi
-    
-    log_success "Frontend applications setup completed"
-}
-
-# Configure services
-configure_services() {
-    log_info "Configuring systemd services..."
-    
-    # Copy service files
-    if [[ -d "$APP_DIR/systemd" ]]; then
-        cp "$APP_DIR"/systemd/*.service /etc/systemd/system/
-        systemctl daemon-reload
-    fi
-    
-    # Configure nginx
-    if [[ -f "$APP_DIR/nginx/remotehive.conf" ]]; then
-        cp "$APP_DIR/nginx/remotehive.conf" /etc/nginx/sites-available/
-        ln -sf /etc/nginx/sites-available/remotehive.conf /etc/nginx/sites-enabled/
-        
-        # Test nginx configuration
-        nginx -t || error_exit "Nginx configuration test failed"
-    fi
-    
-    log_success "Services configured successfully"
-}
-
-# Start services
-start_services() {
-    log_info "Starting RemoteHive services..."
-    
-    # Enable and start systemd services
-    for service in "${SERVICES[@]}"; do
-        if [[ -f "/etc/systemd/system/$service.service" ]]; then
-            log_info "Starting $service..."
-            systemctl enable "$service"
-            systemctl start "$service"
-            
-            # Wait a moment and check if service started successfully
-            sleep 2
-            if systemctl is-active --quiet "$service"; then
-                log_success "$service started successfully"
-            else
-                log_error "Failed to start $service"
-                systemctl status "$service" --no-pager
-            fi
-        else
-            log_warning "Service file for $service not found"
-        fi
-    done
-    
-    # Reload nginx
-    if systemctl is-active --quiet nginx; then
-        systemctl reload nginx
-        log_success "Nginx reloaded successfully"
-    else
-        systemctl start nginx
-        log_success "Nginx started successfully"
-    fi
-}
-
-# Health check
-health_check() {
-    log_info "Performing health checks..."
-    
-    local health_check_timeout=60
-    local check_interval=5
-    local elapsed=0
-    
-    # Define service endpoints
-    local endpoints=(
-        "http://localhost:8000/health:Backend API"
-        "http://localhost:8001/health:Autoscraper Service"
-        "http://localhost:3000:Admin Panel"
-        "http://localhost:5173:Public Website"
-    )
-    
-    for endpoint_info in "${endpoints[@]}"; do
-        IFS=':' read -r endpoint name <<< "$endpoint_info"
-        
-        log_info "Checking $name at $endpoint..."
-        elapsed=0
-        
-        while [[ $elapsed -lt $health_check_timeout ]]; do
-            if curl -f --max-time 10 "$endpoint" &>/dev/null; then
-                log_success "$name is healthy"
-                break
-            fi
-            
-            sleep $check_interval
-            elapsed=$((elapsed + check_interval))
-        done
-        
-        if [[ $elapsed -ge $health_check_timeout ]]; then
-            log_error "$name health check failed after ${health_check_timeout}s"
-        fi
-    done
-}
-
-# Generate deployment report
-generate_report() {
-    log_info "Generating deployment report..."
-    
-    local report_file="/var/log/remotehive-deployment-$(date +%Y%m%d-%H%M%S).report"
-    
-    cat > "$report_file" << EOF
-RemoteHive Deployment Report
-============================
-
-Deployment Date: $(date)
-Deployment ID: ${DEPLOYMENT_ID:-"manual-$(date +%Y%m%d-%H%M%S)"}
-Git Commit: ${GIT_COMMIT:-"unknown"}
-Branch: ${BRANCH_NAME:-"unknown"}
-Triggered By: ${TRIGGERED_BY:-"manual"}
-
-Service Status:
-EOF
-    
-    for service in "${SERVICES[@]}"; do
-        if systemctl is-active --quiet "$service" 2>/dev/null; then
-            echo "✅ $service: Running" >> "$report_file"
-        else
-            echo "❌ $service: Not Running" >> "$report_file"
-        fi
-    done
-    
-    echo "" >> "$report_file"
-    echo "System Information:" >> "$report_file"
-    echo "- OS: $(lsb_release -d | cut -f2)" >> "$report_file"
-    echo "- Kernel: $(uname -r)" >> "$report_file"
-    echo "- Memory: $(free -h | awk 'NR==2{printf "%.1fG used / %.1fG total", $3/1024, $2/1024}')" >> "$report_file"
-    echo "- Disk: $(df -h / | awk 'NR==2{printf "%s used / %s total (%s)", $3, $2, $5}')" >> "$report_file"
-    
-    log_success "Deployment report generated: $report_file"
-    cat "$report_file"
-}
-
-# Main deployment function
-main() {
-    log_info "Starting RemoteHive deployment..."
-    log_info "Deployment ID: ${DEPLOYMENT_ID:-"manual-$(date +%Y%m%d-%H%M%S)"}"
-    
-    check_permissions
-    validate_environment
-    create_backup
-    stop_services
-    update_code
-    setup_backend
-    setup_autoscraper
-    setup_frontend
-    configure_services
+    # Start services
     start_services
     
-    # Wait for services to stabilize
-    log_info "Waiting for services to stabilize..."
-    sleep 10
-    
+    # Health checks
     health_check
-    generate_report
     
-    log_success "RemoteHive deployment completed successfully!"
-    log_info "Services are available at:"
-    log_info "  - Backend API: http://$(hostname -I | awk '{print $1}'):8000"
-    log_info "  - Autoscraper: http://$(hostname -I | awk '{print $1}'):8001"
-    log_info "  - Admin Panel: http://$(hostname -I | awk '{print $1}'):3000"
-    log_info "  - Public Website: http://$(hostname -I | awk '{print $1}'):5173"
+    # Cleanup
+    cleanup_backups
+    
+    success "=== RemoteHive Deployment Completed Successfully ==="
+    log "Deployment log saved to: $LOG_FILE"
 }
 
-# Run main function
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    main "$@"
-fi
+# Rollback function
+rollback() {
+    log "=== Starting Rollback Process ==="
+    
+    # Find the most recent backup
+    local latest_backup=$(ls -t "$BACKUP_DIR"/remotehive_backup_* 2>/dev/null | head -1)
+    
+    if [ -z "$latest_backup" ]; then
+        error "No backup found for rollback"
+    fi
+    
+    log "Rolling back to: $(basename "$latest_backup")"
+    
+    # Stop services
+    stop_services
+    
+    # Backup current failed deployment
+    if [ -d "$APP_DIR" ]; then
+        sudo mv "$APP_DIR" "$APP_DIR"_failed_$(date +%Y%m%d_%H%M%S)
+    fi
+    
+    # Restore from backup
+    sudo cp -r "$latest_backup" "$APP_DIR"
+    sudo chown -R ubuntu:ubuntu "$APP_DIR"
+    
+    # Start services
+    cd "$APP_DIR"
+    start_services
+    
+    # Health checks
+    health_check
+    
+    success "=== Rollback Completed Successfully ==="
+}
+
+# Script usage
+usage() {
+    echo "Usage: $0 [branch] [environment] [action]"
+    echo "  branch: Git branch to deploy (default: main)"
+    echo "  environment: Deployment environment (default: production)"
+    echo "  action: deploy (default) or rollback"
+    echo ""
+    echo "Examples:"
+    echo "  $0                          # Deploy main branch to production"
+    echo "  $0 develop staging          # Deploy develop branch to staging"
+    echo "  $0 main production rollback # Rollback production deployment"
+}
+
+# Parse command line arguments
+ACTION="${3:-deploy}"
+
+case "$ACTION" in
+    "deploy")
+        main
+        ;;
+    "rollback")
+        rollback
+        ;;
+    "help")
+        usage
+        ;;
+    *)
+        error "Invalid action: $ACTION. Use 'deploy', 'rollback', or 'help'"
+        ;;
+esac

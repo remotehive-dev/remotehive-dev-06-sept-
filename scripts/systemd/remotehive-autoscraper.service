@@ -1,0 +1,38 @@
+[Unit]
+Description=RemoteHive Autoscraper Service
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/RemoteHive/autoscraper-service
+Environment=PATH=/home/ubuntu/.local/bin:/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=/home/ubuntu/RemoteHive/.env
+ExecStart=/usr/bin/python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8001 --workers 1
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=10
+KillMode=mixed
+TimeoutStopSec=30
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/home/ubuntu/RemoteHive
+ReadWritePaths=/tmp
+ReadWritePaths=/var/log
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=2048
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=remotehive-autoscraper
+
+[Install]
+WantedBy=multi-user.target

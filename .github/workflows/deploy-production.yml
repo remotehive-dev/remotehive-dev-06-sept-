@@ -1,0 +1,264 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      force_deploy:
+        description: 'Force deployment even if tests fail'
+        required: false
+        default: 'false'
+        type: boolean
+
+env:
+  DEPLOYMENT_ID: ${{ github.sha }}-${{ github.run_number }}
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.9'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    outputs:
+      test_status: ${{ steps.test.outcome }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          
+      - name: Cache Python dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+            
+      - name: Cache Node dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+            
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-asyncio
+          
+      - name: Run Python tests
+        id: test
+        run: |
+          pytest tests/ -v --cov=app --cov-report=xml --cov-report=term
+          
+      - name: Test Admin Panel build
+        run: |
+          cd remotehive-admin
+          npm ci
+          npm run build
+          
+      - name: Test Public Website build
+        run: |
+          cd remotehive-public
+          npm ci
+          npm run build
+          
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: test-results
+          path: |
+            coverage.xml
+            pytest-report.xml
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          
+      - name: Install security tools
+        run: |
+          pip install safety bandit semgrep
+          
+      - name: Run dependency security check
+        run: |
+          safety check -r requirements.txt --json --output safety-report.json || true
+          
+      - name: Run code security analysis
+        run: |
+          bandit -r app/ -f json -o bandit-report.json || true
+          
+      - name: Run Semgrep security scan
+        run: |
+          semgrep --config=auto app/ --json --output=semgrep-report.json || true
+          
+      - name: Upload security reports
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: security-reports
+          path: |
+            safety-report.json
+            bandit-report.json
+            semgrep-report.json
+
+  deploy:
+    needs: [test, security-scan]
+    runs-on: ubuntu-latest
+    if: needs.test.outputs.test_status == 'success' || github.event.inputs.force_deploy == true
+    environment: production
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Create deployment record
+        run: |
+          echo "🚀 Starting RemoteHive Production Deployment"
+          echo "Deployment ID: ${{ env.DEPLOYMENT_ID }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Triggered by: ${{ github.actor }}"
+          echo "Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          
+      - name: Deploy to VPC
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.VPC_HOST }}
+          username: ${{ secrets.VPC_USERNAME }}
+          key: ${{ secrets.VPC_SSH_KEY }}
+          port: 22
+          timeout: 300s
+          script: |
+            set -e
+            
+            # Set deployment variables
+            export DEPLOYMENT_ID="${{ env.DEPLOYMENT_ID }}"
+            export GIT_COMMIT="${{ github.sha }}"
+            export BRANCH_NAME="${{ github.ref_name }}"
+            export TRIGGERED_BY="${{ github.actor }}"
+            export DEPLOYMENT_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            
+            # Navigate to application directory
+            cd /opt/remotehive
+            
+            # Create backup before deployment
+            sudo mkdir -p /opt/remotehive-backups
+            sudo cp -r /opt/remotehive /opt/remotehive-backups/backup-$(date +%Y%m%d-%H%M%S)
+            
+            # Update code
+            git fetch origin
+            git reset --hard origin/main
+            
+            # Make deployment script executable and run it
+            chmod +x scripts/deploy.sh
+            ./scripts/deploy.sh
+            
+      - name: Run health checks
+        run: |
+          echo "⏳ Waiting for services to stabilize..."
+          sleep 45
+          
+          echo "🔍 Running health checks..."
+          
+          # Check Backend API
+          if curl -f --max-time 10 http://${{ secrets.VPC_HOST }}:8000/health; then
+            echo "✅ Backend API is healthy"
+          else
+            echo "❌ Backend API health check failed"
+            exit 1
+          fi
+          
+          # Check Autoscraper Service
+          if curl -f --max-time 10 http://${{ secrets.VPC_HOST }}:8001/health; then
+            echo "✅ Autoscraper Service is healthy"
+          else
+            echo "❌ Autoscraper Service health check failed"
+            exit 1
+          fi
+          
+          # Check Admin Panel
+          if curl -f --max-time 10 http://${{ secrets.VPC_HOST }}:3000; then
+            echo "✅ Admin Panel is accessible"
+          else
+            echo "❌ Admin Panel health check failed"
+            exit 1
+          fi
+          
+          # Check Public Website
+          if curl -f --max-time 10 http://${{ secrets.VPC_HOST }}:5173; then
+            echo "✅ Public Website is accessible"
+          else
+            echo "❌ Public Website health check failed"
+            exit 1
+          fi
+          
+          echo "🎉 All services are healthy!"
+          
+      - name: Notify deployment success
+        if: success()
+        run: |
+          if [ -n "${{ secrets.SLACK_WEBHOOK }}" ]; then
+            curl -X POST -H 'Content-type: application/json' \
+              --data '{
+                "text": "✅ RemoteHive Production Deployment Successful",
+                "blocks": [
+                  {
+                    "type": "section",
+                    "text": {
+                      "type": "mrkdwn",
+                      "text": "*RemoteHive Production Deployment Successful* ✅\n\n*Deployment Details:*\n• Deployment ID: `${{ env.DEPLOYMENT_ID }}`\n• Commit: `${{ github.sha }}`\n• Branch: `${{ github.ref_name }}`\n• Triggered by: ${{ github.actor }}\n• Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)\n\n*Services Status:*\n🟢 Backend API: http://${{ secrets.VPC_HOST }}:8000\n🟢 Autoscraper: http://${{ secrets.VPC_HOST }}:8001\n🟢 Admin Panel: http://${{ secrets.VPC_HOST }}:3000\n🟢 Public Website: http://${{ secrets.VPC_HOST }}:5173"
+                    }
+                  }
+                ]
+              }' \
+              ${{ secrets.SLACK_WEBHOOK }}
+          fi
+          
+      - name: Handle deployment failure
+        if: failure()
+        run: |
+          echo "❌ Deployment failed, initiating rollback..."
+          
+          # Attempt rollback via SSH
+          ssh -o StrictHostKeyChecking=no -i <(echo "${{ secrets.VPC_SSH_KEY }}") \
+            ${{ secrets.VPC_USERNAME }}@${{ secrets.VPC_HOST }} \
+            'cd /opt/remotehive && chmod +x scripts/rollback.sh && ./scripts/rollback.sh'
+          
+          # Send failure notification
+          if [ -n "${{ secrets.SLACK_WEBHOOK }}" ]; then
+            curl -X POST -H 'Content-type: application/json' \
+              --data '{
+                "text": "❌ RemoteHive Production Deployment Failed",
+                "blocks": [
+                  {
+                    "type": "section",
+                    "text": {
+                      "type": "mrkdwn",
+                      "text": "*RemoteHive Production Deployment Failed* ❌\n\n*Deployment Details:*\n• Deployment ID: `${{ env.DEPLOYMENT_ID }}`\n• Commit: `${{ github.sha }}`\n• Branch: `${{ github.ref_name }}`\n• Triggered by: ${{ github.actor }}\n• Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)\n\n*Action Taken:*\n🔄 Automatic rollback initiated\n\n*Next Steps:*\n• Check deployment logs\n• Verify service status\n• Investigate failure cause"
+                    }
+                  }
+                ]
+              }' \
+              ${{ secrets.SLACK_WEBHOOK }}
+          fi
+          
+          exit 1

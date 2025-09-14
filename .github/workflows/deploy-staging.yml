@@ -1,0 +1,305 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches: [ develop ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - development
+
+env:
+  DEPLOYMENT_ID: staging-${{ github.sha }}-${{ github.run_number }}
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.9'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    outputs:
+      test_status: ${{ steps.test.outcome }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          
+      - name: Cache Python dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+            
+      - name: Cache Node dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+            
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-asyncio
+          
+      - name: Run Python tests with coverage
+        id: test
+        run: |
+          pytest tests/ -v --cov=app --cov-report=xml --cov-report=term --cov-fail-under=80
+          
+      - name: Run integration tests
+        run: |
+          # Run integration tests if they exist
+          if [ -d "tests/integration" ]; then
+            pytest tests/integration/ -v
+          fi
+          
+      - name: Test Admin Panel build
+        run: |
+          cd remotehive-admin
+          npm ci
+          npm run lint || true
+          npm run test || true
+          npm run build
+          
+      - name: Test Public Website build
+        run: |
+          cd remotehive-public
+          npm ci
+          npm run lint || true
+          npm run test || true
+          npm run build
+          
+      - name: Upload test artifacts
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: staging-test-results
+          path: |
+            coverage.xml
+            pytest-report.xml
+            remotehive-admin/coverage/
+            remotehive-public/coverage/
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          
+      - name: Install security tools
+        run: |
+          pip install safety bandit semgrep
+          
+      - name: Run comprehensive security checks
+        run: |
+          # Python dependency security
+          safety check -r requirements.txt --json --output safety-report.json || true
+          
+          # Python code security analysis
+          bandit -r app/ -f json -o bandit-report.json || true
+          
+          # Multi-language security scan
+          semgrep --config=auto . --json --output=semgrep-report.json || true
+          
+      - name: Check for secrets in code
+        run: |
+          # Simple secret detection
+          if grep -r -i "password\|secret\|key\|token" --include="*.py" --include="*.js" --include="*.ts" --exclude-dir=node_modules .; then
+            echo "⚠️ Potential secrets found in code. Please review."
+          fi
+          
+      - name: Upload security reports
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: staging-security-reports
+          path: |
+            safety-report.json
+            bandit-report.json
+            semgrep-report.json
+
+  deploy-staging:
+    needs: [test, security-scan]
+    runs-on: ubuntu-latest
+    if: needs.test.outputs.test_status == 'success'
+    environment: staging
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Create staging deployment record
+        run: |
+          echo "🚀 Starting RemoteHive Staging Deployment"
+          echo "Deployment ID: ${{ env.DEPLOYMENT_ID }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Triggered by: ${{ github.actor }}"
+          echo "Environment: ${{ github.event.inputs.environment || 'staging' }}"
+          echo "Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          
+      - name: Deploy to Staging VPC
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.STAGING_VPC_HOST }}
+          username: ${{ secrets.STAGING_VPC_USERNAME }}
+          key: ${{ secrets.STAGING_VPC_SSH_KEY }}
+          port: 22
+          timeout: 300s
+          script: |
+            set -e
+            
+            # Set deployment variables
+            export DEPLOYMENT_ID="${{ env.DEPLOYMENT_ID }}"
+            export GIT_COMMIT="${{ github.sha }}"
+            export BRANCH_NAME="${{ github.ref_name }}"
+            export TRIGGERED_BY="${{ github.actor }}"
+            export ENVIRONMENT="${{ github.event.inputs.environment || 'staging' }}"
+            export DEPLOYMENT_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            
+            # Navigate to staging application directory
+            cd /opt/remotehive-staging
+            
+            # Create backup
+            sudo mkdir -p /opt/remotehive-staging-backups
+            sudo cp -r /opt/remotehive-staging /opt/remotehive-staging-backups/backup-$(date +%Y%m%d-%H%M%S)
+            
+            # Update code from develop branch
+            git fetch origin
+            git reset --hard origin/develop
+            
+            # Run staging deployment script
+            chmod +x scripts/deploy-staging.sh
+            ./scripts/deploy-staging.sh
+            
+      - name: Run staging health checks
+        run: |
+          echo "⏳ Waiting for staging services to stabilize..."
+          sleep 30
+          
+          echo "🔍 Running staging health checks..."
+          
+          # Check Backend API (staging ports: 8010, 8011, 3010, 5183)
+          if curl -f --max-time 10 http://${{ secrets.STAGING_VPC_HOST }}:8010/health; then
+            echo "✅ Staging Backend API is healthy"
+          else
+            echo "❌ Staging Backend API health check failed"
+            exit 1
+          fi
+          
+          # Check Autoscraper Service
+          if curl -f --max-time 10 http://${{ secrets.STAGING_VPC_HOST }}:8011/health; then
+            echo "✅ Staging Autoscraper Service is healthy"
+          else
+            echo "❌ Staging Autoscraper Service health check failed"
+            exit 1
+          fi
+          
+          # Check Admin Panel
+          if curl -f --max-time 10 http://${{ secrets.STAGING_VPC_HOST }}:3010; then
+            echo "✅ Staging Admin Panel is accessible"
+          else
+            echo "❌ Staging Admin Panel health check failed"
+            exit 1
+          fi
+          
+          # Check Public Website
+          if curl -f --max-time 10 http://${{ secrets.STAGING_VPC_HOST }}:5183; then
+            echo "✅ Staging Public Website is accessible"
+          else
+            echo "❌ Staging Public Website health check failed"
+            exit 1
+          fi
+          
+          echo "🎉 All staging services are healthy!"
+          
+      - name: Run smoke tests
+        run: |
+          echo "🧪 Running smoke tests on staging environment..."
+          
+          # Test API endpoints
+          curl -f http://${{ secrets.STAGING_VPC_HOST }}:8010/docs
+          curl -f http://${{ secrets.STAGING_VPC_HOST }}:8011/docs
+          
+          # Test database connectivity (if health endpoint includes DB status)
+          if curl -s http://${{ secrets.STAGING_VPC_HOST }}:8010/health | grep -q '"database":"healthy"'; then
+            echo "✅ Database connectivity verified"
+          else
+            echo "⚠️ Database connectivity check inconclusive"
+          fi
+          
+          echo "✅ Smoke tests completed"
+          
+      - name: Notify staging deployment success
+        if: success()
+        run: |
+          if [ -n "${{ secrets.SLACK_WEBHOOK }}" ]; then
+            curl -X POST -H 'Content-type: application/json' \
+              --data '{
+                "text": "✅ RemoteHive Staging Deployment Successful",
+                "blocks": [
+                  {
+                    "type": "section",
+                    "text": {
+                      "type": "mrkdwn",
+                      "text": "*RemoteHive Staging Deployment Successful* ✅\n\n*Deployment Details:*\n• Deployment ID: `${{ env.DEPLOYMENT_ID }}`\n• Commit: `${{ github.sha }}`\n• Branch: `${{ github.ref_name }}`\n• Environment: ${{ github.event.inputs.environment || 'staging' }}\n• Triggered by: ${{ github.actor }}\n• Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)\n\n*Staging Services:*\n🟢 Backend API: http://${{ secrets.STAGING_VPC_HOST }}:8010\n🟢 Autoscraper: http://${{ secrets.STAGING_VPC_HOST }}:8011\n🟢 Admin Panel: http://${{ secrets.STAGING_VPC_HOST }}:3010\n🟢 Public Website: http://${{ secrets.STAGING_VPC_HOST }}:5183\n\n*Ready for testing and QA review*"
+                    }
+                  }
+                ]
+              }' \
+              ${{ secrets.SLACK_WEBHOOK }}
+          fi
+          
+      - name: Handle staging deployment failure
+        if: failure()
+        run: |
+          echo "❌ Staging deployment failed, initiating rollback..."
+          
+          # Attempt rollback via SSH
+          ssh -o StrictHostKeyChecking=no -i <(echo "${{ secrets.STAGING_VPC_SSH_KEY }}") \
+            ${{ secrets.STAGING_VPC_USERNAME }}@${{ secrets.STAGING_VPC_HOST }} \
+            'cd /opt/remotehive-staging && chmod +x scripts/rollback.sh && ./scripts/rollback.sh'
+          
+          # Send failure notification
+          if [ -n "${{ secrets.SLACK_WEBHOOK }}" ]; then
+            curl -X POST -H 'Content-type: application/json' \
+              --data '{
+                "text": "❌ RemoteHive Staging Deployment Failed",
+                "blocks": [
+                  {
+                    "type": "section",
+                    "text": {
+                      "type": "mrkdwn",
+                      "text": "*RemoteHive Staging Deployment Failed* ❌\n\n*Deployment Details:*\n• Deployment ID: `${{ env.DEPLOYMENT_ID }}`\n• Commit: `${{ github.sha }}`\n• Branch: `${{ github.ref_name }}`\n• Environment: ${{ github.event.inputs.environment || 'staging' }}\n• Triggered by: ${{ github.actor }}\n• Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)\n\n*Action Taken:*\n🔄 Automatic rollback initiated\n\n*Next Steps:*\n• Check staging deployment logs\n• Verify staging service status\n• Fix issues before promoting to production"
+                    }
+                  }
+                ]
+              }' \
+              ${{ secrets.SLACK_WEBHOOK }}
+          fi
+          
+          exit 1
