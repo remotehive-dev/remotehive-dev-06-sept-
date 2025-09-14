@@ -37,16 +37,7 @@ spec:
             sleep 2
           done
           echo "Redis is ready!"
-      - name: wait-for-mongodb
-        image: busybox:1.35
-        command: ['sh', '-c']
-        args:
-        - |
-          until nc -z mongodb 27017; do
-            echo "Waiting for MongoDB..."
-            sleep 2
-          done
-          echo "MongoDB is ready!"
+      # MongoDB init container removed - using MongoDB Atlas
       containers:
       - name: celery-worker
         image: remotehive/backend-api:latest
@@ -54,7 +45,7 @@ spec:
         command:
         - celery
         - -A
-        - app.tasks.celery_app
+        - app.core.celery:celery_app
         - worker
         - --loglevel=info
         - --concurrency=4
@@ -142,7 +133,7 @@ spec:
             command:
             - celery
             - -A
-            - app.tasks.celery_app
+            - app.core.celery:celery_app
             - inspect
             - ping
           initialDelaySeconds: 30
@@ -154,7 +145,7 @@ spec:
             command:
             - celery
             - -A
-            - app.tasks.celery_app
+            - app.core.celery:celery_app
             - inspect
             - ping
           initialDelaySeconds: 10
@@ -206,16 +197,7 @@ spec:
             sleep 2
           done
           echo "Redis is ready!"
-      - name: wait-for-mongodb
-        image: busybox:1.35
-        command: ['sh', '-c']
-        args:
-        - |
-          until nc -z mongodb 27017; do
-            echo "Waiting for MongoDB..."
-            sleep 2
-          done
-          echo "MongoDB is ready!"
+      # MongoDB init container removed - using MongoDB Atlas
       containers:
       - name: celery-beat
         image: remotehive/backend-api:latest
@@ -223,10 +205,10 @@ spec:
         command:
         - celery
         - -A
-        - app.tasks.celery_app
+        - app.core.celery:celery_app
         - beat
         - --loglevel=info
-        - --schedule=/app/celerybeat-schedule
+        - --schedule=/app/celerybeat-schedule/celerybeat-schedule
         env:
         - name: ENVIRONMENT
           valueFrom:
@@ -285,11 +267,11 @@ spec:
           mountPath: /app/celerybeat-schedule
         resources:
           requests:
-            memory: "256Mi"
-            cpu: "100m"
+            memory: "128Mi"
+            cpu: "50m"
           limits:
-            memory: "512Mi"
-            cpu: "250m"
+            memory: "256Mi"
+            cpu: "200m"
         livenessProbe:
           exec:
             command:

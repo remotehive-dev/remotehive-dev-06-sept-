@@ -39,8 +39,8 @@ spec:
           echo "Redis is ready!"
       containers:
       - name: autoscraper-service
-        image: remotehive/autoscraper-service:latest
-        imagePullPolicy: Always
+        image: remotehive-autoscraper:latest
+        imagePullPolicy: Never
         ports:
         - containerPort: 8001
           name: http

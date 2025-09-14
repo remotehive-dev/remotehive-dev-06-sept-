@@ -1,0 +1,10 @@
+HTTP/1.1 200 OK
+date: Wed, 03 Sep 2025 16:29:51 GMT
+server: uvicorn
+cache-control: no-cache
+connection: keep-alive
+access-control-allow-origin: *
+access-control-allow-headers: Cache-Control
+content-type: text/event-stream; charset=utf-8
+transfer-encoding: chunked
+

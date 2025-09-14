@@ -26,7 +26,7 @@ services:
       - PYTHONPATH=/app
       
       # Database connections
-      - MONGODB_URL=${MONGODB_URL:-mongodb://mongodb:27017/remotehive}
+      - MONGODB_URL=${MONGODB_URL:-mongodb+srv://remotehiveofficial_db_user:b9z6QbkaiR3qc2KZ@remotehive.l5zq7k0.mongodb.net/?retryWrites=true&w=majority&appName=Remotehive}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
       
       # Security
@@ -59,8 +59,6 @@ services:
     networks:
       - remotehive-prod
     depends_on:
-      mongodb:
-        condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
@@ -210,7 +208,7 @@ services:
       - ENVIRONMENT=production
       - DEBUG=false
       - LOG_LEVEL=info
-      - MONGODB_URL=${MONGODB_URL:-mongodb://mongodb:27017/remotehive}
+      - MONGODB_URL=${MONGODB_URL:-mongodb+srv://remotehiveofficial_db_user:b9z6QbkaiR3qc2KZ@remotehive.l5zq7k0.mongodb.net/?retryWrites=true&w=majority&appName=Remotehive}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
       - CELERY_BROKER_URL=${REDIS_URL:-redis://redis:6379/0}
       - CELERY_RESULT_BACKEND=${REDIS_URL:-redis://redis:6379/0}
@@ -220,8 +218,6 @@ services:
     networks:
       - remotehive-prod
     depends_on:
-      mongodb:
-        condition: service_healthy
       redis:
         condition: service_healthy
     command: >
@@ -260,7 +256,7 @@ services:
       - ENVIRONMENT=production
       - DEBUG=false
       - LOG_LEVEL=info
-      - MONGODB_URL=${MONGODB_URL:-mongodb://mongodb:27017/remotehive}
+      - MONGODB_URL=${MONGODB_URL:-mongodb+srv://remotehiveofficial_db_user:b9z6QbkaiR3qc2KZ@remotehive.l5zq7k0.mongodb.net/?retryWrites=true&w=majority&appName=Remotehive}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
       - CELERY_BROKER_URL=${REDIS_URL:-redis://redis:6379/0}
       - CELERY_RESULT_BACKEND=${REDIS_URL:-redis://redis:6379/0}
@@ -270,8 +266,6 @@ services:
     networks:
       - remotehive-prod
     depends_on:
-      mongodb:
-        condition: service_healthy
       redis:
         condition: service_healthy
     command: celery -A app.tasks.celery_app beat --loglevel=info --pidfile=/tmp/celerybeat.pid
@@ -290,39 +284,39 @@ services:
           cpus: '0.1'
           memory: 128M
 
-  # Production MongoDB
-  mongodb:
-    image: mongo:7.0
-    container_name: remotehive-mongodb-prod
-    restart: unless-stopped
-    environment:
-      - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USERNAME:-admin}
-      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD}
-      - MONGO_INITDB_DATABASE=${MONGO_DATABASE:-remotehive}
-    volumes:
-      - mongodb_data:/data/db
-      - mongodb_config:/data/configdb
-      - ./scripts/mongo-init-prod.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
-      - ./config/mongod.conf:/etc/mongod.conf:ro
-    ports:
-      - "27017:27017"
-    networks:
-      - remotehive-prod
-    command: mongod --config /etc/mongod.conf
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    deploy:
-      resources:
-        limits:
-          cpus: '2.0'
-          memory: 4G
-        reservations:
-          cpus: '0.5'
-          memory: 1G
+  # Production MongoDB - COMMENTED OUT (Using MongoDB Atlas)
+  # mongodb:
+  #   image: mongo:7.0
+  #   container_name: remotehive-mongodb-prod
+  #   restart: unless-stopped
+  #   environment:
+  #     - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USERNAME:-admin}
+  #     - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD}
+  #     - MONGO_INITDB_DATABASE=${MONGO_DATABASE:-remotehive}
+  #   volumes:
+  #     - mongodb_data:/data/db
+  #     - mongodb_config:/data/configdb
+  #     - ./scripts/mongo-init-prod.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+  #     - ./config/mongod.conf:/etc/mongod.conf:ro
+  #   ports:
+  #     - "27017:27017"
+  #   networks:
+  #     - remotehive-prod
+  #   command: mongod --config /etc/mongod.conf
+  #   healthcheck:
+  #     test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 40s
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         cpus: '2.0'
+  #         memory: 4G
+  #       reservations:
+  #         cpus: '0.5'
+  #         memory: 1G
 
   # Production Redis
   redis:
@@ -463,13 +457,13 @@ services:
 
 # Production volumes with backup labels
 volumes:
-  mongodb_data:
-    driver: local
-    labels:
-      backup: "true"
-      service: "mongodb"
-  mongodb_config:
-    driver: local
+  # mongodb_data: # COMMENTED OUT (Using MongoDB Atlas)
+  #   driver: local
+  #   labels:
+  #     backup: "true"
+  #     service: "mongodb"
+  # mongodb_config: # COMMENTED OUT (Using MongoDB Atlas)
+  #   driver: local
   redis_data:
     driver: local
     labels:

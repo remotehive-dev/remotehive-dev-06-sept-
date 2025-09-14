@@ -14,7 +14,7 @@ uvloop==0.19.0  # Faster event loop for asyncio
 httptools==0.6.1  # Faster HTTP parsing
 
 # Security enhancements
-cryptography==41.0.8
+cryptography>=3.4.8,<42.0.0
 argon2-cffi==23.1.0  # Secure password hashing
 
 # Production database optimizations
@@ -35,7 +35,7 @@ Pillow==10.2.0  # Image processing
 orjson==3.9.10  # Faster JSON serialization
 
 # Background task processing
-celery[redis]==5.3.4
+# celery already specified in requirements.txt
 kombu==5.3.4
 
 # Health checks and monitoring

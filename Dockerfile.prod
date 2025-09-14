@@ -49,9 +49,9 @@ RUN pip install --upgrade pip setuptools wheel && \
 
 # Copy application code
 COPY app/ ./app/
-COPY alembic/ ./alembic/
 COPY alembic.ini .
 COPY pytest.ini .
+COPY migrations/ ./migrations/
 
 # Create non-root user
 RUN groupadd -r appuser && useradd -r -g appuser appuser
@@ -150,9 +150,9 @@ RUN pip install --upgrade pip setuptools wheel && \
 # Copy application code (will be overridden by volume mounts in dev)
 COPY app/ ./app/
 COPY tests/ ./tests/
-COPY alembic/ ./alembic/
 COPY alembic.ini .
 COPY pytest.ini .
+COPY migrations/ ./migrations/
 
 # Create non-root user
 RUN groupadd -r appuser && useradd -r -g appuser appuser

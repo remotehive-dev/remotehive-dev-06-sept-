@@ -9,7 +9,7 @@ metadata:
     tier: backend
     version: "1.0"
 spec:
-  replicas: 3
+  replicas: 1
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -27,16 +27,7 @@ spec:
         version: "1.0"
     spec:
       initContainers:
-      - name: wait-for-mongodb
-        image: busybox:1.35
-        command: ['sh', '-c']
-        args:
-        - |
-          until nc -z mongodb 27017; do
-            echo "Waiting for MongoDB..."
-            sleep 2
-          done
-          echo "MongoDB is ready!"
+      # MongoDB init container removed - using MongoDB Atlas
       - name: wait-for-redis
         image: busybox:1.35
         command: ['sh', '-c']
@@ -49,8 +40,8 @@ spec:
           echo "Redis is ready!"
       containers:
       - name: backend-api
-        image: remotehive/backend-api:latest
-        imagePullPolicy: Always
+        image: remotehive-api:latest
+        imagePullPolicy: Never
         ports:
         - containerPort: 8000
           name: http
@@ -70,6 +61,13 @@ spec:
             secretKeyRef:
               name: mongodb-secret
               key: MONGODB_URL
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: mongodb-secret
+              key: MONGODB_URL
+        - name: MONGODB_DATABASE_NAME
+          value: "remotehive_main"
         - name: REDIS_URL
           valueFrom:
             secretKeyRef:
@@ -80,6 +78,10 @@ spec:
             secretKeyRef:
               name: remotehive-secrets
               key: JWT_SECRET_KEY
+        - name: ENABLE_FILE_LOGGING
+          value: "false"
+        - name: ERROR_TRACKING_ENABLED
+          value: "false"
         - name: JWT_ALGORITHM
           valueFrom:
             configMapKeyRef:
@@ -127,11 +129,11 @@ spec:
           mountPath: /app/uploads
         resources:
           requests:
-            memory: "512Mi"
-            cpu: "250m"
+            memory: "256Mi"
+            cpu: "100m"
           limits:
-            memory: "1Gi"
-            cpu: "500m"
+            memory: "512Mi"
+            cpu: "200m"
         livenessProbe:
           httpGet:
             path: /health
@@ -152,10 +154,10 @@ spec:
           httpGet:
             path: /health
             port: 8000
-          initialDelaySeconds: 10
-          periodSeconds: 5
-          timeoutSeconds: 3
-          failureThreshold: 30
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 60
       volumes:
       - name: logs
         persistentVolumeClaim:

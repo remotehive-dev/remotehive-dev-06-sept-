@@ -39,8 +39,8 @@ spec:
           echo "Backend API is ready!"
       containers:
       - name: public-website
-        image: remotehive/public-website:latest
-        imagePullPolicy: Always
+        image: remotehive-public:latest
+        imagePullPolicy: Never
         ports:
         - containerPort: 80
           name: http
