@@ -1,3 +1,7 @@
+# Large tar files
+*.tar
+*.tar.gz
+
 # Python
 __pycache__/
 *.py[cod]

@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "echo \"No tests specified\" && exit 0",
+    "test:ci": "echo \"No tests specified\" && exit 0"
   },
   "dependencies": {
     "@clerk/clerk-react": "^5.39.0",
