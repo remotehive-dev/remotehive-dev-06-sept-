@@ -1,0 +1,36 @@
+RemoteHive Deployment Test Report
+=================================
+Date: Tue Sep 16 01:47:58 IST 2025
+Host: --verbose
+Test Duration: 
+
+Service URLs:
+- Backend API: http://--verbose:8000
+- Autoscraper Service: http://--verbose:8001
+- Admin Panel: http://--verbose:3000
+- Public Website: http://--verbose:5173
+- Nginx Proxy: http://--verbose
+
+Test Results:
+[0;34m[INFO][0m Testing SSH connection to --verbose...
+[0;31m[ERROR][0m ❌ SSH connection failed
+[0;31m[ERROR][0m SSH connection failed. Cannot proceed with remote tests.
+
+[0;31m[ERROR][0m ❌ Some deployment tests failed. Please check the logs and fix issues.
+
+Troubleshooting:
+  • Check service logs: ssh ubuntu@--verbose 'sudo journalctl -u remotehive-backend -f'
+  • Verify PM2 processes: ssh ubuntu@--verbose 'pm2 list'
+  • Check system resources: ssh ubuntu@--verbose 'htop'
+[0;34m[INFO][0m Generating deployment test report...
+date: illegal option -- d
+usage: date [-jnRu] [-I[date|hours|minutes|seconds|ns]] [-f input_fmt]
+            [ -z output_zone ] [-r filename|seconds] [-v[+|-]val[y|m|w|d|H|M|S]]
+            [[[[mm]dd]HH]MM[[cc]yy][.SS] | new_date] [+output_fmt]
+
+Next Steps:
+1. If tests failed, check service logs: ssh ubuntu@--verbose 'sudo journalctl -u remotehive-backend -f'
+2. Verify firewall settings allow access to ports 8000, 8001, 3000, 5173, 80
+3. Check PM2 process status: ssh ubuntu@--verbose 'pm2 list'
+4. Monitor system resources: ssh ubuntu@--verbose 'htop'
+
