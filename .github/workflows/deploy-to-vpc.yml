@@ -62,7 +62,7 @@ jobs:
   deploy:
     needs: test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') && always()
     
     steps:
     - uses: actions/checkout@v4
