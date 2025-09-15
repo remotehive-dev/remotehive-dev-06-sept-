@@ -89,11 +89,16 @@ jobs:
           # Clone or pull latest code
           if [ -d ".git" ]; then
             echo "Pulling latest changes..."
-            git pull origin ${{ github.ref_name }}
+            git fetch origin
+            git reset --hard origin/${{ github.ref_name }}
+            git clean -fd
           else
             echo "Cloning repository..."
             git clone -b ${{ github.ref_name }} https://github.com/${{ github.repository }} .
           fi
+          
+          # Set proper ownership
+          sudo chown -R ubuntu:ubuntu /home/ubuntu/RemoteHive
           
           # Stop existing services
           echo "Stopping existing services..."
@@ -105,18 +110,18 @@ jobs:
           echo "Installing Python dependencies..."
           python3 -m pip install --user -r requirements.txt
           
-          # Install Node.js dependencies and build frontend
-          echo "Building Admin Panel..."
-          cd remotehive-admin
-          npm ci --production
+          # Install Node.js dependencies for admin panel
+          cd /home/ubuntu/RemoteHive/remotehive-admin
+          npm ci
           npm run build
           
-          echo "Building Public Website..."
-          cd ../remotehive-public
-          npm ci --production
+          # Install Node.js dependencies for public website
+          cd /home/ubuntu/RemoteHive/remotehive-public
+          npm ci
           npm run build
           
-          cd ..
+          # Return to project root
+          cd /home/ubuntu/RemoteHive
           
           # Create environment file
           echo "Creating environment file..."
@@ -143,9 +148,18 @@ jobs:
           sudo cp config/systemd/remotehive-autoscraper.service /etc/systemd/system/
           sudo systemctl daemon-reload
           
+          # Create logs directory
+          mkdir -p /home/ubuntu/RemoteHive/logs
+          mkdir -p /home/ubuntu/RemoteHive/autoscraper-service/logs
+          mkdir -p /home/ubuntu/RemoteHive/autoscraper-service/data
+          
           # Copy PM2 ecosystem file
           echo "Setting up PM2 configuration..."
           cp config/pm2/ecosystem.config.js .
+          
+          # Configure PM2 for frontend services
+          echo "Configuring PM2..."
+          pm2 delete all || true
           
           # Copy and setup Nginx configuration
           echo "Setting up Nginx configuration..."
@@ -165,26 +179,30 @@ jobs:
           echo "Starting frontend services..."
           pm2 start ecosystem.config.js --env production
           pm2 save
+          pm2 startup | sudo bash || true
           
           # Health check
           echo "Performing health checks..."
-          sleep 10
+          sleep 30
           
-          # Check backend health
-          curl -f http://localhost:8000/health || {
-            echo "Backend health check failed"
-            sudo journalctl -u remotehive-backend --no-pager -n 20
-            exit 1
-          }
+          # Check systemd services
+          sudo systemctl is-active --quiet remotehive-backend || (echo "Backend service failed" && exit 1)
+          sudo systemctl is-active --quiet remotehive-autoscraper || (echo "Autoscraper service failed" && exit 1)
           
-          # Check autoscraper health
-          curl -f http://localhost:8001/health || {
-            echo "Autoscraper health check failed"
-            sudo journalctl -u remotehive-autoscraper --no-pager -n 20
-            exit 1
-          }
+          # Check backend API
+          curl -f http://localhost:8000/health || (echo "Backend API health check failed" && exit 1)
+          
+          # Check autoscraper service
+          curl -f http://localhost:8001/health || (echo "Autoscraper API health check failed" && exit 1)
+          
+          # Check PM2 processes
+          pm2 list | grep -E "(remotehive-admin|remotehive-public)" | grep -v "errored" || (echo "PM2 processes failed" && exit 1)
           
           # Check frontend services
+          curl -f http://localhost:3000 || (echo "Admin panel health check failed" && exit 1)
+          curl -f http://localhost:5173 || (echo "Public website health check failed" && exit 1)
+          
+          echo "All health checks passed!"
           pm2 status
           
           echo "Deployment completed successfully!"

@@ -5,12 +5,12 @@ Requires=network.target
 
 [Service]
 Type=simple
-User=remotehive
-Group=remotehive
-WorkingDirectory=/opt/remotehive/autoscraper-service
-Environment=PATH=/opt/remotehive/autoscraper-service/venv/bin
-EnvironmentFile=/opt/remotehive/.env.production
-ExecStart=/opt/remotehive/autoscraper-service/venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8001 --workers 2
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/RemoteHive/autoscraper-service
+Environment=PATH=/home/ubuntu/.local/bin:/usr/bin:/bin
+EnvironmentFile=/home/ubuntu/RemoteHive/.env
+ExecStart=/usr/bin/python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8001 --workers 2
 ExecReload=/bin/kill -HUP $MAINPID
 KillMode=mixed
 TimeoutStopSec=5
@@ -24,7 +24,7 @@ StartLimitBurst=3
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/opt/remotehive/autoscraper-service/logs /tmp
+ReadWritePaths=/home/ubuntu/RemoteHive/autoscraper-service/logs /tmp /home/ubuntu/RemoteHive/autoscraper-service/data
 PrivateDevices=true
 ProtectKernelTunables=true
 ProtectKernelModules=true

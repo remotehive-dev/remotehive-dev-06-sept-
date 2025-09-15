@@ -4,7 +4,7 @@ module.exports = {
       name: 'remotehive-admin',
       script: 'npm',
       args: 'run preview',
-      cwd: '/opt/remotehive/admin-panel',
+      cwd: '/home/ubuntu/RemoteHive/remotehive-admin',
       instances: 1,
       exec_mode: 'fork',
       env: {
@@ -18,9 +18,9 @@ module.exports = {
         HOST: '0.0.0.0'
       },
       // Logging
-      log_file: '/opt/remotehive/logs/admin-panel.log',
-      out_file: '/opt/remotehive/logs/admin-panel-out.log',
-      error_file: '/opt/remotehive/logs/admin-panel-error.log',
+      log_file: '/home/ubuntu/RemoteHive/logs/admin-panel.log',
+      out_file: '/home/ubuntu/RemoteHive/logs/admin-panel-out.log',
+      error_file: '/home/ubuntu/RemoteHive/logs/admin-panel-error.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
       
@@ -41,13 +41,13 @@ module.exports = {
       listen_timeout: 8000,
       
       // Environment variables from file
-      env_file: '/opt/remotehive/.env.production'
+      env_file: '/home/ubuntu/RemoteHive/.env'
     },
     {
       name: 'remotehive-public',
       script: 'npm',
       args: 'run preview',
-      cwd: '/opt/remotehive/public-website',
+      cwd: '/home/ubuntu/RemoteHive/remotehive-public',
       instances: 1,
       exec_mode: 'fork',
       env: {
@@ -61,9 +61,9 @@ module.exports = {
         HOST: '0.0.0.0'
       },
       // Logging
-      log_file: '/opt/remotehive/logs/public-website.log',
-      out_file: '/opt/remotehive/logs/public-website-out.log',
-      error_file: '/opt/remotehive/logs/public-website-error.log',
+      log_file: '/home/ubuntu/RemoteHive/logs/public-website.log',
+      out_file: '/home/ubuntu/RemoteHive/logs/public-website-out.log',
+      error_file: '/home/ubuntu/RemoteHive/logs/public-website-error.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
       
@@ -84,7 +84,7 @@ module.exports = {
       listen_timeout: 8000,
       
       // Environment variables from file
-      env_file: '/opt/remotehive/.env.production'
+      env_file: '/home/ubuntu/RemoteHive/.env'
     }
   ],
   
@@ -95,7 +95,7 @@ module.exports = {
       host: ['210.79.129.9'],
       ref: 'origin/main',
       repo: 'git@github.com:your-username/remotehive.git',
-      path: '/opt/remotehive',
+      path: '/home/ubuntu/RemoteHive',
       'pre-deploy-local': '',
       'post-deploy': 'npm install && npm run build && pm2 reload ecosystem.config.js --env production',
       'pre-setup': '',
@@ -106,7 +106,7 @@ module.exports = {
       host: ['210.79.129.9'],
       ref: 'origin/develop',
       repo: 'git@github.com:your-username/remotehive.git',
-      path: '/opt/remotehive-staging',
+      path: '/home/ubuntu/RemoteHive-staging',
       'pre-deploy-local': '',
       'post-deploy': 'npm install && npm run build && pm2 reload ecosystem.config.js --env staging',
       'pre-setup': '',
@@ -115,7 +115,7 @@ module.exports = {
   },
   
   // Global PM2 settings
-  pm2_serve_path: '/opt/remotehive/public',
+  pm2_serve_path: '/home/ubuntu/RemoteHive/public',
   pm2_serve_port: 8080,
   pm2_serve_spa: true,
   pm2_serve_homepage: '/index.html',
@@ -124,9 +124,9 @@ module.exports = {
   pmx: true,
   
   // Error handling
-  error_file: '/opt/remotehive/logs/pm2-error.log',
-  out_file: '/opt/remotehive/logs/pm2-out.log',
-  log_file: '/opt/remotehive/logs/pm2.log',
+  error_file: '/home/ubuntu/RemoteHive/logs/pm2-error.log',
+  out_file: '/home/ubuntu/RemoteHive/logs/pm2-out.log',
+  log_file: '/home/ubuntu/RemoteHive/logs/pm2.log',
   
   // Process monitoring
   monitoring: {
