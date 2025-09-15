@@ -1,0 +1,168 @@
+name: Force Deploy RemoteHive to VPC (Skip Tests)
+
+on:
+  workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: 'Skip tests and force deployment'
+        required: false
+        default: 'true'
+        type: boolean
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup SSH
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.VPC_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H ${{ secrets.VPC_HOST }} >> ~/.ssh/known_hosts
+    
+    - name: Deploy to VPC
+      run: |
+        ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.VPC_HOST }} << 'EOF'
+          set -e
+          
+          # Navigate to project directory
+          cd /home/ubuntu/RemoteHive || {
+            echo "Creating project directory..."
+            mkdir -p /home/ubuntu/RemoteHive
+            cd /home/ubuntu/RemoteHive
+          }
+          
+          # Clone or pull latest code
+          if [ -d ".git" ]; then
+            echo "Pulling latest changes..."
+            git pull origin main
+          else
+            echo "Cloning repository..."
+            git clone -b main https://github.com/${{ github.repository }} .
+          fi
+          
+          # Stop existing services
+          echo "Stopping existing services..."
+          sudo systemctl stop remotehive-backend || true
+          sudo systemctl stop remotehive-autoscraper || true
+          pm2 stop all || true
+          
+          # Install Python dependencies
+          echo "Installing Python dependencies..."
+          python3 -m pip install --user -r requirements.txt
+          
+          # Install Node.js dependencies and build frontend
+          echo "Building Admin Panel..."
+          cd remotehive-admin
+          npm ci --production
+          npm run build
+          
+          echo "Building Public Website..."
+          cd ../remotehive-public
+          npm ci --production
+          npm run build
+          
+          cd ..
+          
+          # Create environment file
+          echo "Creating environment file..."
+          cat > .env << 'ENVEOF'
+        MONGODB_URL=${{ secrets.MONGODB_URL }}
+        JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}
+        JWT_ALGORITHM=HS256
+        JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
+        REDIS_URL=redis://localhost:6379
+        ENVIRONMENT=production
+        DEBUG=false
+        CORS_ORIGINS=${{ secrets.CORS_ORIGINS }}
+        SMTP_SERVER=${{ secrets.SMTP_SERVER }}
+        SMTP_PORT=${{ secrets.SMTP_PORT }}
+        SMTP_USERNAME=${{ secrets.SMTP_USERNAME }}
+        SMTP_PASSWORD=${{ secrets.SMTP_PASSWORD }}
+        ADMIN_EMAIL=${{ secrets.ADMIN_EMAIL }}
+        ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
+        ENVEOF
+          
+          # Copy systemd service files
+          echo "Setting up systemd services..."
+          sudo cp config/systemd/remotehive-backend.service /etc/systemd/system/ || true
+          sudo cp config/systemd/remotehive-autoscraper.service /etc/systemd/system/ || true
+          sudo systemctl daemon-reload
+          
+          # Copy PM2 ecosystem file
+          echo "Setting up PM2 configuration..."
+          cp config/pm2/ecosystem.config.js . || true
+          
+          # Copy and setup Nginx configuration
+          echo "Setting up Nginx configuration..."
+          sudo cp config/nginx/remotehive.conf /etc/nginx/sites-available/ || true
+          sudo ln -sf /etc/nginx/sites-available/remotehive.conf /etc/nginx/sites-enabled/ || true
+          sudo nginx -t && sudo systemctl reload nginx || true
+          
+          # Start services
+          echo "Starting backend services..."
+          sudo systemctl enable remotehive-backend || true
+          sudo systemctl start remotehive-backend || true
+          
+          sudo systemctl enable remotehive-autoscraper || true
+          sudo systemctl start remotehive-autoscraper || true
+          
+          # Start frontend services with PM2
+          echo "Starting frontend services..."
+          pm2 start ecosystem.config.js --env production || true
+          pm2 save || true
+          
+          # Health check
+          echo "Performing health checks..."
+          sleep 10
+          
+          # Check backend health
+          curl -f http://localhost:8000/health || {
+            echo "Backend health check failed, checking logs..."
+            sudo journalctl -u remotehive-backend --no-pager -n 20 || true
+          }
+          
+          # Check autoscraper health
+          curl -f http://localhost:8001/health || {
+            echo "Autoscraper health check failed, checking logs..."
+            sudo journalctl -u remotehive-autoscraper --no-pager -n 20 || true
+          }
+          
+          # Check frontend services
+          pm2 status || true
+          
+          echo "Deployment completed!"
+        EOF
+    
+    - name: Verify Deployment
+      run: |
+        ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.VPC_HOST }} << 'EOF'
+          echo "=== Service Status ==="
+          sudo systemctl status remotehive-backend --no-pager -l || true
+          sudo systemctl status remotehive-autoscraper --no-pager -l || true
+          pm2 status || true
+          
+          echo "=== Network Status ==="
+          netstat -tlnp | grep -E ':(8000|8001|3000|5173)' || true
+          
+          echo "=== Health Check Results ==="
+          curl -s http://localhost:8000/health || echo "Backend health check failed"
+          curl -s http://localhost:8001/health || echo "Autoscraper health check failed"
+        EOF
+
+  notify:
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Notify Deployment Status
+      run: |
+        if [ "${{ needs.deploy.result }}" == "success" ]; then
+          echo "✅ VPC Deployment completed successfully!"
+        else
+          echo "❌ VPC Deployment failed!"
+        fi
