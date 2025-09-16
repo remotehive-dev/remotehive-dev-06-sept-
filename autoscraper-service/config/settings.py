@@ -35,6 +35,9 @@ class AutoscraperSettings(BaseSettings):
         "http://127.0.0.1:3001"
     ]
     
+    # Database Configuration
+    DATABASE_URL: Optional[str] = None  # For SQLite fallback
+    
     # MongoDB Atlas Configuration
     MONGODB_URL: str = os.getenv("MONGODB_URL", "mongodb+srv://remotehiveofficial_db_user:b9z6QbkaiR3qc2KZ@remotehive.l5zq7k0.mongodb.net/?retryWrites=true&w=majority&appName=Remotehive")
     MONGODB_DATABASE_NAME: str = os.getenv("MONGODB_DATABASE_NAME", "remotehive_autoscraper")
