@@ -21,7 +21,7 @@ import json
 
 from app.database.database import DatabaseManager
 from app.middleware.auth import get_current_user_optional, require_auth, require_admin
-from app.utils.metrics import AutoScraperMetrics
+# from app.utils.metrics import AutoScraperMetrics  # Temporarily disabled
 from app.models.models import (
     JobBoard, ScheduleConfig, ScrapeJob, ScrapeRun,
     RawJob, NormalizedJob, EngineState,
@@ -45,7 +45,7 @@ from app.services.settings_service import settings_service
 from config.settings import get_settings
 
 settings = get_settings()
-metrics = AutoScraperMetrics()
+# metrics = AutoScraperMetrics()  # Temporarily disabled
 
 # Create router
 router = APIRouter(prefix="/api/v1/autoscraper", tags=["autoscraper"])
@@ -201,7 +201,7 @@ async def get_dashboard(
         
         # Record metrics
         duration = time.time() - start_time
-        metrics.record_http_request("GET", "/dashboard", 200, duration)
+        # metrics.record_http_request("GET", "/dashboard", 200, duration)  # Temporarily disabled
         
         return DashboardResponse(
             stats=stats,
@@ -211,7 +211,7 @@ async def get_dashboard(
         
     except Exception as e:
         duration = time.time() - start_time
-        metrics.record_http_request("GET", "/dashboard", 500, duration)
+        # metrics.record_http_request("GET", "/dashboard", 500, duration)  # Temporarily disabled
         logger.error(f"Dashboard error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
