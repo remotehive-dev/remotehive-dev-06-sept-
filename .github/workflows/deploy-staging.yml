@@ -17,7 +17,7 @@ on:
 env:
   DEPLOYMENT_ID: staging-${{ github.sha }}-${{ github.run_number }}
   NODE_VERSION: '18'
-  PYTHON_VERSION: '3.9'
+  PYTHON_VERSION: '3.11'
 
 jobs:
   test:

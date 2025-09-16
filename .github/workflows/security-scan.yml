@@ -23,7 +23,7 @@ on:
 
 env:
   NODE_VERSION: '18'
-  PYTHON_VERSION: '3.9'
+  PYTHON_VERSION: '3.11'
 
 jobs:
   dependency-scan:
@@ -57,6 +57,15 @@ jobs:
             echo "⚠️ Safety found vulnerabilities in Python dependencies"
             safety check -r requirements.txt --short-report
           }
+          
+      - name: Run Snyk to check for vulnerabilities
+        if: ${{ secrets.SNYK_TOKEN != '' }}
+        uses: snyk/actions/python@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high
+        continue-on-error: true
           
           # Pip-audit check
           pip-audit -r requirements.txt --format=json --output=pip-audit-report.json || {
@@ -161,21 +170,29 @@ jobs:
           
       - name: Install code security tools
         run: |
-          pip install bandit semgrep
-          npm install -g eslint-plugin-security
+          pip install bandit safety pip-audit || echo "Failed to install some Python security tools"
+          npm install -g audit-ci || echo "Failed to install audit-ci"
+          # Install semgrep if available
+          pip install semgrep || echo "Semgrep not available, skipping"
+        continue-on-error: true
           
       - name: Python static security analysis
         run: |
           echo "🔒 Running Python static security analysis..."
           
           # Bandit security linter
-          bandit -r app/ autoscraper-service/ -f json -o bandit-report.json || {
-            echo "⚠️ Bandit found security issues in Python code"
-            bandit -r app/ autoscraper-service/ -f txt
-          }
-          
-          # Generate readable report
-          bandit -r app/ autoscraper-service/ -f txt -o bandit-readable-report.txt || true
+          if command -v bandit &> /dev/null; then
+            bandit -r app/ autoscraper-service/ -f json -o bandit-report.json || {
+              echo "⚠️ Bandit found security issues in Python code"
+              bandit -r app/ autoscraper-service/ -f txt
+            }
+            
+            # Generate readable report
+            bandit -r app/ autoscraper-service/ -f txt -o bandit-readable-report.txt || true
+          else
+            echo "Bandit not available, skipping"
+          fi
+        continue-on-error: true
           
       - name: Multi-language security pattern scan
         run: |

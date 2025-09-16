@@ -8,8 +8,9 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "echo \"No tests specified\" && exit 0",
-    "test:ci": "echo \"No tests specified\" && exit 0"
+    "test": "vitest",
+    "test:ci": "vitest run --coverage",
+    "test:watch": "vitest --watch"
   },
   "dependencies": {
     "@clerk/clerk-react": "^5.39.0",
@@ -28,17 +29,23 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",
+    "@testing-library/react": "^14.1.2",
+    "@testing-library/jest-dom": "^6.1.5",
+    "@testing-library/user-event": "^14.5.1",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react-swc": "^3.10.2",
+    "@vitest/coverage-v8": "^1.0.4",
     "autoprefixer": "^10.4.21",
     "eslint": "^9.30.1",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^16.3.0",
+    "jsdom": "^23.0.1",
     "postcss": "^8.5.6",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.35.1",
-    "vite": "^5.4.10"
+    "vite": "^5.4.10",
+    "vitest": "^1.0.4"
   }
 }

@@ -1,5 +1,5 @@
 # Multi-stage build for RemoteHive Backend API
-FROM python:3.9-slim as builder
+FROM python:3.11-slim as builder
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -21,7 +21,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Development stage
-FROM python:3.9-slim as development
+FROM python:3.11-slim as development
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -51,8 +51,22 @@ EXPOSE 8000
 # Start development server with auto-reload
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
+# Test stage
+FROM development as test
+
+# Install test dependencies
+COPY requirements-dev.txt .
+RUN pip install --no-cache-dir -r requirements-dev.txt
+
+# Copy test files
+COPY tests/ ./tests/
+COPY pytest.ini .
+
+# Run tests by default
+CMD ["pytest", "tests/", "-v", "--cov=app", "--cov-report=xml"]
+
 # Production stage
-FROM python:3.9-slim as production
+FROM python:3.11-slim as production
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -69,7 +83,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy Python packages from builder stage
-COPY --from=builder /usr/local/lib/python3.9/site-packages /usr/local/lib/python3.9/site-packages
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy application code

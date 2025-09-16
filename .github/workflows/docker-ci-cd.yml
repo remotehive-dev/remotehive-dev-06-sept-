@@ -44,6 +44,17 @@ jobs:
         else
           docker run --rm remotehive-autoscraper-test pytest tests/ -v --cov=app --cov-report=xml
         fi
+      env:
+        MONGODB_URL: ${{ secrets.MONGODB_URL || 'mongodb://localhost:27017/test_remotehive' }}
+        JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY || 'test-secret-key-for-ci' }}
+        JWT_ALGORITHM: HS256
+        JWT_ACCESS_TOKEN_EXPIRE_MINUTES: 30
+        REDIS_URL: ${{ secrets.REDIS_URL || 'redis://localhost:6379' }}
+        ENVIRONMENT: test
+        DEBUG: false
+        CORS_ORIGINS: http://localhost:3000,http://localhost:5173
+        ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL || 'admin@remotehive.in' }}
+        ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD || 'Ranjeet11$' }}
 
   # Frontend Test Job
   frontend-test:
@@ -150,8 +161,8 @@ jobs:
     - name: Build and push ${{ matrix.service }} image
       uses: docker/build-push-action@v5
       with:
-        context: ${{ matrix.service == 'backend' && '.' || matrix.service == 'nginx' && './nginx' || format('./{0}-service', matrix.service == 'autoscraper' && 'autoscraper' || format('remotehive-{0}', matrix.service)) }}
-        file: ${{ matrix.service == 'backend' && './Dockerfile' || matrix.service == 'nginx' && './nginx/Dockerfile' || format('./{0}/Dockerfile', matrix.service == 'autoscraper' && 'autoscraper-service' || format('remotehive-{0}', matrix.service)) }}
+        context: ${{ matrix.service == 'backend' && '.' || matrix.service == 'nginx' && './nginx' || matrix.service == 'autoscraper' && './autoscraper-service' || format('./remotehive-{0}', matrix.service) }}
+        file: ${{ matrix.service == 'backend' && './Dockerfile' || matrix.service == 'nginx' && './nginx/Dockerfile' || matrix.service == 'autoscraper' && './autoscraper-service/Dockerfile' || format('./remotehive-{0}/Dockerfile', matrix.service) }}
         push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}

@@ -1,5 +1,5 @@
 # Dockerfile for RemoteHive Autoscraper Service
-FROM python:3.9-slim as builder
+FROM python:3.11-slim as builder
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -21,8 +21,54 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Development stage
+FROM python:3.11-slim as development
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    ENVIRONMENT=development
+
+# Install system dependencies including dev tools
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    wget \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create working directory
+WORKDIR /app
+
+# Copy requirements and install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY . .
+
+# Expose port
+EXPOSE 8001
+
+# Start development server with auto-reload
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001", "--reload"]
+
+# Test stage
+FROM development as test
+
+# Install test dependencies if they exist
+COPY requirements-dev.txt* ./
+RUN if [ -f requirements-dev.txt ]; then pip install --no-cache-dir -r requirements-dev.txt; fi
+
+# Copy test files
+COPY tests/ ./tests/ 2>/dev/null || true
+COPY pytest.ini* ./
+
+# Run tests by default
+CMD ["pytest", "tests/", "-v", "--cov=app", "--cov-report=xml"]
+
 # Production stage
-FROM python:3.9-slim as production
+FROM python:3.11-slim as production
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -40,7 +86,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy Python packages from builder stage
-COPY --from=builder /usr/local/lib/python3.9/site-packages /usr/local/lib/python3.9/site-packages
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy application code
