@@ -22,11 +22,11 @@ sys.path.append(str(Path(__file__).parent.parent))
 from config.settings import get_settings
 from app.middleware.auth import AuthMiddleware
 from app.middleware.rate_limit import RateLimitMiddleware
-from app.utils.metrics import MetricsMiddleware
+# from app.utils.metrics import MetricsMiddleware
 from app.database.database import DatabaseManager
 from app.api.autoscraper import router as autoscraper_router
 from app.utils.health import health_router
-from app.utils.metrics import metrics_router
+# from app.utils.metrics import metrics_router
 
 settings = get_settings()
 
@@ -95,7 +95,7 @@ app.add_middleware(
 )
 
 # Add custom middleware (order matters)
-app.add_middleware(MetricsMiddleware)
+# app.add_middleware(MetricsMiddleware)  # Temporarily disabled
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(AuthMiddleware)
 
@@ -136,7 +136,7 @@ async def general_exception_handler(request: Request, exc: Exception):
 
 # Include routers
 app.include_router(health_router, prefix="/health", tags=["Health"])
-app.include_router(metrics_router, prefix="/metrics", tags=["Metrics"])
+# app.include_router(metrics_router, prefix="/metrics", tags=["Metrics"])  # Temporarily disabled
 app.include_router(autoscraper_router, tags=["AutoScraper"])
 
 
