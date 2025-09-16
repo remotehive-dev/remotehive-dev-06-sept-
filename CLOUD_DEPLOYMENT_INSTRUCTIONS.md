@@ -14,9 +14,8 @@
 You need to manually add the SSH public key to your cloud instance's authorized_keys file.
 
 ### SSH Public Key to Add:
-```
-ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDJZYpJo7HLd9UnQZ7sAW0mUnMJhQ2q619MitBAwZ7p7R/TtSb6QVlf95bWkuBDnBVQXrZeYb3sxwc5cSVTySCVjMsMwZ5v7HIZjPSpx1N7LA6IdAQkaWXzWO0ouxKS+KWvina2itlPdBAEnK12UA4STiAG5Cb0WJ2iuj4rUgXUpFcY0GrVtRe78X9uQPX8mkh8+oMOKLvOf2Sj3GUBC8c53Q5FWIgTTK2dOMtplohaU5zb7OIsNCOFZeFuU7lnv1PiE2siMHieNC7tkgeb+3W1WKxNAb0szOb8e0HamyoiefwuW29fFmd3s11H1kPGCbgoz+XIjY/NH2BDvBFJ0P/+HUECv4fB4NUSJZ7KPkwbYtZwv2ENresGMzRiEVLKcqTFJnOyud4TXZe1hMrpnTmkDSf1c/HZgvsdIeEWYuHHOypNz06UWFP75qNXG6e/+Goktl0v8Hmu9TYbWrNkwxBEKBiKOxOGwWcEfTizosit6hHymKR6DioXLTiuyh+rniUVuarI9L0skFxoz5avk30c/I81ihRVrHaojGBPCfJ3pqHbUhUTxAPz8Ou1omAAN11ItehpawYu2XcLTuV3ERluze+PnY5yr5WmvNjmNepQJwhHpFLbT9tHfQX6Iao/LxdcH29O1Tr4yhPLF/1j8Y/rIXI2xj8dCknpRfvkYDeSvQ== remotehive-deployment@cloud
-```
+
+Use the content from `remotehive-vpc-key.pub` file in your project directory.
 
 ### Manual Steps:
 1. **Access your cloud instance console** (via your cloud provider's web interface)
@@ -27,7 +26,7 @@ ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDJZYpJo7HLd9UnQZ7sAW0mUnMJhQ2q619MitBAwZ7p
    mkdir -p ~/.ssh
    
    # Add the public key to authorized_keys
-   echo "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDJZYpJo7HLd9UnQZ7sAW0mUnMJhQ2q619MitBAwZ7p7R/TtSb6QVlf95bWkuBDnBVQXrZeYb3sxwc5cSVTySCVjMsMwZ5v7HIZjPSpx1N7LA6IdAQkaWXzWO0ouxKS+KWvina2itlPdBAEnK12UA4STiAG5Cb0WJ2iuj4rUgXUpFcY0GrVtRe78X9uQPX8mkh8+oMOKLvOf2Sj3GUBC8c53Q5FWIgTTK2dOMtplohaU5zb7OIsNCOFZeFuU7lnv1PiE2siMHieNC7tkgeb+3W1WKxNAb0szOb8e0HamyoiefwuW29fFmd3s11H1kPGCbgoz+XIjY/NH2BDvBFJ0P/+HUECv4fB4NUSJZ7KPkwbYtZwv2ENresGMzRiEVLKcqTFJnOyud4TXZe1hMrpnTmkDSf1c/HZgvsdIeEWYuHHOypNz06UWFP75qNXG6e/+Goktl0v8Hmu9TYbWrNkwxBEKBiKOxOGwWcEfTizosit6hHymKR6DioXLTiuyh+rniUVuarI9L0skFxoz5avk30c/I81ihRVrHaojGBPCfJ3pqHbUhUTxAPz8Ou1omAAN11ItehpawYu2XcLTuV3ERluze+PnY5yr5WmvNjmNepQJwhHpFLbT9tHfQX6Iao/LxdcH29O1Tr4yhPLF/1j8Y/rIXI2xj8dCknpRfvkYDeSvQ== remotehive-deployment@cloud" >> ~/.ssh/authorized_keys
+   cat remotehive-vpc-key.pub >> ~/.ssh/authorized_keys
    
    # Set proper permissions
    chmod 700 ~/.ssh
@@ -39,7 +38,7 @@ ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDJZYpJo7HLd9UnQZ7sAW0mUnMJhQ2q619MitBAwZ7p
 After adding the public key, test the SSH connection from your local machine:
 
 ```bash
-ssh -i remotehive_key_new -o ConnectTimeout=10 root@210.79.129.170
+ssh -i remotehive-vpc-key -o ConnectTimeout=10 root@210.79.129.170
 ```
 
 ## Step 3: Deploy RemoteHive
