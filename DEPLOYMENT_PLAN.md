@@ -8,10 +8,10 @@ This document outlines the comprehensive deployment strategy for RemoteHive plat
 ### Current Project Structure
 ```
 RemoteHive/
-├── app/                    # Main Backend API (FastAPI + MongoDB)
-├── autoscraper-service/    # Job Scraping Service (FastAPI + SQLite)
-├── remotehive-admin/       # Admin Panel (Next.js)
-├── remotehive-public/      # Public Website (React + Vite)
+├── backend/                    # Main Backend API (FastAPI + MongoDB)
+├── autoscraper-engine-api/    # Job Scraping Service (FastAPI + SQLite)
+├── admin-panel/       # Admin Panel (Next.js)
+├── website/      # Public Website (React + Vite)
 ├── k8s/                    # Kubernetes manifests
 ├── .github/workflows/      # CI/CD pipelines
 ├── docker-compose.yml      # Local development

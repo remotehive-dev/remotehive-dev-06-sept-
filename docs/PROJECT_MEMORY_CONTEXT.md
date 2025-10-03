@@ -53,7 +53,7 @@ Redis Cache:          redis://localhost:6379
 ### Project Structure
 ```
 RemoteHive_Migration_Package/
-├── app/                           # Main Backend API
+├── backend/                           # Main Backend API
 │   ├── main.py                   # FastAPI application entry
 │   ├── config.py                 # Configuration settings
 │   ├── api/                      # API endpoints
@@ -71,13 +71,13 @@ RemoteHive_Migration_Package/
 │   │   ├── config.py            # Core configuration
 │   │   └── rbac.py              # Role-based access control
 │   └── tests/                    # Test files
-├── autoscraper-service/          # Independent scraping service
-├── remotehive-admin/             # Next.js admin panel
+├── autoscraper-engine-api/          # Independent scraping service
+├── admin-panel/             # Next.js admin panel
 │   ├── src/
 │   │   ├── lib/api.ts           # API service layer
 │   │   ├── components/          # React components
 │   │   └── pages/              # Next.js pages
-├── remotehive-public/            # React public website
+├── website/            # React public website
 │   ├── src/
 │   │   ├── lib/                # API and utilities
 │   │   ├── components/         # React components
@@ -134,7 +134,7 @@ class JobApplication(Document):
 ```
 
 ### Autoscraper Database (SQLite)
-**Location**: `autoscraper-service/app.db`
+**Location**: `autoscraper-engine-api/app.db`
 
 #### Key Tables
 - `autoscrape_schedule_config` - Scraping schedules
@@ -301,19 +301,19 @@ redis-server
 # 2. Start Main Backend API (Terminal 1)
 cd /path/to/RemoteHive_Migration_Package
 source venv/bin/activate
-uvicorn app.main:app --reload --port 8000
+uvicorn backend.main:app --reload --port 8000
 
 # 3. Start Autoscraper Service (Terminal 2)
-cd autoscraper-service
-uvicorn app.main:app --reload --port 8001
+cd autoscraper-engine-api
+uvicorn backend.main:app --reload --port 8001
 
 # 4. Start Admin Panel (Terminal 3)
-cd remotehive-admin
+cd admin-panel
 npm install
 npm run dev
 
 # 5. Start Public Website (Terminal 4)
-cd remotehive-public
+cd website
 npm install
 npm run dev
 
@@ -413,7 +413,7 @@ class UserRole(str, Enum):
 ## Frontend Applications
 
 ### Admin Panel (Next.js)
-**Location**: `/remotehive-admin/`
+**Location**: `/admin-panel/`
 **Port**: 3000
 
 #### Key Features
@@ -443,7 +443,7 @@ export const jobsApi = {
 ```
 
 ### Public Website (React + Vite)
-**Location**: `/remotehive-public/`
+**Location**: `/website/`
 **Port**: 5173
 
 #### Key Features
@@ -471,7 +471,7 @@ export const jobApi = {
 
 ### Celery Configuration
 ```python
-# app/core/celery.py
+# backend/core/celery.py
 from celery import Celery
 
 celery_app = Celery(
@@ -560,11 +560,11 @@ markers =
 ### Frontend Testing
 ```bash
 # Admin Panel
-cd remotehive-admin
+cd admin-panel
 npm test
 
 # Public Website
-cd remotehive-public
+cd website
 npm test
 ```
 
@@ -583,12 +583,12 @@ gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
 #### Frontend Deployment
 ```bash
 # Admin Panel Build
-cd remotehive-admin
+cd admin-panel
 npm run build
 npm start
 
 # Public Website Build
-cd remotehive-public
+cd website
 npm run build
 npm run preview
 ```
@@ -671,7 +671,7 @@ lsof -i :6379  # Redis
 
 ### Logging Configuration
 ```python
-# app/core/logging.py
+# backend/core/logging.py
 from loguru import logger
 
 logger.add(
@@ -688,9 +688,9 @@ logger.add(
 ## Key Files Reference
 
 ### Configuration Files
-- `/app/main.py` - FastAPI application entry point
-- `/app/config.py` - Main backend configuration
-- `/app/core/config.py` - Core configuration settings
+- `/backend/main.py` - FastAPI application entry point
+- `/backend/config.py` - Main backend configuration
+- `/backend/core/config.py` - Core configuration settings
 - `/fixed_startup.py` - Service startup script
 - `/.env` - Environment variables
 - `/requirements.txt` - Python dependencies
@@ -698,36 +698,36 @@ logger.add(
 - `/tsconfig.json` - TypeScript configuration
 
 ### Database Models
-- `/app/models/mongodb_models.py` - MongoDB/Beanie models
-- `/app/models/models.py` - SQLAlchemy models (legacy)
-- `/app/database/database.py` - Database initialization
+- `/backend/models/mongodb_models.py` - MongoDB/Beanie models
+- `/backend/models/models.py` - SQLAlchemy models (legacy)
+- `/backend/database/database.py` - Database initialization
 
 ### API Layer
-- `/app/api/api.py` - Main API router
-- `/app/api/endpoints/` - Individual endpoint modules
-- `/remotehive-admin/src/lib/api.ts` - Admin API service
-- `/remotehive-public/src/lib/api.ts` - Public API service
+- `/backend/api/api.py` - Main API router
+- `/backend/api/endpoints/` - Individual endpoint modules
+- `/admin-panel/src/lib/api.ts` - Admin API service
+- `/website/src/lib/api.ts` - Public API service
 
 ### Authentication & Security
-- `/app/core/auth.py` - Authentication logic
-- `/app/core/rbac.py` - Role-based access control
-- `/app/middleware/` - Custom middleware
+- `/backend/core/auth.py` - Authentication logic
+- `/backend/core/rbac.py` - Role-based access control
+- `/backend/middleware/` - Custom middleware
 
 ### Background Tasks
-- `/app/core/celery.py` - Celery configuration
-- `/app/tasks/` - Background task definitions
+- `/backend/core/celery.py` - Celery configuration
+- `/backend/tasks/` - Background task definitions
 
 ### Frontend Components
-- `/remotehive-admin/src/components/` - Admin panel components
-- `/remotehive-public/src/components/` - Public website components
-- `/remotehive-public/src/pages/` - Page components
-- `/remotehive-public/src/contexts/` - React contexts
+- `/admin-panel/src/components/` - Admin panel components
+- `/website/src/components/` - Public website components
+- `/website/src/pages/` - Page components
+- `/website/src/contexts/` - React contexts
 
 ### Testing
 - `/tests/` - Backend test files
-- `/app/tests/` - Application-specific tests
-- `/remotehive-admin/tests/` - Admin panel tests
-- `/remotehive-public/tests/` - Public website tests
+- `/backend/tests/` - Application-specific tests
+- `/admin-panel/tests/` - Admin panel tests
+- `/website/tests/` - Public website tests
 
 ### Documentation
 - `/docs/` - Project documentation
@@ -742,8 +742,8 @@ logger.add(
 ### Database Migration (PostgreSQL → MongoDB)
 The project has been migrated from PostgreSQL/Supabase to MongoDB:
 
-- **Legacy models**: `/app/models/models.py` (SQLAlchemy)
-- **Current models**: `/app/models/mongodb_models.py` (Beanie ODM)
+- **Legacy models**: `/backend/models/models.py` (SQLAlchemy)
+- **Current models**: `/backend/models/mongodb_models.py` (Beanie ODM)
 - **Migration scripts**: `/migrations/` directory
 - **Backup data**: `/migration_backup_*/` directories
 

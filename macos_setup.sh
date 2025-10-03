@@ -247,7 +247,7 @@ setup_frontend_dependencies() {
     
     # Admin frontend
     if [ -d "remotehive-admin" ]; then
-        cd remotehive-admin
+        cd admin-panel
         if [ -f "package.json" ]; then
             print_status "Installing admin frontend dependencies..."
             npm install
@@ -260,7 +260,7 @@ setup_frontend_dependencies() {
     
     # Public frontend
     if [ -d "remotehive-public" ]; then
-        cd remotehive-public
+        cd website
         if [ -f "package.json" ]; then
             print_status "Installing public frontend dependencies..."
             npm install
@@ -298,8 +298,8 @@ setup_environment_files() {
 
     
     # Admin frontend .env.local
-    if [ -d "remotehive-admin" ] && [ ! -f "remotehive-admin/.env.local" ]; then
-        cat > remotehive-admin/.env.local << EOF
+    if [ -d "remotehive-admin" ] && [ ! -f "admin-panel/.env.local" ]; then
+        cat > admin-panel/.env.local << EOF
 NEXT_PUBLIC_API_URL=http://localhost:8001
 NEXT_PUBLIC_FRONTEND_URL=http://localhost:3001
 NEXTAUTH_URL=http://localhost:3001
@@ -307,17 +307,17 @@ NEXTAUTH_SECRET=your_nextauth_secret_here
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 EOF
-        print_success "✓ Created remotehive-admin/.env.local"
+        print_success "✓ Created admin-panel/.env.local"
     fi
     
     # Public frontend .env.local
-    if [ -d "remotehive-public" ] && [ ! -f "remotehive-public/.env.local" ]; then
-        cat > remotehive-public/.env.local << EOF
+    if [ -d "remotehive-public" ] && [ ! -f "website/.env.local" ]; then
+        cat > website/.env.local << EOF
 VITE_API_URL=http://localhost:8001
 VITE_FRONTEND_URL=http://localhost:3002
 VITE_GOOGLE_MAPS_API_KEY=your_google_maps_key
 EOF
-        print_success "✓ Created remotehive-public/.env.local"
+        print_success "✓ Created website/.env.local"
     fi
     
     print_success "Environment files setup complete"
@@ -461,8 +461,8 @@ display_final_instructions() {
     echo "• View service logs: brew services list"
     echo
     echo -e "${YELLOW}Frontend Development:${NC}"
-    echo "• Admin frontend: cd remotehive-admin && npm run dev"
-    echo "• Public frontend: cd remotehive-public && npm run dev"
+    echo "• Admin frontend: cd admin-panel && npm run dev"
+    echo "• Public frontend: cd website && npm run dev"
     echo
     echo -e "${GREEN}Setup script completed successfully! 🚀${NC}"
 }

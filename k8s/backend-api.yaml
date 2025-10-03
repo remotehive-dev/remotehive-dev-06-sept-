@@ -122,9 +122,9 @@ spec:
               key: CLERK_SECRET_KEY
         volumeMounts:
         - name: logs
-          mountPath: /app/logs
+          mountPath: /backend/logs
         - name: uploads
-          mountPath: /app/uploads
+          mountPath: /backend/uploads
         resources:
           requests:
             memory: "512Mi"

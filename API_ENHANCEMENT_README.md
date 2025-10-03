@@ -45,7 +45,7 @@ This document describes the comprehensive API enhancements implemented for the R
 ## 📁 File Structure
 
 ```
-app/
+backend/
 ├── api/
 │   ├── documentation.py      # Enhanced API documentation
 │   ├── integration.py         # Comprehensive API integration
@@ -262,15 +262,15 @@ All responses include comprehensive security headers:
 
 ```bash
 # Run all API integration tests
-pytest app/tests/test_api_integration.py -v
+pytest backend/tests/test_api_integration.py -v
 
 # Run specific test categories
-pytest app/tests/test_api_integration.py::TestAPIVersioning -v
-pytest app/tests/test_api_integration.py::TestAPIValidation -v
-pytest app/tests/test_api_integration.py::TestAPISecurityHeaders -v
+pytest backend/tests/test_api_integration.py::TestAPIVersioning -v
+pytest backend/tests/test_api_integration.py::TestAPIValidation -v
+pytest backend/tests/test_api_integration.py::TestAPISecurityHeaders -v
 
 # Run with coverage
-pytest app/tests/test_api_integration.py --cov=app.api --cov=app.middleware --cov=app.schemas
+pytest backend/tests/test_api_integration.py --cov=app.api --cov=app.middleware --cov=app.schemas
 ```
 
 ### Test Categories

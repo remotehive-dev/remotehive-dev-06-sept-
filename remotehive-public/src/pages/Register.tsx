@@ -22,7 +22,7 @@ interface RegisterForm {
 
 const Register: React.FC = () => {
   const navigate = useNavigate()
-  const { signUp, loading } = useAuth()
+  const { signUp } = useAuth()
   
   const [step, setStep] = useState(1) // 1: Role Selection, 2: Account Details
   const [formData, setFormData] = useState<RegisterForm>({
@@ -140,11 +140,11 @@ const Register: React.FC = () => {
         
         // Small delay to show the toast before navigation
         setTimeout(() => {
-          // Redirect based on role
+          // Redirect based on role using new dashboard paths
           if (formData.role === 'employer') {
-            navigate('/employer/dashboard')
+            navigate('/dashboard/employer')
           } else if (formData.role === 'job_seeker') {
-            navigate('/jobseeker/dashboard')
+            navigate('/dashboard/jobseeker')
           } else {
             navigate('/')
           }
@@ -204,7 +204,7 @@ const Register: React.FC = () => {
                       ? 'border-blue-500 ring-4 ring-blue-100'
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
-                  onClick={() => setFormData(prev => ({ ...prev, role: option.value as 'jobseeker' | 'employer' }))}
+                  onClick={() => setFormData(prev => ({ ...prev, role: option.value as 'job_seeker' | 'employer' }))}
                 >
                   <div className="text-center mb-6">
                     <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-full p-4 w-16 h-16 mx-auto mb-4">
@@ -498,7 +498,13 @@ const Register: React.FC = () => {
 
           {/* Social Sign Up Options */}
           <div className="space-y-3">
-            <GoogleSignInButton />
+            <GoogleSignInButton 
+              role={formData.role}
+              onSuccess={() => {
+                // Success handling is done in GoogleCallback component
+              }}
+              onError={(error) => setError(error)}
+            />
             <LinkedInSignInButton />
             <SSOSignInButton />
           </div>

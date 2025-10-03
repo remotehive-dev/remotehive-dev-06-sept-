@@ -478,8 +478,8 @@ update_application_configs() {
     log "DEBUG" "Updating application configurations for $env environment"
     
     # Update frontend API configurations
-    local admin_api_config="$PROJECT_ROOT/remotehive-admin/src/lib/api.ts"
-    local public_api_config="$PROJECT_ROOT/remotehive-public/src/lib/api.ts"
+    local admin_api_config="$PROJECT_ROOT/admin-panel/src/lib/api.ts"
+    local public_api_config="$PROJECT_ROOT/website/src/lib/api.ts"
     
     if [[ -f "$admin_api_config" ]]; then
         # Update API base URL in admin panel

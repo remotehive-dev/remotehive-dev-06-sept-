@@ -25,12 +25,12 @@ class MLTestRunner:
         
         # Define all ML-related test files
         self.ml_test_files = [
-            "app/services/test_gemini_client.py",
-            "app/services/test_ml_parsing_service.py", 
-            "app/services/test_enhanced_scraper_manager.py",
-            "app/services/test_job_data_validator.py",
-            "app/services/test_ml_config_service.py",
-            "app/services/test_scraper_integration.py"
+            "backend/services/test_gemini_client.py",
+            "backend/services/test_ml_parsing_service.py", 
+            "backend/services/test_enhanced_scraper_manager.py",
+            "backend/services/test_job_data_validator.py",
+            "backend/services/test_ml_config_service.py",
+            "backend/services/test_scraper_integration.py"
         ]
         
         # Test categories for reporting
@@ -196,7 +196,7 @@ class MLTestRunner:
         for category, test_files in self.test_categories.items():
             category_tests = []
             for test_file in test_files:
-                full_path = f"app/services/{test_file}"
+                full_path = f"backend/services/{test_file}"
                 if full_path in self.test_results:
                     category_tests.append(self.test_results[full_path])
             

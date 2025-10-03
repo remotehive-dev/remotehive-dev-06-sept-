@@ -42,7 +42,7 @@ This document outlines a comprehensive plan to resolve all identified issues in 
 #### Implementation Steps:
 1. **Create requirements.txt**
    ```bash
-   # Location: /autoscraper-service/requirements.txt
+   # Location: /autoscraper-engine-api/requirements.txt
    ```
    - Add all necessary dependencies with version pinning
    - Include: FastAPI, uvicorn, SQLAlchemy, psycopg2-binary, redis, celery
@@ -85,9 +85,9 @@ This document outlines a comprehensive plan to resolve all identified issues in 
 1. **Create Environment Files**
    ```bash
    # Create files:
-   # /autoscraper-service/.env.development
-   # /autoscraper-service/.env.production
-   # /autoscraper-service/.env.example
+   # /autoscraper-engine-api/.env.development
+   # /autoscraper-engine-api/.env.production
+   # /autoscraper-engine-api/.env.example
    ```
 
 2. **Update Configuration Management**
@@ -121,7 +121,7 @@ This document outlines a comprehensive plan to resolve all identified issues in 
 1. **Set Up Alembic Migrations**
    ```bash
    # Initialize Alembic in autoscraper-service
-   cd autoscraper-service
+   cd autoscraper-engine-api
    alembic init alembic
    ```
    - Create initial migration for all models

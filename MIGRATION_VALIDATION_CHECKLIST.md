@@ -31,8 +31,8 @@ This checklist helps validate that your RemoteHive project has been successfully
 ### ✅ Complete Project Transfer
 - [ ] Copy entire project directory to macOS
 - [ ] Verify all subdirectories transferred:
-  - [ ] `remotehive-admin/` (Next.js admin panel)
-  - [ ] `remotehive-public/` (Vite public site)
+  - [ ] `admin-panel/` (Next.js admin panel)
+  - [ ] `website/` (Vite public site)
   - [ ] `database_migration/` (if exists)
   - [ ] `static/` and `uploads/` directories
 - [ ] Copy migration backup directory
@@ -65,8 +65,8 @@ This checklist helps validate that your RemoteHive project has been successfully
 - [ ] No critical package installation errors
 
 ### ✅ Node.js Environment
-- [ ] Admin frontend dependencies installed (`remotehive-admin/node_modules/`)
-- [ ] Public frontend dependencies installed (`remotehive-public/node_modules/`)
+- [ ] Admin frontend dependencies installed (`admin-panel/node_modules/`)
+- [ ] Public frontend dependencies installed (`website/node_modules/`)
 - [ ] Root dependencies installed (if applicable)
 - [ ] No critical npm installation errors
 
@@ -133,7 +133,7 @@ This checklist helps validate that your RemoteHive project has been successfully
 - [ ] API documentation accessible
 
 ### ✅ Admin Frontend (Next.js)
-- [ ] Navigate to `remotehive-admin/` directory
+- [ ] Navigate to `admin-panel/` directory
 - [ ] Install dependencies: `npm install` (if not done)
 - [ ] Start development server: `npm run dev`
 - [ ] Admin panel loads at `http://localhost:3001`
@@ -144,7 +144,7 @@ This checklist helps validate that your RemoteHive project has been successfully
 - [ ] Forms and interactions work
 
 ### ✅ Public Frontend (Vite)
-- [ ] Navigate to `remotehive-public/` directory
+- [ ] Navigate to `website/` directory
 - [ ] Install dependencies: `npm install` (if not done)
 - [ ] Start development server: `npm run dev`
 - [ ] Public site loads at `http://localhost:3002`

@@ -131,11 +131,11 @@ class ServiceIntegrationValidator:
         
         # Files that should be updated to use centralized JWT
         files_to_check = [
-            ("app/core/auth.py", "Main service auth.py"),
-            ("app/core/local_auth.py", "Main service local_auth.py"),
-            ("app/core/security.py", "Main service security.py"),
-            ("app/core/deps.py", "Main service deps.py"),
-            ("autoscraper-service/app/middleware/auth.py", "Autoscraper service auth middleware")
+            ("backend/core/auth.py", "Main service auth.py"),
+            ("backend/core/local_auth.py", "Main service local_auth.py"),
+            ("backend/core/security.py", "Main service security.py"),
+            ("backend/core/deps.py", "Main service deps.py"),
+            ("autoscraper-engine-api/backend/middleware/auth.py", "Autoscraper service auth middleware")
         ]
         
         for file_path, description in files_to_check:

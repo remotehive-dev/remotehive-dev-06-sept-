@@ -254,19 +254,19 @@ sequenceDiagram
 ## Implementation Files
 
 ### Core Authentication Files
-- `app/core/auth.py` - Authentication logic
-- `app/core/database.py` - Database connections
-- `app/schemas/user.py` - User data models
+- `backend/core/auth.py` - Authentication logic
+- `backend/core/database.py` - Database connections
+- `backend/schemas/user.py` - User data models
 - `comprehensive_auth_roles_table.sql` - Database schema
 
 ### Configuration Files
-- `app/core/config.py` - Environment settings
-- `app/core/security.py` - Security utilities
+- `backend/core/config.py` - Environment settings
+- `backend/core/security.py` - Security utilities
 
 ### API Endpoints
-- `app/api/auth.py` - Authentication endpoints
-- `app/api/users.py` - User management
-- `app/api/admin.py` - Admin operations
+- `backend/api/auth.py` - Authentication endpoints
+- `backend/api/users.py` - User management
+- `backend/api/admin.py` - Admin operations
 
 ## Troubleshooting Common Issues
 

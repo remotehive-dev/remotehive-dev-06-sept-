@@ -144,15 +144,15 @@ docker build -t ${REGISTRY_URL}/remotehive-backend:${TAG} -f Dockerfile .
 docker push ${REGISTRY_URL}/remotehive-backend:${TAG}
 
 # Autoscraper Service
-docker build -t ${REGISTRY_URL}/remotehive-autoscraper:${TAG} -f autoscraper-service/Dockerfile ./autoscraper-service
+docker build -t ${REGISTRY_URL}/remotehive-autoscraper:${TAG} -f autoscraper-engine-api/Dockerfile ./autoscraper-service
 docker push ${REGISTRY_URL}/remotehive-autoscraper:${TAG}
 
 # Admin Panel
-docker build -t ${REGISTRY_URL}/remotehive-admin:${TAG} -f remotehive-admin/Dockerfile ./remotehive-admin
+docker build -t ${REGISTRY_URL}/remotehive-admin:${TAG} -f admin-panel/Dockerfile ./remotehive-admin
 docker push ${REGISTRY_URL}/remotehive-admin:${TAG}
 
 # Public Website
-docker build -t ${REGISTRY_URL}/remotehive-public:${TAG} -f remotehive-public/Dockerfile ./remotehive-public
+docker build -t ${REGISTRY_URL}/remotehive-public:${TAG} -f website/Dockerfile ./remotehive-public
 docker push ${REGISTRY_URL}/remotehive-public:${TAG}
 ```
 

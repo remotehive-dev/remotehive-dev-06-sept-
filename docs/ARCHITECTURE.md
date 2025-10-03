@@ -70,7 +70,7 @@ RemoteHive is a modern, scalable job board platform built with a microservices a
 
 **Service Structure**:
 ```
-app/
+backend/
 ├── main.py                 # FastAPI application entry point
 ├── config.py              # Configuration management
 ├── api/                   # API layer
@@ -130,8 +130,8 @@ app/
 
 **Service Structure**:
 ```
-autoscraper-service/
-├── app/
+autoscraper-engine-api/
+├── backend/
 │   ├── main.py           # FastAPI application
 │   ├── config.py         # Configuration
 │   ├── models/           # SQLAlchemy models
@@ -176,9 +176,9 @@ autoscraper-service/
 
 **Application Structure**:
 ```
-remotehive-admin/
+admin-panel/
 ├── src/
-│   ├── app/              # Next.js App Router
+│   ├── backend/              # Next.js App Router
 │   │   ├── layout.tsx    # Root layout
 │   │   ├── page.tsx      # Dashboard page
 │   │   ├── login/        # Authentication pages
@@ -228,7 +228,7 @@ remotehive-admin/
 
 **Application Structure**:
 ```
-remotehive-public/
+website/
 ├── src/
 │   ├── components/       # Reusable components
 │   │   ├── common/      # Common UI components

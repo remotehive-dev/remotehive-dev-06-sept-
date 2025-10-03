@@ -300,7 +300,7 @@ class AlertFrequency(str, Enum):
 
 ## SQLite Schema (Autoscraper Service)
 
-**Location**: `/autoscraper-service/app.db`
+**Location**: `/autoscraper-engine-api/app.db`
 **ORM**: SQLAlchemy
 
 ### Tables
@@ -602,7 +602,7 @@ mongodump --uri="mongodb://localhost:27017/remotehive" --out=/backups/mongodb/$(
 ### SQLite Backup
 ```bash
 # Backup autoscraper database
-cp autoscraper-service/app.db /backups/sqlite/app_$(date +%Y%m%d).db
+cp autoscraper-engine-api/app.db /backups/sqlite/app_$(date +%Y%m%d).db
 ```
 
 ### Redis Backup

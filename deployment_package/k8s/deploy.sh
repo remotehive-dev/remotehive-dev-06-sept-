@@ -64,17 +64,17 @@ build_and_push_images() {
     
     # Build Autoscraper Service
     print_status "Building Autoscraper Service image..."
-    docker build -t ${DOCKER_REGISTRY}/autoscraper-service:${IMAGE_TAG} ./autoscraper-service/
+    docker build -t ${DOCKER_REGISTRY}/autoscraper-service:${IMAGE_TAG} ./autoscraper-engine-api/
     docker push ${DOCKER_REGISTRY}/autoscraper-service:${IMAGE_TAG}
     
     # Build Admin Panel
     print_status "Building Admin Panel image..."
-    docker build -t ${DOCKER_REGISTRY}/admin-panel:${IMAGE_TAG} ./remotehive-admin/
+    docker build -t ${DOCKER_REGISTRY}/admin-panel:${IMAGE_TAG} ./admin-panel/
     docker push ${DOCKER_REGISTRY}/admin-panel:${IMAGE_TAG}
     
     # Build Public Website
     print_status "Building Public Website image..."
-    docker build -t ${DOCKER_REGISTRY}/public-website:${IMAGE_TAG} ./remotehive-public/
+    docker build -t ${DOCKER_REGISTRY}/public-website:${IMAGE_TAG} ./website/
     docker push ${DOCKER_REGISTRY}/public-website:${IMAGE_TAG}
     
     print_success "All images built and pushed successfully"

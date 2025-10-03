@@ -12,9 +12,9 @@ RemoteHive is a comprehensive job platform consisting of multiple interconnected
 
 ```
 RemoteHive_Migration_Package/
-├── app/                          # FastAPI Backend API
-├── remotehive-public/            # React Public Website
-├── remotehive-admin/             # Next.js Admin Panel
+├── backend/                          # FastAPI Backend API
+├── website/            # React Public Website
+├── admin-panel/             # Next.js Admin Panel
 ├── database_migration/           # Database migration scripts
 ├── supabase/                     # Supabase configuration
 └── [Configuration & Scripts]     # Various setup and utility files
@@ -25,12 +25,12 @@ RemoteHive_Migration_Package/
 ### Core Components
 
 #### Application Structure
-- **Main Entry**: `app/main.py` - FastAPI application instance with CORS configuration
-- **API Router**: `app/api/v1/api.py` - Central router integrating all endpoint modules
-- **Configuration**: `app/core/config.py` - Centralized settings management
-- **Database**: `app/core/database.py` - SQLAlchemy database connection and session management
+- **Main Entry**: `backend/main.py` - FastAPI application instance with CORS configuration
+- **API Router**: `backend/api/v1/api.py` - Central router integrating all endpoint modules
+- **Configuration**: `backend/core/config.py` - Centralized settings management
+- **Database**: `backend/core/database.py` - SQLAlchemy database connection and session management
 
-#### Key Models (`app/models/`)
+#### Key Models (`backend/models/`)
 - **User Management**: `user.py`, `employer.py`, `job_seeker.py`
 - **Job System**: `job.py`, `application.py`, `company.py`
 - **Content Management**: `cms.py`, `website_page.py`
@@ -38,7 +38,7 @@ RemoteHive_Migration_Package/
 - **Analytics**: `analytics.py`, `admin_log.py`
 - **ML Integration**: `ml_training.py`, `scraper_memory.py`
 
-#### API Endpoints (`app/api/v1/endpoints/`)
+#### API Endpoints (`backend/api/v1/endpoints/`)
 - **Authentication**: Local RBAC (`auth_endpoints.py`) + Clerk integration (`clerk_auth_endpoints.py`)
 - **User Management**: `users.py`, `employers.py`, `job_seekers.py`
 - **Job Management**: `jobs.py`, `applications.py`, `companies.py`
@@ -49,7 +49,7 @@ RemoteHive_Migration_Package/
 - **Location Services**: `location.py`
 - **Notifications**: `notifications.py`
 
-#### Services (`app/services/`)
+#### Services (`backend/services/`)
 - **Authentication**: `auth_service.py`, `clerk_service.py`
 - **Job Processing**: `job_service.py`, `job_quality_service.py`
 - **ML Integration**: `ml_service.py`, `ml_integration_runner.py`
@@ -68,7 +68,7 @@ RemoteHive_Migration_Package/
 
 ## Frontend Architecture
 
-### Public Website (`remotehive-public/`)
+### Public Website (`website/`)
 
 #### Technology Stack
 - **Framework**: React 19.1.0 with Vite
@@ -84,7 +84,7 @@ RemoteHive_Migration_Package/
 - **AuthContext.tsx**: Authentication state management
 - **Pages**: Job listings, employer dashboard, job seeker profiles
 
-### Admin Panel (`remotehive-admin/`)
+### Admin Panel (`admin-panel/`)
 
 #### Technology Stack
 - **Framework**: Next.js 15.4.1 with React 19.1.0

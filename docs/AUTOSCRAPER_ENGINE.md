@@ -1570,12 +1570,12 @@ services:
     ports:
       - "8001:8001"
     environment:
-      - AUTOSCRAPER_DB_PATH=/app/data/autoscraper.db
+      - AUTOSCRAPER_DB_PATH=/backend/data/autoscraper.db
       - MAIN_API_BASE_URL=http://main-api:8000
       - LOG_LEVEL=INFO
     volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs
+      - ./data:/backend/data
+      - ./logs:/backend/logs
     depends_on:
       - redis
     restart: unless-stopped
@@ -1638,7 +1638,7 @@ spec:
         - containerPort: 8001
         env:
         - name: AUTOSCRAPER_DB_PATH
-          value: "/app/data/autoscraper.db"
+          value: "/backend/data/autoscraper.db"
         - name: MAIN_API_BASE_URL
           value: "http://main-api-service:8000"
         - name: REDIS_URL
@@ -1652,7 +1652,7 @@ spec:
             cpu: "1000m"
         volumeMounts:
         - name: data-volume
-          mountPath: /app/data
+          mountPath: /backend/data
         livenessProbe:
           httpGet:
             path: /health

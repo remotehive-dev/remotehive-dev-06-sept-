@@ -89,8 +89,8 @@ services:
     networks:
       - remotehive-network
     volumes:
-      - ./logs:/app/logs
-      - ./uploads:/app/uploads
+      - ./logs:/backend/logs
+      - ./uploads:/backend/uploads
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -116,7 +116,7 @@ services:
     restart: unless-stopped
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-production}
-      - DATABASE_URL=sqlite:///app/data/autoscraper.db
+      - DATABASE_URL=sqlite:///backend/data/autoscraper.db
       - REDIS_URL=redis://:${REDIS_PASSWORD:-redis123}@redis:6379/1
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - SCRAPER_DELAY=${SCRAPER_DELAY:-5}
@@ -130,8 +130,8 @@ services:
     networks:
       - remotehive-network
     volumes:
-      - ./autoscraper-service/data:/app/data
-      - ./logs:/app/logs
+      - ./autoscraper-engine-api/data:/backend/data
+      - ./logs:/backend/logs
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
       interval: 30s
@@ -234,7 +234,7 @@ services:
       - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-redis123}@redis:6379/0
       - CELERY_WORKER_CONCURRENCY=${CELERY_WORKER_CONCURRENCY:-4}
     volumes:
-      - ./logs:/app/logs
+      - ./logs:/backend/logs
     networks:
       - remotehive-network
     depends_on:
@@ -273,8 +273,8 @@ services:
       - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-redis123}@redis:6379/0
       - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-redis123}@redis:6379/0
     volumes:
-      - ./logs:/app/logs
-      - celery_beat_data:/app/celerybeat-schedule
+      - ./logs:/backend/logs
+      - celery_beat_data:/backend/celerybeat-schedule
     networks:
       - remotehive-network
     depends_on:
@@ -284,7 +284,7 @@ services:
         condition: service_healthy
     command: celery -A app.tasks.celery_app beat --loglevel=info
     healthcheck:
-      test: ["CMD", "test", "-f", "/app/celerybeat-schedule"]
+      test: ["CMD", "test", "-f", "/backend/celerybeat-schedule"]
       interval: 60s
       timeout: 10s
       retries: 3

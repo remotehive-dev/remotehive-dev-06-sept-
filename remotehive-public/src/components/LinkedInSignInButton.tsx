@@ -19,8 +19,8 @@ const LinkedInSignInButton: React.FC<LinkedInSignInButtonProps> = ({
     try {
       setIsLoading(true)
       
-      // LinkedIn OAuth URL
-      const linkedInAuthUrl = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${import.meta.env.VITE_LINKEDIN_CLIENT_ID}&redirect_uri=${encodeURIComponent(window.location.origin + '/auth/linkedin/callback')}&scope=r_liteprofile r_emailaddress`
+      // LinkedIn OAuth URL with modern API v2 scopes
+      const linkedInAuthUrl = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${import.meta.env.VITE_LINKEDIN_CLIENT_ID}&redirect_uri=${encodeURIComponent(window.location.origin + '/auth/linkedin/callback')}&scope=openid profile email`
       
       // Open LinkedIn OAuth in a popup
       const popup = window.open(

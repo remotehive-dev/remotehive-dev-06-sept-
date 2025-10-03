@@ -368,15 +368,15 @@ build_images() {
     
     # Build autoscraper image
     log_debug "Building autoscraper image..."
-    docker build -t "${REGISTRY}remotehive-autoscraper:${TAG}" -f autoscraper-service/Dockerfile autoscraper-service/
+    docker build -t "${REGISTRY}remotehive-autoscraper:${TAG}" -f autoscraper-engine-api/Dockerfile autoscraper-engine-api/
     
     # Build admin image
     log_debug "Building admin image..."
-    docker build -t "${REGISTRY}remotehive-admin:${TAG}" -f remotehive-admin/Dockerfile remotehive-admin/
+    docker build -t "${REGISTRY}remotehive-admin:${TAG}" -f admin-panel/Dockerfile admin-panel/
     
     # Build public image
     log_debug "Building public image..."
-    docker build -t "${REGISTRY}remotehive-public:${TAG}" -f remotehive-public/Dockerfile remotehive-public/
+    docker build -t "${REGISTRY}remotehive-public:${TAG}" -f website/Dockerfile website/
     
     log_success "Docker images built successfully"
 }
@@ -430,15 +430,15 @@ run_tests() {
     
     # Run frontend tests
     log_debug "Running admin panel tests..."
-    if [[ -f "remotehive-admin/package.json" ]]; then
-        cd remotehive-admin
+    if [[ -f "admin-panel/package.json" ]]; then
+        cd admin-panel
         npm test -- --watchAll=false
         cd ..
     fi
     
     log_debug "Running public website tests..."
-    if [[ -f "remotehive-public/package.json" ]]; then
-        cd remotehive-public
+    if [[ -f "website/package.json" ]]; then
+        cd website
         npm test -- --watchAll=false
         cd ..
     fi

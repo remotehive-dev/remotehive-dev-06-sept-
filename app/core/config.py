@@ -144,7 +144,7 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
     
     # Service URLs and Health Endpoints
-    AUTOSCRAPER_SERVICE_URL: str = os.getenv("AUTOSCRAPER_SERVICE_URL", "http://localhost:8003")
+    AUTOSCRAPER_SERVICE_URL: str = os.getenv("AUTOSCRAPER_SERVICE_URL", "http://localhost:8001")
     AUTOSCRAPER_SERVICE_HEALTH_ENDPOINT: str = os.getenv("AUTOSCRAPER_SERVICE_HEALTH_ENDPOINT", "/health")
     ADMIN_SERVICE_URL: str = os.getenv("ADMIN_SERVICE_URL", "http://localhost:8002")
     ADMIN_SERVICE_HEALTH_ENDPOINT: str = os.getenv("ADMIN_SERVICE_HEALTH_ENDPOINT", "/health")

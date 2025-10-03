@@ -1018,7 +1018,7 @@ spec:
         - name: ENVIRONMENT
           value: "$ENVIRONMENT"
         - name: DATABASE_URL
-          value: "sqlite:///app/scraper.db"
+          value: "sqlite:///backend/scraper.db"
         livenessProbe:
           httpGet:
             path: /health

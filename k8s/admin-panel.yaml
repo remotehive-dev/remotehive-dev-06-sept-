@@ -75,7 +75,7 @@ spec:
               key: ADMIN_URL
         volumeMounts:
         - name: logs
-          mountPath: /app/logs
+          mountPath: /backend/logs
         resources:
           requests:
             memory: "256Mi"

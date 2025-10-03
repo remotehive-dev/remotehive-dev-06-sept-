@@ -68,11 +68,11 @@ cp -r app ./deployment_package/
 
 # Copy frontend directories excluding node_modules
 if [ -d "remotehive-admin" ]; then
-    rsync -av --exclude='node_modules' --exclude='.next' --exclude='dist' remotehive-admin/ ./deployment_package/remotehive-admin/
+    rsync -av --exclude='node_modules' --exclude='.next' --exclude='dist' admin-panel/ ./deployment_package/admin-panel/
 fi
 
 if [ -d "remotehive-public" ]; then
-    rsync -av --exclude='node_modules' --exclude='dist' --exclude='build' remotehive-public/ ./deployment_package/remotehive-public/
+    rsync -av --exclude='node_modules' --exclude='dist' --exclude='build' website/ ./deployment_package/website/
 fi
 
 cp -r k8s ./deployment_package/

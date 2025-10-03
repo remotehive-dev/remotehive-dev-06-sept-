@@ -308,15 +308,15 @@ build_images() {
     
     # Build autoscraper service image
     print_status "Building autoscraper image..."
-    docker build -t "${DOCKER_REGISTRY}/autoscraper:${IMAGE_TAG}" ./autoscraper-service/
+    docker build -t "${DOCKER_REGISTRY}/autoscraper:${IMAGE_TAG}" ./autoscraper-engine-api/
     
     # Build admin panel image
     print_status "Building admin panel image..."
-    docker build -t "${DOCKER_REGISTRY}/admin:${IMAGE_TAG}" ./remotehive-admin/
+    docker build -t "${DOCKER_REGISTRY}/admin:${IMAGE_TAG}" ./admin-panel/
     
     # Build public website image
     print_status "Building public website image..."
-    docker build -t "${DOCKER_REGISTRY}/public:${IMAGE_TAG}" ./remotehive-public/
+    docker build -t "${DOCKER_REGISTRY}/public:${IMAGE_TAG}" ./website/
     
     print_success "All images built successfully"
 }
@@ -363,17 +363,17 @@ run_tests() {
     fi
     
     # Run Node.js tests for admin panel
-    if [[ -d "remotehive-admin" && -f "remotehive-admin/package.json" ]]; then
+    if [[ -d "remotehive-admin" && -f "admin-panel/package.json" ]]; then
         print_status "Running admin panel tests..."
-        cd remotehive-admin
+        cd admin-panel
         npm test -- --watchAll=false
         cd ..
     fi
     
     # Run Node.js tests for public website
-    if [[ -d "remotehive-public" && -f "remotehive-public/package.json" ]]; then
+    if [[ -d "remotehive-public" && -f "website/package.json" ]]; then
         print_status "Running public website tests..."
-        cd remotehive-public
+        cd website
         npm test -- --watchAll=false
         cd ..
     fi

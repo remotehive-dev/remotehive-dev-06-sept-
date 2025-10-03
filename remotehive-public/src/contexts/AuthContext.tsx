@@ -7,7 +7,7 @@ interface AuthContextType {
   loading: boolean
   isAuthenticated: boolean
   signUp: (data: SignUpData) => Promise<void>
-  signIn: (data: SignInData) => Promise<User>
+  signIn: (email: string, password: string) => Promise<User>
   signInWithGoogle: (data: GoogleAuthData) => Promise<User>
   signInWithLinkedIn: (data: LinkedInAuthData) => Promise<User>
   signInWithSSO: (data: SSOAuthData) => Promise<User>
@@ -78,8 +78,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setLoading(true)
       const response = await authAPI.signUp(data)
-      setUser(response.user)
-      toast.success('Account created successfully!')
+      
+      if (response.success && response.data) {
+        setUser(response.data.user)
+        toast.success('Account created successfully!')
+      } else {
+        throw new Error(response.error || 'Registration failed')
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create account'
       toast.error(message)
@@ -89,13 +94,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }
 
-  const signIn = async (data: SignInData) => {
+  const signIn = async (email: string, password: string) => {
     try {
       setLoading(true)
-      const response = await authAPI.signIn(data)
-      setUser(response.user)
-      toast.success('Signed in successfully!')
-      return response.user
+      const response = await authAPI.signIn({ email, password })
+      
+      if (response.success && response.data) {
+        setUser(response.data.user)
+        toast.success('Signed in successfully!')
+        return response.data.user
+      } else {
+        throw new Error(response.error || 'Login failed')
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to sign in'
       toast.error(message)
@@ -108,10 +118,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const signInWithGoogle = async (data: GoogleAuthData) => {
     try {
       setLoading(true)
-      const response = await authAPI.signInWithGoogle(data)
-      setUser(response.user)
+      const user = await authAPI.signInWithGoogle(data)
+      setUser(user)
       toast.success('Signed in with Google successfully!')
-      return response.user
+      return user
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to sign in with Google'
       toast.error(message)
@@ -124,10 +134,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const signInWithLinkedIn = async (data: LinkedInAuthData) => {
     try {
       setLoading(true)
-      const response = await authAPI.signInWithLinkedIn(data)
-      setUser(response.user)
+      const user = await authAPI.signInWithLinkedIn(data)
+      setUser(user)
       toast.success('Signed in with LinkedIn successfully!')
-      return response.user
+      return user
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to sign in with LinkedIn'
       toast.error(message)

@@ -96,7 +96,7 @@ LINKEDIN_API_KEY=your_linkedin_api_key
 ### Frontend Environment Files
 
 #### Admin Frontend (`.env.local`)
-Location: `remotehive-admin/.env.local`
+Location: `admin-panel/.env.local`
 
 ```bash
 # Next.js Configuration
@@ -111,7 +111,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
 #### Public Frontend (`.env.local`)
-Location: `remotehive-public/.env.local`
+Location: `website/.env.local`
 
 ```bash
 # Vite Configuration
@@ -152,7 +152,7 @@ scikit-learn==1.3.2
 
 ### Frontend Dependencies
 
-#### Admin Frontend (`remotehive-admin/package.json`)
+#### Admin Frontend (`admin-panel/package.json`)
 ```json
 {
   "dependencies": {
@@ -171,7 +171,7 @@ scikit-learn==1.3.2
 }
 ```
 
-#### Public Frontend (`remotehive-public/package.json`)
+#### Public Frontend (`website/package.json`)
 ```json
 {
   "dependencies": {
@@ -225,8 +225,8 @@ LOG_FILE=logs/application.log
 ```bash
 # Set appropriate permissions for environment files
 chmod 600 .env
-chmod 600 remotehive-admin/.env.local
-chmod 600 remotehive-public/.env.local
+chmod 600 admin-panel/.env.local
+chmod 600 website/.env.local
 ```
 
 ## Migration Checklist

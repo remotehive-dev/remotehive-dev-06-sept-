@@ -14,20 +14,20 @@ RemoteHive is a comprehensive job board platform with a microservices architectu
 1. **Main Backend API** (Port 8000)
    - FastAPI application with MongoDB
    - Authentication, user management, job management
-   - Location: `/app/main.py`
+   - Location: `/backend/main.py`
 
 2. **Autoscraper Service** (Port 8001)
    - Independent FastAPI service for job scraping
    - SQLite database for scraper data
-   - Location: `/autoscraper-service/`
+   - Location: `/autoscraper-engine-api/`
 
 3. **Admin Panel** (Port 3000)
    - Next.js application for administrative tasks
-   - Location: `/remotehive-admin/`
+   - Location: `/admin-panel/`
 
 4. **Public Website** (Port 5173)
    - React + Vite application for job seekers and employers
-   - Location: `/remotehive-public/`
+   - Location: `/website/`
 
 5. **Background Services**
    - Redis (Port 6379)
@@ -56,9 +56,9 @@ RemoteHive is a comprehensive job board platform with a microservices architectu
 
 ### 2. File Structure Navigation
 
-#### Backend (`/app/`)
+#### Backend (`/backend/`)
 ```
-app/
+backend/
 ├── main.py                 # FastAPI application entry
 ├── config.py              # Configuration settings
 ├── api/                   # API endpoints
@@ -76,13 +76,13 @@ app/
 
 #### Frontend Applications
 ```
-remotehive-admin/         # Next.js Admin Panel
+admin-panel/         # Next.js Admin Panel
 ├── src/
 │   ├── lib/api.ts       # API service layer
 │   ├── components/      # React components
 │   └── pages/          # Next.js pages
 
-remotehive-public/        # React Public Website
+website/        # React Public Website
 ├── src/
 │   ├── lib/            # API and utility functions
 │   ├── components/     # React components
@@ -101,18 +101,18 @@ remotehive-public/        # React Public Website
    
    # 2. Start main backend
    cd /path/to/project
-   uvicorn app.main:app --reload --port 8000
+   uvicorn backend.main:app --reload --port 8000
    
    # 3. Start autoscraper service
-   cd autoscraper-service
-   uvicorn app.main:app --reload --port 8001
+   cd autoscraper-engine-api
+   uvicorn backend.main:app --reload --port 8001
    
    # 4. Start admin panel
-   cd remotehive-admin
+   cd admin-panel
    npm run dev
    
    # 5. Start public website
-   cd remotehive-public
+   cd website
    npm run dev
    
    # 6. Start background workers
@@ -152,8 +152,8 @@ remotehive-public/        # React Public Website
 - **Problem**: 401 Unauthorized errors between services
 - **Solution**: Verify API URLs in frontend configuration files
 - **Files to check**: 
-  - `/remotehive-admin/src/lib/api.ts`
-  - `/remotehive-public/src/lib/api.ts`
+  - `/admin-panel/src/lib/api.ts`
+  - `/website/src/lib/api.ts`
 
 #### Database Connection Issues
 - **MongoDB**: Check connection string in `.env`
@@ -247,18 +247,18 @@ SMTP_PASSWORD=your-password
 ### 10. Key Files Reference
 
 #### Configuration Files
-- `/app/config.py` - Main backend configuration
-- `/app/main.py` - FastAPI application setup
-- `/remotehive-admin/src/lib/api.ts` - Admin panel API configuration
-- `/remotehive-public/src/lib/api.ts` - Public website API configuration
+- `/backend/config.py` - Main backend configuration
+- `/backend/main.py` - FastAPI application setup
+- `/admin-panel/src/lib/api.ts` - Admin panel API configuration
+- `/website/src/lib/api.ts` - Public website API configuration
 
 #### Database Models
-- `/app/models/mongodb_models.py` - MongoDB models
-- `/app/database/database.py` - Database initialization
+- `/backend/models/mongodb_models.py` - MongoDB models
+- `/backend/database/database.py` - Database initialization
 
 #### API Endpoints
-- `/app/api/api.py` - Main API router
-- `/app/api/endpoints/` - Individual endpoint modules
+- `/backend/api/api.py` - Main API router
+- `/backend/api/endpoints/` - Individual endpoint modules
 
 #### Startup Scripts
 - `/fixed_startup.py` - Comprehensive service startup

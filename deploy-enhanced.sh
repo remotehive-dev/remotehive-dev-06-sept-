@@ -384,21 +384,21 @@ build_images() {
     
     # Build autoscraper service
     log_info "Building autoscraper-service image..."
-    docker build -t "${REGISTRY}/${IMAGE_PREFIX}-autoscraper-service:${IMAGE_TAG}" autoscraper-service/ || {
+    docker build -t "${REGISTRY}/${IMAGE_PREFIX}-autoscraper-service:${IMAGE_TAG}" autoscraper-engine-api/ || {
         log_error "Failed to build autoscraper-service image"
         exit 1
     }
     
     # Build admin panel
     log_info "Building admin-panel image..."
-    docker build -t "${REGISTRY}/${IMAGE_PREFIX}-admin-panel:${IMAGE_TAG}" remotehive-admin/ || {
+    docker build -t "${REGISTRY}/${IMAGE_PREFIX}-admin-panel:${IMAGE_TAG}" admin-panel/ || {
         log_error "Failed to build admin-panel image"
         exit 1
     }
     
     # Build public website
     log_info "Building public-website image..."
-    docker build -t "${REGISTRY}/${IMAGE_PREFIX}-public-website:${IMAGE_TAG}" remotehive-public/ || {
+    docker build -t "${REGISTRY}/${IMAGE_PREFIX}-public-website:${IMAGE_TAG}" website/ || {
         log_error "Failed to build public-website image"
         exit 1
     }
@@ -761,9 +761,9 @@ run_tests() {
     log_info "Running integration tests..."
     
     # Backend tests
-    if [[ -f "pytest.ini" ]] && [[ -d "app/tests" ]]; then
+    if [[ -f "pytest.ini" ]] && [[ -d "backend/tests" ]]; then
         log_info "Running backend tests..."
-        python -m pytest app/tests/ -v --tb=short || {
+        python -m pytest backend/tests/ -v --tb=short || {
             log_error "Backend tests failed"
             if [[ "$FORCE" != "true" ]]; then
                 exit 1
@@ -773,7 +773,7 @@ run_tests() {
     
     # Frontend tests
     for frontend_app in "remotehive-admin" "remotehive-public"; do
-        if [[ -d "$frontend_app" ]] && [[ -f "$frontend_app/package.json" ]]; then
+        if [[ -d "$frontend_app" ]] && [[ -f "$frontend_backend/package.json" ]]; then
             log_info "Running tests for $frontend_app..."
             (cd "$frontend_app" && npm test -- --watchAll=false) || {
                 log_error "Tests failed for $frontend_app"

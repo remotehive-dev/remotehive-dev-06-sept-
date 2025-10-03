@@ -6,7 +6,7 @@ This document outlines the comprehensive security enhancements implemented in th
 
 ## Security Features Implemented
 
-### 1. Security Middleware (`app/middleware/security.py`)
+### 1. Security Middleware (`backend/middleware/security.py`)
 
 A comprehensive security middleware that provides multiple layers of protection:
 
@@ -37,7 +37,7 @@ class SecurityConfig:
     ]
 ```
 
-### 2. Input Validation System (`app/core/validation.py`)
+### 2. Input Validation System (`backend/core/validation.py`)
 
 Advanced input validation with security-focused checks:
 
@@ -61,7 +61,7 @@ class UserModel(SecureBaseModel):
     name: str
 ```
 
-### 3. Security Configuration (`app/core/config.py`)
+### 3. Security Configuration (`backend/core/config.py`)
 
 Centralized security configuration with environment variable support:
 
@@ -95,7 +95,7 @@ CSP_ENABLED = True
 CSP_REPORT_URI = "/api/v1/security/csp-report"
 ```
 
-### 4. Security API Endpoints (`app/api/v1/security.py`)
+### 4. Security API Endpoints (`backend/api/v1/security.py`)
 
 Dedicated endpoints for security monitoring and reporting:
 

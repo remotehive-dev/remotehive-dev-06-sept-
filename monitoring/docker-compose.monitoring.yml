@@ -311,7 +311,7 @@ services:
     ports:
       - "3002:3001"
     volumes:
-      - uptime_kuma_data:/app/data
+      - uptime_kuma_data:/backend/data
     networks:
       - monitoring
       - remotehive-network

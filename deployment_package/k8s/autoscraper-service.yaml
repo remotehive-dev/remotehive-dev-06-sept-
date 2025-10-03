@@ -76,7 +76,7 @@ spec:
               name: remotehive-config
               key: SCRAPER_MAX_RETRIES
         - name: DATABASE_URL
-          value: "sqlite:///app/data/autoscraper.db"
+          value: "sqlite:///backend/data/autoscraper.db"
         - name: BACKEND_API_URL
           value: "http://backend-api:8000"
         - name: JWT_SECRET_KEY
@@ -86,9 +86,9 @@ spec:
               key: JWT_SECRET_KEY
         volumeMounts:
         - name: autoscraper-storage
-          mountPath: /app/data
+          mountPath: /backend/data
         - name: logs
-          mountPath: /app/logs
+          mountPath: /backend/logs
         - name: playwright-cache
           mountPath: /home/appuser/.cache/ms-playwright
         resources:

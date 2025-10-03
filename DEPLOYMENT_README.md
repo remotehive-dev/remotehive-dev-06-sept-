@@ -260,14 +260,14 @@ pytest tests/ --cov=app --cov-report=html
 
 ```bash
 # Format code
-black app/ tests/
-isort app/ tests/
+black backend/ tests/
+isort backend/ tests/
 
 # Lint code
-flake8 app/ tests/
+flake8 backend/ tests/
 
 # Security scan
-bandit -r app/
+bandit -r backend/
 ```
 
 ## 🔧 Configuration
@@ -376,7 +376,7 @@ docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
   aquasec/trivy image remotehive-backend:latest
 
 # Security linting
-bandit -r app/
+bandit -r backend/
 
 # Dependency scanning
 safety check

@@ -88,7 +88,7 @@ filebeat.inputs:
   enabled: false
   paths:
     - /var/log/remotehive/*.log
-    - /app/logs/*.log
+    - /backend/logs/*.log
   fields:
     service: "remotehive"
     log_type: "application"

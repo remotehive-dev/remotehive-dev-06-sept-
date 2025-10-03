@@ -43,7 +43,7 @@ The AutoScraper service is configured in `start_remotehive_macos.py` with the fo
 ```python
 "autoscraper_service": {
     "port": 8001,
-    "command": "uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload",
+    "command": "uvicorn backend.main:app --host 0.0.0.0 --port 8001 --reload",
     "cwd": "autoscraper-service",
     "health_url": "http://localhost:8001/health",
     "name": "AutoScraper Service",
@@ -82,12 +82,12 @@ For development or debugging, you can start the service manually:
 
 ```bash
 # Using the dedicated startup script
-cd autoscraper-service/scripts
+cd autoscraper-engine-api/scripts
 python startup.py
 
 # Or directly with uvicorn
-cd autoscraper-service
-uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+cd autoscraper-engine-api
+uvicorn backend.main:app --host 0.0.0.0 --port 8001 --reload
 ```
 
 ### Service Management
@@ -95,7 +95,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
 Use the service manager for operational control:
 
 ```bash
-cd autoscraper-service/scripts
+cd autoscraper-engine-api/scripts
 
 # Start service
 python service_manager.py start
@@ -202,7 +202,7 @@ The health monitoring system (`health_monitor.py`) provides:
 ### Running Health Checks
 
 ```bash
-cd autoscraper-service/scripts
+cd autoscraper-engine-api/scripts
 
 # Single health check
 python health_monitor.py check
@@ -273,7 +273,7 @@ API_KEY=your-api-key
 
 #### Service Configuration
 
-The service configuration is defined in `app/core/config.py`:
+The service configuration is defined in `backend/core/config.py`:
 
 ```python
 class Settings(BaseSettings):
@@ -369,8 +369,8 @@ netstat -tlnp | grep 8001
 
 ### Log Files
 
-- **Service Logs**: `autoscraper-service/logs/service.log`
-- **Health Monitor Logs**: `autoscraper-service/logs/health_monitor.log`
+- **Service Logs**: `autoscraper-engine-api/logs/service.log`
+- **Health Monitor Logs**: `autoscraper-engine-api/logs/health_monitor.log`
 - **Test Results**: `tests/*.json`
 - **System Logs**: `/var/log/remotehive/`
 

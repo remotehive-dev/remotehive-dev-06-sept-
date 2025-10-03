@@ -37,7 +37,7 @@ This document outlines the complete implementation plan for building a comprehen
 
 ### 1.1 Admin Schemas Creation
 
-**File: `app/schemas/admin.py`**
+**File: `backend/schemas/admin.py`**
 ```python
 from pydantic import BaseModel, EmailStr
 from typing import Optional, List, Dict, Any
@@ -79,7 +79,7 @@ class DashboardStats(BaseModel):
 
 ### 1.2 Enhanced Admin Services
 
-**File: `app/services/admin_service.py`**
+**File: `backend/services/admin_service.py`**
 ```python
 from typing import Dict, Any, List, Optional
 from supabase import Client
@@ -150,7 +150,7 @@ class AdminService:
 
 ### 1.3 Complete Admin Endpoints
 
-**File: `app/api/v1/endpoints/admin.py` (Enhanced)**
+**File: `backend/api/v1/endpoints/admin.py` (Enhanced)**
 ```python
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from typing import Dict, Any, List, Optional
@@ -398,7 +398,7 @@ async def get_admin_logs(
 
 ### 2.1 Admin Dashboard Structure
 
-**File: `remotehive-public/src/pages/admin/AdminDashboard.tsx`**
+**File: `website/src/pages/admin/AdminDashboard.tsx`**
 ```typescript
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -588,7 +588,7 @@ export default AdminDashboard;
 
 ### 2.2 User Management Interface
 
-**File: `remotehive-public/src/pages/admin/UserManagement.tsx`**
+**File: `website/src/pages/admin/UserManagement.tsx`**
 ```typescript
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -898,7 +898,7 @@ export default UserManagement;
 
 ### 3.1 Admin Authentication Context
 
-**File: `remotehive-public/src/contexts/AdminAuthContext.tsx`**
+**File: `website/src/contexts/AdminAuthContext.tsx`**
 ```typescript
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
@@ -1033,7 +1033,7 @@ export const AdminAuthProvider: React.FC<AdminAuthProviderProps> = ({ children }
 
 ### 4.1 Analytics Dashboard
 
-**File: `remotehive-public/src/pages/admin/Analytics.tsx`**
+**File: `website/src/pages/admin/Analytics.tsx`**
 ```typescript
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -1228,7 +1228,7 @@ export default Analytics;
 
 ### 5.1 System Settings Management
 
-**File: `remotehive-public/src/pages/admin/SystemSettings.tsx`**
+**File: `website/src/pages/admin/SystemSettings.tsx`**
 ```typescript
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -1482,7 +1482,7 @@ export default SystemSettings;
 
 2. **Install Frontend Dependencies**
    ```bash
-   cd remotehive-public
+   cd website
    npm install recharts lucide-react
    ```
 
@@ -1492,7 +1492,7 @@ export default SystemSettings;
    python run_dev.py
    
    # Frontend
-   cd remotehive-public
+   cd website
    npm run dev
    ```
 
@@ -1533,7 +1533,7 @@ def test_user_management():
 
 ### Frontend Testing
 ```typescript
-// File: remotehive-public/src/__tests__/AdminDashboard.test.tsx
+// File: website/src/__tests__/AdminDashboard.test.tsx
 import { render, screen, waitFor } from '@testing-library/react';
 import { AdminAuthProvider } from '@/contexts/AdminAuthContext';
 import AdminDashboard from '@/pages/admin/AdminDashboard';
@@ -1641,7 +1641,7 @@ ALTER TABLE system_settings ENABLE ROW LEVEL SECURITY;
 
 ### 3. Frontend Build
 ```bash
-cd remotehive-public
+cd website
 npm run build
 # Deploy to your hosting platform
 ```
@@ -1654,14 +1654,14 @@ docker run -p 8000:8000 remotehive-admin
 
 # Or using traditional deployment
 pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+uvicorn backend.main:app --host 0.0.0.0 --port 8000 --workers 4
 ```
 
 ## 📈 Monitoring & Maintenance
 
 ### 1. Health Checks
 ```python
-# File: app/api/v1/endpoints/health.py
+# File: backend/api/v1/endpoints/health.py
 @router.get("/health")
 async def health_check():
     return {
@@ -1675,7 +1675,7 @@ async def health_check():
 
 ### 2. Logging Configuration
 ```python
-# File: app/core/logging.py
+# File: backend/core/logging.py
 import logging
 from loguru import logger
 

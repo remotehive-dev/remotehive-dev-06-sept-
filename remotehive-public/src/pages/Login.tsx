@@ -16,7 +16,7 @@ interface LoginForm {
 const Login: React.FC = () => {
   const navigate = useNavigate()
   const location = useLocation()
-  const { signIn, loading } = useAuth()
+  const { signIn } = useAuth()
   
   const [formData, setFormData] = useState<LoginForm>({
     email: '',
@@ -35,12 +35,18 @@ const Login: React.FC = () => {
     if (error) setError('') // Clear error when user starts typing
   }
 
-  const getRedirectPath = (userRole: string) => {
+  const getRedirectPath = (userRole: string, redirectUrl?: string) => {
+    // Use redirect URL from enhanced auth if available
+    if (redirectUrl) {
+      return redirectUrl
+    }
+    
+    // Fallback to role-based redirection
     switch (userRole) {
       case 'employer':
-        return '/employer/dashboard'
+        return '/dashboard/employer'
       case 'job_seeker':
-        return '/jobseeker/dashboard'
+        return '/dashboard/jobseeker'
       case 'admin':
       case 'super_admin':
         return '/admin/dashboard'
@@ -55,12 +61,21 @@ const Login: React.FC = () => {
     setError('')
 
     try {
-      const loggedInUser = await signIn(formData)
-      // Use the returned user data for immediate redirection
-      const redirectPath = from || getRedirectPath(loggedInUser.role)
+      const response = await signIn(formData.email, formData.password)
+      
+      // Check for stored redirect path from protected route
+      const storedRedirect = localStorage.getItem('redirectAfterLogin')
+      if (storedRedirect) {
+        localStorage.removeItem('redirectAfterLogin')
+        navigate(storedRedirect, { replace: true })
+        return
+      }
+      
+      // Use role-based redirection
+      const redirectPath = from || getRedirectPath(response.role, response.redirect_url)
       navigate(redirectPath, { replace: true })
-    } catch (err: any) {
-      setError(err.message || 'Failed to sign in. Please check your credentials.')
+    } catch (error: any) {
+      setError(error.message || 'Login failed')
     } finally {
       setIsLoading(false)
     }
@@ -190,22 +205,17 @@ const Login: React.FC = () => {
           {/* Social Sign-In Options */}
           <div className="space-y-3">
             <GoogleSignInButton
-              onSuccess={async (data) => {
-                try {
-                  const loggedInUser = await signInWithGoogle(data)
-                  const redirectPath = from || getRedirectPath(loggedInUser.role)
-                  navigate(redirectPath, { replace: true })
-                } catch (error) {
-                  console.error('Google sign-in failed:', error)
-                }
+              role="job_seeker"
+              onSuccess={() => {
+                // Success handling is done in GoogleCallback component
               }}
               onError={(error) => setError(error)}
             />
             <LinkedInSignInButton
               onSuccess={async (data) => {
                 try {
-                  const loggedInUser = await signInWithLinkedIn(data)
-                  const redirectPath = from || getRedirectPath(loggedInUser.role)
+                  const response = await signInWithLinkedIn(data)
+                  const redirectPath = from || getRedirectPath(response.role, response.redirect_url)
                   navigate(redirectPath, { replace: true })
                 } catch (error) {
                   console.error('LinkedIn sign-in failed:', error)
@@ -216,8 +226,8 @@ const Login: React.FC = () => {
             <SSOSignInButton
               onSuccess={async (data) => {
                 try {
-                  const loggedInUser = await signInWithSSO(data)
-                  const redirectPath = from || getRedirectPath(loggedInUser.role)
+                  const response = await signInWithSSO(data)
+                  const redirectPath = from || getRedirectPath(response.role, response.redirect_url)
                   navigate(redirectPath, { replace: true })
                 } catch (error) {
                   console.error('SSO sign-in failed:', error)

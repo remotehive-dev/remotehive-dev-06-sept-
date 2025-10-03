@@ -188,7 +188,7 @@ npm install
 cp .env.example .env.local
 ```
 
-Edit `remotehive-admin/.env.local`:
+Edit `admin-panel/.env.local`:
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:8000
 NEXT_PUBLIC_SUPABASE_URL=https://nwltjjqhdpezreaikxfj.supabase.co
@@ -204,7 +204,7 @@ npm install
 cp .env.example .env.local
 ```
 
-Edit `remotehive-public/.env.local`:
+Edit `website/.env.local`:
 ```env
 VITE_API_URL=http://localhost:8000
 VITE_SUPABASE_URL=https://nwltjjqhdpezreaikxfj.supabase.co
@@ -400,8 +400,8 @@ git config gc.auto 256
 ### 2. File Permissions
 ```bash
 chmod 600 ~/RemoteHive/.env
-chmod 600 ~/RemoteHive/remotehive-admin/.env.local
-chmod 600 ~/RemoteHive/remotehive-public/.env.local
+chmod 600 ~/RemoteHive/admin-panel/.env.local
+chmod 600 ~/RemoteHive/website/.env.local
 ```
 
 ## Final Checklist

@@ -31,9 +31,12 @@ const Home: React.FC = () => {
   const loadFeaturedJobs = async () => {
     try {
       const jobs = await jobsApi.getFeaturedJobs(6)
-      setFeaturedJobs(jobs)
+      // Ensure jobs is always an array
+      setFeaturedJobs(Array.isArray(jobs) ? jobs : [])
     } catch (error) {
       console.error('Error loading featured jobs:', error)
+      // Set empty array on error to prevent map errors
+      setFeaturedJobs([])
     } finally {
       setLoading(false)
     }
@@ -45,10 +48,14 @@ const Home: React.FC = () => {
         companiesApi.getFeaturedCompanies(4),
         companiesApi.getTrendingCompanies(4)
       ])
-      setFeaturedCompanies(featured)
-      setTrendingCompanies(trending)
+      // Ensure companies are always arrays
+      setFeaturedCompanies(Array.isArray(featured) ? featured : [])
+      setTrendingCompanies(Array.isArray(trending) ? trending : [])
     } catch (error) {
       console.error('Error loading companies:', error)
+      // Set empty arrays on error to prevent map errors
+      setFeaturedCompanies([])
+      setTrendingCompanies([])
     } finally {
       setCompaniesLoading(false)
     }
@@ -61,11 +68,16 @@ const Home: React.FC = () => {
         cmsApi.getReviews(true), // Get featured reviews
         cmsApi.getSEOSettings()
       ])
-      setCmsPages(pages)
-      setReviews(reviewsData)
-      setSeoSettings(seoData)
+      // Ensure data is properly set with fallbacks
+      setCmsPages(Array.isArray(pages) ? pages : [])
+      setReviews(Array.isArray(reviewsData) ? reviewsData : [])
+      setSeoSettings(seoData || {})
     } catch (error) {
       console.error('Error loading CMS data:', error)
+      // Set empty arrays/objects on error to prevent rendering errors
+      setCmsPages([])
+      setReviews([])
+      setSeoSettings({})
     } finally {
       setCmsLoading(false)
     }

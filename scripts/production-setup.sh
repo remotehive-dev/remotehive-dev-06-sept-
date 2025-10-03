@@ -250,17 +250,17 @@ build_and_push_images() {
     
     # Build Autoscraper Service
     print_status "Building Autoscraper Service image..."
-    docker build -t "${REGISTRY_URL}/remotehive-autoscraper:${TAG}" -f autoscraper-service/Dockerfile ./autoscraper-service
+    docker build -t "${REGISTRY_URL}/remotehive-autoscraper:${TAG}" -f autoscraper-engine-api/Dockerfile ./autoscraper-service
     docker push "${REGISTRY_URL}/remotehive-autoscraper:${TAG}"
     
     # Build Admin Panel
     print_status "Building Admin Panel image..."
-    docker build -t "${REGISTRY_URL}/remotehive-admin:${TAG}" -f remotehive-admin/Dockerfile ./remotehive-admin
+    docker build -t "${REGISTRY_URL}/remotehive-admin:${TAG}" -f admin-panel/Dockerfile ./remotehive-admin
     docker push "${REGISTRY_URL}/remotehive-admin:${TAG}"
     
     # Build Public Website
     print_status "Building Public Website image..."
-    docker build -t "${REGISTRY_URL}/remotehive-public:${TAG}" -f remotehive-public/Dockerfile ./remotehive-public
+    docker build -t "${REGISTRY_URL}/remotehive-public:${TAG}" -f website/Dockerfile ./remotehive-public
     docker push "${REGISTRY_URL}/remotehive-public:${TAG}"
     
     print_success "All images built and pushed successfully"

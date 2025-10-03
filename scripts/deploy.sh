@@ -253,13 +253,13 @@ build_images() {
                 docker build -t "$full_image_name" -f Dockerfile .
                 ;;
             "autoscraper")
-                docker build -t "$full_image_name" -f autoscraper-service/Dockerfile ./autoscraper-service
+                docker build -t "$full_image_name" -f autoscraper-engine-api/Dockerfile ./autoscraper-service
                 ;;
             "admin")
-                docker build -t "$full_image_name" -f remotehive-admin/Dockerfile ./remotehive-admin
+                docker build -t "$full_image_name" -f admin-panel/Dockerfile ./remotehive-admin
                 ;;
             "public")
-                docker build -t "$full_image_name" -f remotehive-public/Dockerfile ./remotehive-public
+                docker build -t "$full_image_name" -f website/Dockerfile ./remotehive-public
                 ;;
             "celery")
                 docker build -t "$full_image_name" -f Dockerfile.celery .

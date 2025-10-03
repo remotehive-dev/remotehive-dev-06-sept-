@@ -120,10 +120,10 @@ RemoteHive is a microservices-based job board platform consisting of:
 1. **Code Changes**
    ```bash
    # Backend changes (auto-reload enabled)
-   # Edit files in app/ or autoscraper-service/
+   # Edit files in backend/ or autoscraper-engine-api/
    
    # Frontend changes (hot reload enabled)
-   # Edit files in remotehive-admin/ or remotehive-public/
+   # Edit files in admin-panel/ or website/
    ```
 
 2. **Running Tests**

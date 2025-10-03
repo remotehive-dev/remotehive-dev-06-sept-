@@ -15,7 +15,7 @@ A comprehensive web scraping service integrated into the RemoteHive application 
 
 1. **Install Dependencies**:
    ```bash
-   cd autoscraper-service
+   cd autoscraper-engine-api
    pip install -r requirements.txt
    ```
 
@@ -63,11 +63,11 @@ AutoScraper Service (Port 8001)
 
 ### Core Components
 
-- **FastAPI App** (`app/main.py`) - Main application entry point
-- **API Routes** (`app/api/`) - REST API endpoints
-- **Health Checks** (`app/api/health.py`) - Service health monitoring
-- **Metrics** (`app/api/metrics.py`) - Prometheus metrics
-- **Configuration** (`app/core/config.py`) - Service configuration
+- **FastAPI App** (`backend/main.py`) - Main application entry point
+- **API Routes** (`backend/api/`) - REST API endpoints
+- **Health Checks** (`backend/api/health.py`) - Service health monitoring
+- **Metrics** (`backend/api/metrics.py`) - Prometheus metrics
+- **Configuration** (`backend/core/config.py`) - Service configuration
 
 ## API Endpoints
 
@@ -165,7 +165,7 @@ HEALTH_CHECK_INTERVAL=30
 
 ### Service Settings
 
-Edit `app/core/config.py` for advanced configuration:
+Edit `backend/core/config.py` for advanced configuration:
 
 ```python
 class Settings(BaseSettings):
@@ -203,21 +203,21 @@ class Settings(BaseSettings):
 pip install -r requirements-dev.txt
 
 # Start in development mode
-uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+uvicorn backend.main:app --host 0.0.0.0 --port 8001 --reload
 
 # Run tests
 pytest tests/
 
 # Code formatting
-black app/
-flake8 app/
+black backend/
+flake8 backend/
 ```
 
 ### Project Structure
 
 ```
-autoscraper-service/
-├── app/
+autoscraper-engine-api/
+├── backend/
 │   ├── __init__.py
 │   ├── main.py              # FastAPI application
 │   ├── api/
@@ -360,7 +360,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
-COPY app/ ./app/
+COPY backend/ ./backend/
 COPY scripts/ ./scripts/
 
 EXPOSE 8001
@@ -424,7 +424,7 @@ redis-cli info stats
 export DEBUG=true
 
 # Start with verbose logging
-uvicorn app.main:app --host 0.0.0.0 --port 8001 --log-level debug
+uvicorn backend.main:app --host 0.0.0.0 --port 8001 --log-level debug
 ```
 
 ## Security
@@ -456,7 +456,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8001 --log-level debug
 1. **Setup Development Environment**:
    ```bash
    git clone <repository>
-   cd autoscraper-service
+   cd autoscraper-engine-api
    pip install -r requirements-dev.txt
    ```
 
@@ -471,8 +471,8 @@ uvicorn app.main:app --host 0.0.0.0 --port 8001 --log-level debug
    python -m pytest tests/ -v
    
    # Check code style
-   black app/ --check
-   flake8 app/
+   black backend/ --check
+   flake8 backend/
    ```
 
 4. **Submit Changes**:

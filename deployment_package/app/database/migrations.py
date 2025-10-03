@@ -19,14 +19,14 @@ class MigrationManager:
         
         # Setup Alembic configuration
         self.alembic_cfg = Config()
-        self.alembic_cfg.set_main_option("script_location", "app/database/alembic")
+        self.alembic_cfg.set_main_option("script_location", "backend/database/alembic")
         self.alembic_cfg.set_main_option("sqlalchemy.url", str(self.engine.url))
     
     def init_alembic(self):
         """Initialize Alembic for the project."""
         try:
             # Create alembic directory if it doesn't exist
-            alembic_dir = "app/database/alembic"
+            alembic_dir = "backend/database/alembic"
             if not os.path.exists(alembic_dir):
                 command.init(self.alembic_cfg, alembic_dir)
                 logger.info("Alembic initialized successfully")

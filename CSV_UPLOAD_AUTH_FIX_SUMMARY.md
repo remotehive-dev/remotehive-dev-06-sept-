@@ -21,7 +21,7 @@ The authentication flow works as follows:
 ## Solution Implemented
 
 ### Fixed Authentication Middleware
-Updated `/autoscraper-service/app/middleware/auth.py` to handle both singular and plural role fields:
+Updated `/autoscraper-engine-api/backend/middleware/auth.py` to handle both singular and plural role fields:
 
 ```python
 # Handle both 'role' (singular) and 'roles' (plural) fields
@@ -79,7 +79,7 @@ Authentication Flow: ✅
 
 ## Files Modified
 
-1. **`/autoscraper-service/app/middleware/auth.py`**
+1. **`/autoscraper-engine-api/backend/middleware/auth.py`**
    - Fixed role field handling in authentication middleware
    - Added support for both `role` and `roles` fields
 
@@ -106,8 +106,8 @@ Authentication Flow: ✅
 ## Deployment Notes
 
 ### Service Startup
-1. **Main Service**: `uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload`
-2. **AutoScraper Service**: `uvicorn app.main:app --host 0.0.0.0 --port 8002 --reload`
+1. **Main Service**: `uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload`
+2. **AutoScraper Service**: `uvicorn backend.main:app --host 0.0.0.0 --port 8002 --reload`
 
 ### Environment Variables
 Ensure consistent JWT configuration across services:

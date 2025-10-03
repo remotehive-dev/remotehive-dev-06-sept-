@@ -10,6 +10,8 @@ import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
 import LoadingSpinner from './components/LoadingSpinner'
+import ProtectedRoute from './components/ProtectedRoute'
+import RoleBasedRedirect from './components/RoleBasedRedirect'
 
 // Pages
 import Home from './pages/Home'
@@ -37,6 +39,8 @@ import AdminUserManagement from './pages/AdminUserManagement'
 import AdminSettings from './pages/AdminSettings'
 import AdminAnalytics from './pages/AdminAnalytics'
 import EmailVerification from './pages/EmailVerification'
+import GoogleCallback from './pages/GoogleCallback'
+import LinkedInCallback from './pages/LinkedInCallback'
 
 
 
@@ -68,27 +72,57 @@ function App() {
 function AppContent() {
   const { user, loading } = useAuth()
 
-  // Protected route component
-  const ProtectedRoute: React.FC<{ children: React.ReactNode, requiredRole?: string }> = ({ 
+  // Enhanced Protected route component with role-based navigation guards
+  const ProtectedRoute: React.FC<{ 
+    children: React.ReactNode, 
+    requiredRole?: string,
+    allowedRoles?: string[]
+  }> = ({ 
     children, 
-    requiredRole 
+    requiredRole,
+    allowedRoles 
   }) => {
     if (loading) {
       return <LoadingSpinner />
     }
 
     if (!user) {
+      // Store the attempted URL for redirect after login
+      const currentPath = window.location.pathname
+      localStorage.setItem('redirectAfterLogin', currentPath)
       return <Navigate to="/login" replace />
     }
 
-    if (requiredRole) {
-      // Allow both admin and super_admin for admin routes
-      if (requiredRole === 'admin' && !['admin', 'super_admin'].includes(user.role)) {
-        return <Navigate to="/" replace />
+    // Check if user has required role or is in allowed roles
+    if (requiredRole || allowedRoles) {
+      let hasAccess = false
+
+      if (requiredRole) {
+        // Allow both admin and super_admin for admin routes
+        if (requiredRole === 'admin' && ['admin', 'super_admin'].includes(user.role)) {
+          hasAccess = true
+        }
+        // For other roles, exact match required
+        else if (user.role === requiredRole) {
+          hasAccess = true
+        }
       }
-      // For other roles, exact match required
-      else if (requiredRole !== 'admin' && user.role !== requiredRole) {
-        return <Navigate to="/" replace />
+
+      if (allowedRoles && allowedRoles.includes(user.role)) {
+        hasAccess = true
+      }
+
+      if (!hasAccess) {
+        // Redirect to appropriate dashboard based on user role
+        if (user.role === 'admin' || user.role === 'super_admin') {
+          return <Navigate to="/admin/dashboard" replace />
+        } else if (user.role === 'employer') {
+          return <Navigate to="/dashboard/employer" replace />
+        } else if (user.role === 'job_seeker') {
+          return <Navigate to="/dashboard/jobseeker" replace />
+        } else {
+          return <Navigate to="/" replace />
+        }
       }
     }
 
@@ -108,9 +142,9 @@ function AppContent() {
     if (user.role === 'admin' || user.role === 'super_admin') {
       return <Navigate to="/admin/dashboard" replace />
     } else if (user.role === 'employer') {
-      return <Navigate to="/employer/dashboard" replace />
+      return <Navigate to="/dashboard/employer" replace />
     } else if (user.role === 'job_seeker') {
-      return <Navigate to="/jobseeker/dashboard" replace />
+      return <Navigate to="/dashboard/jobseeker" replace />
     } else {
       return <Navigate to="/" replace />
     }
@@ -153,18 +187,33 @@ function AppContent() {
                   element={user ? <RoleBasedRedirect /> : <Register />} 
                 />
                 <Route path="/verify-email" element={<EmailVerification />} />
+                <Route path="/auth/google/callback" element={<GoogleCallback />} />
+                <Route path="/auth/linkedin/callback" element={<LinkedInCallback />} />
                 {/* Redirect old Clerk routes */}
                 <Route path="/clerk-login" element={<Navigate to="/login" replace />} />
                 <Route path="/clerk-register" element={<Navigate to="/register" replace />} />
                 
                 {/* Protected Routes */}
                 <Route 
-                  path="/employer/dashboard" 
+                  path="/dashboard/employer" 
                   element={
                     <ProtectedRoute requiredRole="employer">
                       <EmployerDashboard />
                     </ProtectedRoute>
                   } 
+                />
+                <Route 
+                  path="/dashboard/jobseeker" 
+                  element={
+                    <ProtectedRoute requiredRole="job_seeker">
+                      <JobSeekerDashboard />
+                    </ProtectedRoute>
+                  } 
+                />
+                {/* Legacy employer routes - redirect to new paths */}
+                <Route 
+                  path="/employer/dashboard" 
+                  element={<Navigate to="/dashboard/employer" replace />}
                 />
                 <Route 
                   path="/employer/my-jobs" 
@@ -214,13 +263,10 @@ function AppContent() {
                     </ProtectedRoute>
                   } 
                 />
+                {/* Legacy jobseeker routes - redirect to new paths */}
                 <Route 
                   path="/jobseeker/dashboard" 
-                  element={
-                    <ProtectedRoute requiredRole="job_seeker">
-                      <JobSeekerDashboard />
-                    </ProtectedRoute>
-                  } 
+                  element={<Navigate to="/dashboard/jobseeker" replace />}
                 />
                 <Route 
                   path="/notifications" 

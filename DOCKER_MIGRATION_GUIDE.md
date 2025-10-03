@@ -77,9 +77,9 @@ RemoteHive/
 ├── docker-startup.py              # New Docker-first startup script
 ├── docker-compose.dev.yml         # Development overrides
 ├── Dockerfile                     # Backend container
-├── remotehive-admin/Dockerfile    # Admin panel container
-├── remotehive-public/Dockerfile   # Public website container
-├── autoscraper-service/Dockerfile # Autoscraper container
+├── admin-panel/Dockerfile    # Admin panel container
+├── website/Dockerfile   # Public website container
+├── autoscraper-engine-api/Dockerfile # Autoscraper container
 ├── k8s/                          # Kubernetes manifests
 │   ├── namespace.yaml
 │   ├── configmaps-secrets.yaml
@@ -125,12 +125,12 @@ RemoteHive/
 
 2. **Update API Configurations**
    ```typescript
-   // remotehive-admin/src/lib/api.ts
+   // admin-panel/src/lib/api.ts
    const API_BASE_URL = process.env.NODE_ENV === 'production' 
      ? 'http://backend:8000'  // Internal Docker network
      : 'http://localhost:8000'; // Development
    
-   // remotehive-public/src/lib/api.ts
+   // website/src/lib/api.ts
    const API_BASE_URL = process.env.NODE_ENV === 'production'
      ? 'http://backend:8000'  // Internal Docker network  
      : 'http://localhost:8000'; // Development

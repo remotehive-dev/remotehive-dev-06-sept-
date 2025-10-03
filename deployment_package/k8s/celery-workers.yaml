@@ -127,9 +127,9 @@ spec:
               key: SMTP_PORT
         volumeMounts:
         - name: logs
-          mountPath: /app/logs
+          mountPath: /backend/logs
         - name: uploads
-          mountPath: /app/uploads
+          mountPath: /backend/uploads
         resources:
           requests:
             memory: "512Mi"
@@ -226,7 +226,7 @@ spec:
         - app.tasks.celery_app
         - beat
         - --loglevel=info
-        - --schedule=/app/celerybeat-schedule
+        - --schedule=/backend/celerybeat-schedule
         env:
         - name: ENVIRONMENT
           valueFrom:
@@ -280,9 +280,9 @@ spec:
               key: CELERY_TIMEZONE
         volumeMounts:
         - name: logs
-          mountPath: /app/logs
+          mountPath: /backend/logs
         - name: celery-schedule
-          mountPath: /app/celerybeat-schedule
+          mountPath: /backend/celerybeat-schedule
         resources:
           requests:
             memory: "256Mi"

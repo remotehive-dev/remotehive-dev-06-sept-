@@ -1189,7 +1189,7 @@ setup_application_monitoring() {
     log "INFO" "Setting up application monitoring integration..."
     
     # Create monitoring middleware for FastAPI
-    local backend_monitoring_dir="$PROJECT_ROOT/app/middleware"
+    local backend_monitoring_dir="$PROJECT_ROOT/backend/middleware"
     mkdir -p "$backend_monitoring_dir"
     
     cat > "$backend_monitoring_dir/monitoring.py" << 'EOF'
@@ -1303,7 +1303,7 @@ def get_metrics():
 EOF
 
     # Create health check endpoint
-    cat > "$PROJECT_ROOT/app/api/endpoints/health.py" << 'EOF'
+    cat > "$PROJECT_ROOT/backend/api/endpoints/health.py" << 'EOF'
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database.database import get_db

@@ -61,7 +61,7 @@ A comprehensive job board platform with three integrated applications: Backend A
 
 ```
 RemoteHive/
-├── app/                          # Backend API (FastAPI)
+├── backend/                          # Backend API (FastAPI)
 │   ├── api/
 │   │   └── v1/
 │   │       ├── endpoints/
@@ -82,7 +82,7 @@ RemoteHive/
 │   ├── schemas/
 │   ├── services/
 │   └── tasks/
-├── remotehive-public/            # Public Website (React + Vite)
+├── website/            # Public Website (React + Vite)
 │   ├── src/
 │   │   ├── components/
 │   │   ├── pages/
@@ -96,9 +96,9 @@ RemoteHive/
 │   ├── vite.config.ts
 │   ├── tailwind.config.js
 │   └── .env
-├── remotehive-admin/             # Admin Panel (Next.js)
+├── admin-panel/             # Admin Panel (Next.js)
 │   ├── src/
-│   │   ├── app/
+│   │   ├── backend/
 │   │   ├── components/
 │   │   ├── contexts/
 │   │   └── lib/
@@ -161,10 +161,10 @@ SECRET_KEY=your-super-secret-jwt-key-here
 REDIS_URL=redis://localhost:6379
 ```
 
-#### Public Website (remotehive-public/.env)
+#### Public Website (website/.env)
 
 ```bash
-cd remotehive-public
+cd website
 cp .env.example .env
 ```
 
@@ -176,10 +176,10 @@ VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 VITE_API_URL=http://localhost:8000
 ```
 
-#### Admin Panel (remotehive-admin/.env.local)
+#### Admin Panel (admin-panel/.env.local)
 
 ```bash
-cd remotehive-admin
+cd admin-panel
 cp .env.local.example .env.local
 ```
 
@@ -233,13 +233,13 @@ chmod +x startup_scripts/*.sh
 pip install -r requirements.txt
 
 # Start the API server
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 **Public Website:**
 
 ```bash
-cd remotehive-public
+cd website
 npm install
 npm run dev
 ```
@@ -247,7 +247,7 @@ npm run dev
 **Admin Panel:**
 
 ```bash
-cd remotehive-admin
+cd admin-panel
 npm install
 npm run dev
 ```
@@ -305,7 +305,7 @@ This credential provides access to:
 
 ```
 RemoteHive/
-├── app/                     # Backend API (FastAPI)
+├── backend/                     # Backend API (FastAPI)
 │   ├── main.py             # Application entry point
 │   ├── api/v1/             # API version 1
 │   │   ├── endpoints/      # API endpoint handlers
@@ -324,13 +324,13 @@ RemoteHive/
 │   ├── schemas/            # Pydantic schemas
 │   ├── services/           # Business logic
 │   └── utils/              # Utility functions
-├── remotehive-public/       # Public Website (React + Vite)
+├── website/       # Public Website (React + Vite)
 │   ├── src/                # Source code
 │   ├── public/             # Static assets
 │   ├── package.json        # Dependencies
 │   └── vite.config.ts      # Vite configuration
-├── remotehive-admin/        # Admin Panel (Next.js)
-│   ├── app/                # Next.js app directory
+├── admin-panel/        # Admin Panel (Next.js)
+│   ├── backend/                # Next.js app directory
 │   ├── components/         # React components
 │   ├── lib/                # Utility libraries
 │   ├── package.json        # Dependencies
@@ -579,7 +579,7 @@ docker-compose -f docker-compose.prod.yml up -d
 
 - **Issue**: Code changes not reflected after modification
 - **Solution**: Restart server with `--reload` flag
-- **Command**: `uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload`
+- **Command**: `uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload`
 
 **4. Debug Logs Not Appearing**
 

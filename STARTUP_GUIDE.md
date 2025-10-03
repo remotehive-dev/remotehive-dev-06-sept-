@@ -62,12 +62,12 @@ pip install -r requirements.txt
 pip install -r startup_requirements.txt
 
 # Install Node.js dependencies for admin panel
-cd remotehive-admin
+cd admin-panel
 npm install
 cd ..
 
 # Install Node.js dependencies for website
-cd remotehive-public
+cd website
 npm install
 cd ..
 ```
@@ -203,7 +203,7 @@ pip install -r requirements.txt
 pip install -r startup_requirements.txt
 
 # Install missing Node.js packages
-cd remotehive-admin && npm install
+cd admin-panel && npm install
 cd ../remotehive-public && npm install
 ```
 
@@ -233,7 +233,7 @@ python comprehensive_startup.py --verbose
 tail -f logs/startup_*.log
 
 # Test individual services
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
 ```
 
 ## 🔄 Service Management

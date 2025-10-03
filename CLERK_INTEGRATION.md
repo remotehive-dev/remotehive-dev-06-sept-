@@ -21,7 +21,7 @@ CLERK_API_VERSION=v1
 Run the database migration to add Clerk support:
 
 ```bash
-cd app/database
+cd backend/database
 alembic upgrade head
 ```
 
